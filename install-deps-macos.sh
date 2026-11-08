@@ -1140,7 +1140,7 @@ print_summary() {
 7. Reconfigure hotkeys anytime: ./setup-macos-hotkeys.sh
    • ./setup-macos-hotkeys.sh --wezterm replaces an existing ~/.wezterm.lua
 
-8. A tour of Marmota: docs/tutorial.html; ? in Marmota lists every key
+8. A tour of Marmota: https://junjieliang672.github.io/marmota/tutorial.html ; ? in Marmota lists every key
 
 Everything is ready! Launch WezTerm and run 'y'.
 

@@ -215,7 +215,7 @@ sudo mv ./bin/y /usr/local/bin/y
 ## Documentation
 
 - [README.md](./README.md): what Marmota does, its keys and its settings
-- [docs/tutorial.html](./docs/tutorial.html): a tour for your first session (open it in a browser)
+- [Getting started with Marmota](https://junjieliang672.github.io/marmota/tutorial.html): a tour for your first session
 - `?` in Marmota lists every key
 
 ## Support

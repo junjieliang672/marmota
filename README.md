@@ -89,8 +89,8 @@ PATH or the ChatGPT app).
 
 ## Documentation
 
-New to it? [docs/tutorial.html](./docs/tutorial.html) is a short tour: open it in a browser. In
-Marmota, `?` lists every key.
+New to it? [Getting started with Marmota](https://junjieliang672.github.io/marmota/tutorial.html) is a short tour (its source is
+[docs/tutorial.html](./docs/tutorial.html)). In Marmota, `?` lists every key.
 
 ## License and credits
 

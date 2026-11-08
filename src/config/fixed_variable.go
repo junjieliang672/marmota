@@ -57,6 +57,8 @@ func MoveOldDirs() []string {
 const (
 	// RepoURL is where this program lives: its README, issues and source.
 	RepoURL = "https://github.com/junjieliang672/marmota"
+	// TutorialURL is the tour for new users (docs/tutorial.html, on GitHub Pages).
+	TutorialURL = "https://junjieliang672.github.io/marmota/tutorial.html"
 
 	CurrentVersion = "v1.4.0"
 	// Allowing pre-releases with non production version

@@ -500,8 +500,8 @@ func (m *model) introduceModalRender() string {
 	vimUserWarn := common.ProcessErrorStyle.Render("  ** If you use Vim keys **, copy vimHotkeys.toml from the repository's\n" +
 		"  src/superfile_config over your hotkeys.toml (y path-list prints where it is)")
 	subOne := common.SidebarTitleStyle.Render("  (1)") +
-		common.ModalStyle.Render(" If this is your first time, the tutorial in the repository shows\n"+
-			"      what is where (docs/tutorial.html): "+variable.RepoURL)
+		common.ModalStyle.Render(" If this is your first time, a short tour shows what is where:\n"+
+			"      "+variable.TutorialURL)
 	subTwo := common.SidebarTitleStyle.Render("  (2)") +
 		common.ModalStyle.Render(" If you forget the relevant keys during use,\n"+
 			"      you can press \"?\" (shift+/) at any time to query the keys!")
