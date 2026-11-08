@@ -106,6 +106,40 @@ a:focus-visible, kbd:focus-visible { outline: 2px solid var(--co); outline-offse
   .legend, .states { grid-template-columns: minmax(0, 1fr); }
   .lede { font-size: 17px; }
 }
+
+/* Workflows: a card per way of working, each with a thumbnail of its panes */
+.flows { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.flow-card { display: flex; flex-direction: column; gap: 8px; text-decoration: none; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px; min-width: 0; }
+.flow-card:hover { border-color: var(--co); }
+.flow-card:focus-visible { outline: 2px solid var(--co); outline-offset: 2px; }
+.flow-card strong { font-size: 15px; line-height: 1.3; }
+.flow-card span { font-size: 13px; color: var(--muted); line-height: 1.4; }
+.thumb { background: var(--term-bg); border-radius: 8px; height: 76px; padding: 6px; display: flex; gap: 4px; position: relative; font-family: var(--font-mono); font-size: 9px; color: var(--term-dim); }
+.thumb.big { height: 120px; max-width: 360px; font-size: 11px; }
+.pane { border: 1px solid var(--term-line); border-radius: 4px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; padding: 3px 5px; min-width: 0; overflow: hidden; }
+.pane.hi { border-color: var(--term-hi); color: var(--term-fg); }
+.pane .dock { border-top: 1px solid var(--term-line); padding-top: 2px; }
+.pane .row { white-space: nowrap; overflow: hidden; }
+.pane .add { color: #9ECE6A; }
+.pane .del { color: #F7768E; }
+.thumb .cc { color: var(--term-cc); }
+.thumb .co { color: var(--term-co); }
+.thumb .warn { color: var(--term-warn); }
+.stack { position: absolute; right: 8px; bottom: 6px; display: flex; gap: 2px; }
+.stack i { display: block; width: 14px; height: 10px; border: 1px solid var(--term-line); border-radius: 2px; background: var(--term-panel); }
+.toast { position: absolute; right: 8px; top: 8px; border: 1px solid var(--term-warn); color: var(--term-warn); border-radius: 4px; padding: 0 4px; background: var(--term-panel); }
+.flow { display: flex; flex-direction: column; gap: 22px; scroll-margin-top: 16px; }
+.flow-intro { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
+.flow-intro > div { flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.flow-intro .thumb.big { flex: 0 1 300px; }
+.eyebrow.small { font-size: 12px; }
+.case { display: flex; flex-direction: column; gap: 8px; }
+ol.steps { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 6px; max-width: 70ch; }
+ol.steps li::marker { color: var(--accent); font-family: var(--font-mono); font-size: 0.9em; }
+.cases { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 28px; }
+@media (max-width: 640px) {
+  .cases { grid-template-columns: minmax(0, 1fr); }
+}
 </style>
 
 <div class="page">
@@ -205,91 +239,251 @@ y</pre>
   </div>
 </section>
 
-<section aria-labelledby="s3">
-  <div class="step-head"><span class="step-num">3</span><h2 id="s3">Move through your files</h2></div>
-  <div class="keys-wrap">
-    <table class="keys">
-      <thead><tr><th scope="col">Keys</th><th scope="col">What they do</th></tr></thead>
-      <tbody>
-        <tr><td><kbd>j</kbd> <kbd>k</kbd> or arrows</td><td>Down and up the list; <kbd>g</kbd> and <kbd>G</kbd> jump to the top and bottom</td></tr>
-        <tr><td><kbd>l</kbd> / <kbd>enter</kbd> · <kbd>h</kbd> / <kbd>backspace</kbd></td><td>Open the folder or file · go to the parent folder</td></tr>
-        <tr><td><kbd>z</kbd> · <kbd>s</kbd></td><td>Jump to a folder you use often (zoxide) · the popup with pinned folders, sessions and recent files</td></tr>
-        <tr><td><kbd>/</kbd> · <kbd>f</kbd></td><td>Filter this folder · search inside it</td></tr>
-        <tr><td><kbd>space</kbd></td><td>Select the item under the cursor (<kbd>A</kbd> selects all)</td></tr>
-        <tr><td><kbd>ctrl+c</kbd> <kbd>ctrl+x</kbd> <kbd>v</kbd></td><td>Copy, cut, paste</td></tr>
-        <tr><td><kbd>a</kbd> · <kbd>r</kbd> · <kbd>ctrl+d</kbd></td><td>Create · rename · move to the Trash</td></tr>
-        <tr><td><kbd>e</kbd> · <kbd>p</kbd></td><td>Open in your editor · copy the path</td></tr>
-        <tr><td><kbd>?</kbd> · <kbd>q</kbd></td><td>Every key, with what it does · quit</td></tr>
-      </tbody>
-    </table>
+<section aria-labelledby="pick">
+  <div class="step-head"><span class="step-num">3</span><h2 id="pick">Pick how you want to work</h2></div>
+  <p>Marmota works as a plain file manager, or with coding agents beside it. Start with the way you work today; each one builds on the one before.</p>
+  <nav class="flows" aria-label="Workflows">
+    <a class="flow-card" href="#browse">
+      <div class="thumb" aria-hidden="true"><div class="pane hi"><span class="row">▌ src/</span><span class="row">  README.md</span><span class="dock">!  ·  K</span></div></div>
+      <strong>Just browse files</strong><span>No agents: find, open, move and preview files.</span>
+    </a>
+    <a class="flow-card" href="#one-agent">
+      <div class="thumb" aria-hidden="true"><div class="pane"><span class="row">▌ src/</span><span class="row">  login.go <span class="cc">✳</span></span><span class="dock">K</span></div><div class="pane hi"><span class="row"><span class="cc">✳</span> claude</span><span class="row">&gt; fix the…</span><span class="row"> </span></div></div>
+      <strong>One coding agent beside you</strong><span>Claude Code or Codex next to your files.</span>
+    </a>
+    <a class="flow-card" href="#many">
+      <div class="thumb" aria-hidden="true"><div class="pane"><span class="row">▌ src/</span><span class="row"><span class="cc">cc</span> <span class="co">co</span> <span class="cc">cc</span></span><span class="dock">! 3</span></div><div class="pane hi"><span class="row"><span class="cc">✳</span> claude</span><span class="row">&gt; …</span><span class="row"> </span></div><div class="stack"><i></i><i></i><i></i></div></div>
+      <strong>Several sessions, one beside you</strong><span>Hand off tasks in the background and keep watch.</span>
+    </a>
+    <a class="flow-card" href="#review">
+      <div class="thumb" aria-hidden="true"><div class="pane"><span class="row">W login.go</span><span class="row">  auth.go</span><span class="dock">] [</span></div><div class="pane hi"><span class="row del">- old line</span><span class="row add">+ new line</span><span class="row add">+ new line</span></div></div>
+      <strong>Review what a session changed</strong><span>Its files and each one's diff.</span>
+    </a>
+    <a class="flow-card" href="#away">
+      <div class="thumb" aria-hidden="true"><div class="pane"><span class="row">▌ docs/</span><span class="row"> </span><span class="dock"><span class="warn">⚑ 1</span> · ● 2</span></div><span class="toast">⚑ asks</span></div>
+      <strong>Leave them running</strong><span>Come back when a session needs you.</span>
+    </a>
+  </nav>
+</section>
+
+<section class="flow" id="browse" aria-labelledby="browse-h">
+  <div class="flow-intro">
+    <div class="thumb big" aria-hidden="true"><div class="pane hi"><span class="row">╭ marmota 3/9</span><span class="row">▌ src/</span><span class="row">  README.md</span><span class="row">  build.sh</span><span class="dock">Sessions · Details · Ask</span></div><div class="pane"><span class="row">README.md</span><span class="row"># Marmota</span><span class="row"> </span><span class="row"> </span><span class="dock"> </span></div></div>
+    <div>
+      <span class="eyebrow small">Workflow 1</span>
+      <h2 id="browse-h">Just browse files</h2>
+      <p>No agents needed. Marmota is a file manager first: two or more panels, a preview of what is under the cursor, and the boxes at the foot, which <kbd>F</kbd> hides.</p>
+    </div>
+  </div>
+  <div class="cases">
+    <div class="case">
+      <h3>Jump to a project and open a file</h3>
+      <ol class="steps">
+        <li><kbd>z</kbd>, type part of the folder's name, <kbd>enter</kbd>. (<kbd>ctrl+n</kbd> opens it in a new panel instead.)</li>
+        <li><kbd>/</kbd> and a few letters filter the folder; <kbd>esc</kbd> clears it.</li>
+        <li><kbd>e</kbd> opens the file in your editor; <kbd>E</kbd> in your second one.</li>
+      </ol>
+    </div>
+    <div class="case">
+      <h3>Move files between two folders</h3>
+      <ol class="steps">
+        <li><kbd>n</kbd> opens a second panel; go to the destination there.</li>
+        <li><kbd>tab</kbd> back to the first panel.</li>
+        <li>One file: <kbd>ctrl+c</kbd> to copy or <kbd>ctrl+x</kbd> to cut. Several: <kbd>space</kbd> on each, then <kbd>c</kbd> or <kbd>x</kbd>.</li>
+        <li><kbd>tab</kbd> to the other panel, <kbd>v</kbd> to paste.</li>
+      </ol>
+    </div>
+    <div class="case">
+      <h3>Find a file deep in a folder</h3>
+      <ol class="steps">
+        <li>Put the cursor on the folder and press <kbd>f</kbd>.</li>
+        <li>Type part of the name; <kbd>enter</kbd> goes to the file.</li>
+      </ol>
+    </div>
+    <div class="case">
+      <h3>Look before you open</h3>
+      <ol class="steps">
+        <li>The preview shows text, code, images and PDFs; <kbd>ctrl+f</kbd> hides or shows it. In a PDF, <kbd>alt+shift+→</kbd> turns the page.</li>
+        <li><kbd>M</kbd> focuses Details: the file's size and dates, file operations under way, and your Mac's cpu, memory and disk.</li>
+      </ol>
+    </div>
+    <div class="case">
+      <h3>Hand files to another app</h3>
+      <ol class="steps">
+        <li><kbd>p</kbd> copies the path; <kbd>P</kbd> the parent folder's; <kbd>c</kbd> the current folder's.</li>
+        <li><kbd>Y</kbd> sends the selection to your shelf app (Yoink) to drag elsewhere.</li>
+      </ol>
+    </div>
+    <div class="case">
+      <h3>Keep your places, and leave from one</h3>
+      <ol class="steps">
+        <li><kbd>t</kbd> pins the folder under the cursor; <kbd>s</kbd> opens the popup with pinned folders and recent files.</li>
+        <li><kbd>Q</kbd> quits and leaves your shell in the folder you were in.</li>
+      </ol>
+    </div>
   </div>
 </section>
 
-<section aria-labelledby="s4">
-  <div class="step-head"><span class="step-num">4</span><h2 id="s4">Start a session beside your files</h2></div>
-  <p>Press <kbd>&gt;</kbd> for Agent mode and type one of these; the session opens in a WezTerm pane next to Marmota, in the folder you are in.</p>
-  <div class="keys-wrap">
-    <table class="keys">
-      <tbody>
-        <tr><td><code>claude</code></td><td>Claude Code</td></tr>
-        <tr><td><code>claude rc</code></td><td>Claude Code with Remote Control on, so you can follow it from your phone</td></tr>
-        <tr><td><code>codex</code></td><td>The Codex CLI</td></tr>
-      </tbody>
-    </table>
+<section class="flow" id="one-agent" aria-labelledby="one-h">
+  <div class="flow-intro">
+    <div class="thumb big" aria-hidden="true"><div class="pane"><span class="row">▌ src/</span><span class="row">  login.go <span class="cc">✳</span></span><span class="row">  auth.go</span><span class="row"> </span><span class="dock">✳ 1 working</span></div><div class="pane hi"><span class="row"><span class="cc">✳</span> Claude Code</span><span class="row">&gt; fix the login</span><span class="row">  ⏺ Edit(login.go)</span><span class="row"> </span><span class="dock"> </span></div></div>
+    <div>
+      <span class="eyebrow small">Workflow 2</span>
+      <h2 id="one-h">One coding agent beside you</h2>
+      <p>Claude Code or Codex runs in a WezTerm pane next to Marmota, in the folder you are in. You browse on the left and talk to it on the right; <kbd>Cmd+Opt+←</kbd> <kbd>→</kbd> move between the two.</p>
+    </div>
   </div>
-  <p>Press <kbd>@</kbd> in a file panel to type the selected files into that session as mentions, then switch to its pane and say what to do with them.</p>
+  <div class="cases">
+    <div class="case">
+      <h3>Start it</h3>
+      <ol class="steps">
+        <li>Go to the project's folder.</li>
+        <li><kbd>&gt;</kbd>, type <code>claude</code> or <code>codex</code>, <kbd>enter</kbd>. The session opens beside Marmota.</li>
+      </ol>
+    </div>
+    <div class="case">
+      <h3>Show it the files you mean</h3>
+      <ol class="steps">
+        <li>Select the files in Marmota (<kbd>space</kbd>), or leave the cursor on one.</li>
+        <li><kbd>@</kbd> types them into the session's prompt as mentions and moves the keyboard there.</li>
+        <li>Say what to do with them.</li>
+      </ol>
+    </div>
+    <div class="case">
+      <h3>Keep browsing while it works</h3>
+      <ol class="steps">
+        <li>A <span class="tag cc">✳</span> marks each file it changed; a folder shows how many inside (<span class="tag cc">✳3</span>). Git's letter shows beside changed files.</li>
+        <li>The status line says <span class="tag cc">✳ 1 working</span> until it replies.</li>
+      </ol>
+    </div>
+    <div class="case">
+      <h3>Talk to it without leaving your files</h3>
+      <ol class="steps">
+        <li><kbd>m</kbd> on a file adds it to your draft as a mention.</li>
+        <li><kbd>K</kbd> opens the Ask box, which writes to it; type and press <kbd>enter</kbd>. <kbd>↑</kbd> brings back what you said before.</li>
+      </ol>
+    </div>
+    <div class="case">
+      <h3>Answer when it asks permission</h3>
+      <ol class="steps">
+        <li>The status line shows <span style="color: var(--accent)">⚑ 1 needs you</span>.</li>
+        <li><kbd>!</kbd> lands on it; the preview shows its question with the options.</li>
+        <li><kbd>K</kbd> hands your keys to the question (<kbd>y</kbd>, <kbd>enter</kbd>, arrows, <kbd>esc</kbd>); <kbd>ctrl+k</kbd> gives them back.</li>
+      </ol>
+    </div>
+    <div class="case">
+      <h3>Bring it to the folder you are in</h3>
+      <ol class="steps">
+        <li>Browse to another folder.</li>
+        <li><kbd>=</kbd> moves the Claude Code session there (it types its <code>/cd</code>); the conversation goes on.</li>
+      </ol>
+    </div>
+  </div>
 </section>
 
-<section aria-labelledby="s5">
-  <div class="step-head"><span class="step-num">5</span><h2 id="s5">Keep an eye on your sessions</h2></div>
-  <p>Press <kbd>!</kbd>. The Sessions box takes the keyboard and lands on the session that most needs you. Each row shows how the session stands, which program it runs in, its name and its age; the line under it says what it is doing.</p>
-  <div class="states">
-    <div class="state"><span class="g tag cc">✳</span><strong>Working</strong><span>It is replying or running a tool.</span></div>
-    <div class="state"><span class="g" style="color: var(--accent)">⚑</span><strong>Needs you</strong><span>It asks for a permission or an answer.</span></div>
-    <div class="state"><span class="g tag co">●</span><strong>Unread</strong><span>It replied since you last looked.</span></div>
-    <div class="state"><span class="g" style="color: var(--muted)">○</span><strong>Waiting</strong><span>It is idle, ready for your next prompt.</span></div>
+<section class="flow" id="many" aria-labelledby="many-h">
+  <div class="flow-intro">
+    <div class="thumb big" aria-hidden="true"><div class="pane"><span class="row">▌ src/</span><span class="row">1 <span class="cc">✳ cc</span> fix the login</span><span class="row">2 <span class="warn">⚑</span> <span class="co">co</span> docs pass</span><span class="row">3 ○ <span class="cc">cc</span> tests</span><span class="dock">✳ 1 · ⚑ 1</span></div><div class="pane hi"><span class="row"><span class="cc">✳</span> fix the login</span><span class="row">&gt; …</span><span class="row"> </span><span class="row"> </span><span class="dock"> </span></div><div class="stack"><i></i><i></i></div></div>
+    <div>
+      <span class="eyebrow small">Workflow 3</span>
+      <h2 id="many-h">Several sessions, one beside you</h2>
+      <p>Hand tasks to sessions that run in the background, each in its own folder, while one stays beside you. The Sessions box lists them all; the others wait in a hidden WezTerm workspace until you bring one in.</p>
+    </div>
   </div>
-  <div class="keys-wrap">
-    <table class="keys">
-      <thead><tr><th scope="col">In the Sessions box</th><th scope="col">What it does</th></tr></thead>
-      <tbody>
-        <tr><td><kbd>j</kbd> <kbd>k</kbd> · <kbd>enter</kbd></td><td>Move between sessions · show the session's pane beside Marmota</td></tr>
-        <tr><td><kbd>W</kbd> · <kbd>]</kbd> <kbd>[</kbd></td><td>The files this session changed · the next and previous change in the preview's diff</td></tr>
-        <tr><td><kbd>V</kbd></td><td>Pin the preview to this session while you browse files</td></tr>
-        <tr><td><kbd>r</kbd> · <kbd>w</kbd> · <kbd>x</kbd></td><td>Rename · fork into a new git worktree · stop (it asks first)</td></tr>
-        <tr><td><kbd>m</kbd> · <kbd>n</kbd></td><td>Mention this Claude Code session in the Ask box (Codex sessions have no name to mention) · write to a new session</td></tr>
-        <tr><td><kbd>!</kbd> or <kbd>esc</kbd></td><td>Back to your files</td></tr>
-      </tbody>
-    </table>
+  <div class="cases">
+    <div class="case">
+      <h3>Start one in the background</h3>
+      <ol class="steps">
+        <li><kbd>!</kbd> then <kbd>n</kbd>: the Ask box writes to a new session in this folder. (With no session running yet, <kbd>K</kbd> opens it that way.)</li>
+        <li><kbd>tab</kbd> picks Claude Code or Codex; <kbd>ctrl+o</kbd> the model, <kbd>ctrl+t</kbd> the effort (medium unless you change it), <kbd>shift+tab</kbd> the permission mode.</li>
+        <li>Write the task, <kbd>enter</kbd>. It starts out of sight and your keyboard stays in Marmota.</li>
+      </ol>
+    </div>
+    <div class="case">
+      <h3>See how each one is doing</h3>
+      <ol class="steps">
+        <li><kbd>!</kbd> opens the Sessions box. Each row: its state, <span class="tag cc">cc</span> or <span class="tag co">co</span>, its name, its age, and what it is doing now.</li>
+        <li>The preview shows the selected session's conversation; <kbd>pgup</kbd> <kbd>pgdown</kbd> scroll it.</li>
+      </ol>
+      <div class="states">
+        <div class="state"><span class="g tag cc">✳</span><strong>Working</strong><span>Replying or running a tool.</span></div>
+        <div class="state"><span class="g" style="color: var(--accent)">⚑</span><strong>Needs you</strong><span>Asks a permission or a question.</span></div>
+        <div class="state"><span class="g tag co">●</span><strong>Unread</strong><span>Replied since you looked.</span></div>
+        <div class="state"><span class="g" style="color: var(--muted)">○</span><strong>Waiting</strong><span>Ready for your next prompt.</span></div>
+      </div>
+    </div>
+    <div class="case">
+      <h3>Swap which one is beside you</h3>
+      <ol class="steps">
+        <li>In the Sessions box, <kbd>j</kbd> <kbd>k</kbd> to a session (or <kbd>3</kbd><kbd>g</kbd> for the third).</li>
+        <li><kbd>enter</kbd> brings its pane beside Marmota with the keyboard; the one that was there waits out of sight.</li>
+      </ol>
+    </div>
+    <div class="case">
+      <h3>Write to any of them</h3>
+      <ol class="steps">
+        <li>Select a session in the Sessions box and press <kbd>K</kbd>.</li>
+        <li>Write and press <kbd>enter</kbd>: Claude Code gets it in its prompt even while hidden; Codex runs it after what it is doing.</li>
+        <li>For a running Codex session, <kbd>ctrl+o</kbd> and <kbd>ctrl+t</kbd> change its model and effort from your next message.</li>
+      </ol>
+    </div>
+    <div class="case">
+      <h3>Keep one in view while you browse</h3>
+      <ol class="steps">
+        <li>Select it, press <kbd>V</kbd>: the preview stays on its conversation while you move through files.</li>
+        <li><kbd>V</kbd> again lets go.</li>
+      </ol>
+    </div>
+    <div class="case">
+      <h3>Branch, rename, stop</h3>
+      <ol class="steps">
+        <li><kbd>w</kbd> forks the session into a new git worktree, to try another approach without touching the first.</li>
+        <li><kbd>r</kbd> renames it; <kbd>x</kbd> stops it after asking (the conversation is kept); <kbd>m</kbd> mentions a Claude Code session in your draft.</li>
+      </ol>
+    </div>
   </div>
 </section>
 
-<section aria-labelledby="s6">
-  <div class="step-head"><span class="step-num">6</span><h2 id="s6">Ask without leaving your files</h2></div>
-  <p>Press <kbd>K</kbd>. What you write goes to the session the Sessions box is on: typed into a Claude Code session's prompt, or sent to Codex, which runs it after what it is doing. On a new session (<kbd>n</kbd> in the Sessions box, or a folder with none), sending starts one in the background and keeps the keyboard with you.</p>
-  <div class="keys-wrap">
-    <table class="keys">
-      <thead><tr><th scope="col">In the Ask box</th><th scope="col">What it does</th></tr></thead>
-      <tbody>
-        <tr><td><kbd>enter</kbd></td><td>Send</td></tr>
-        <tr><td><kbd>tab</kbd></td><td>For a new session: Claude Code or Codex (Claude Code unless you switch)</td></tr>
-        <tr><td><kbd>ctrl+o</kbd> · <kbd>ctrl+t</kbd></td><td>The model · the effort (medium unless you choose). For a running Codex session they change from your next message.</td></tr>
-        <tr><td><kbd>shift+tab</kbd></td><td>The permission mode a new session runs in: bypass, accept edits, auto, plan or manual</td></tr>
-        <tr><td><kbd>↑</kbd> <kbd>↓</kbd> · <kbd>ctrl+u</kbd></td><td>Your earlier messages to this session · clear what you wrote</td></tr>
-        <tr><td><kbd>esc</kbd></td><td>Close the box; your draft stays for next time</td></tr>
-      </tbody>
-    </table>
+<section class="flow" id="review" aria-labelledby="review-h">
+  <div class="flow-intro">
+    <div class="thumb big" aria-hidden="true"><div class="pane"><span class="row">fix the login: 2 files</span><span class="row">▌ login.go</span><span class="row">  auth.go</span><span class="row"> </span><span class="dock">] next · [ previous</span></div><div class="pane hi"><span class="row">login.go</span><span class="row del">- if user == nil {</span><span class="row add">+ if user == nil || !ok {</span><span class="row add">+   return errAuth</span><span class="dock"> </span></div></div>
+    <div>
+      <span class="eyebrow small">Workflow 4</span>
+      <h2 id="review-h">Review what a session changed</h2>
+      <p>Before you accept a session's work, read what it did, file by file, without opening each one.</p>
+    </div>
   </div>
-  <p>In a file panel, <kbd>m</kbd> adds the file under the cursor (or the selection) to your draft, so the session knows exactly which file you mean.</p>
+  <div class="case">
+    <ol class="steps">
+      <li><kbd>!</kbd>, select the session, <kbd>W</kbd>: the panel lists the files it changed.</li>
+      <li>Move through them; the preview shows each file's diff. <kbd>]</kbd> and <kbd>[</kbd> jump to the next and previous change.</li>
+      <li><kbd>e</kbd> opens the file in your editor to fix something yourself, or write to the session with <kbd>K</kbd>.</li>
+      <li><kbd>W</kbd> or <kbd>esc</kbd> goes back to the folder.</li>
+    </ol>
+  </div>
 </section>
 
-<section aria-labelledby="s7">
-  <div class="step-head"><span class="step-num">7</span><h2 id="s7">Answer a session that needs you</h2></div>
-  <p>When a session asks something, its row shows <span style="color: var(--accent)">⚑</span>, the status line counts it, and the preview shows the question as the session draws it, options included. Press <kbd>K</kbd> and your keys go to that question: <kbd>y</kbd>, <kbd>enter</kbd>, the arrows, <kbd>esc</kbd>, whatever it takes. <kbd>ctrl+k</kbd> gives the keyboard back to the list.</p>
+<section class="flow" id="away" aria-labelledby="away-h">
+  <div class="flow-intro">
+    <div class="thumb big" aria-hidden="true"><div class="pane"><span class="row">▌ notes/</span><span class="row">  plan.md</span><span class="row"> </span><span class="row"> </span><span class="dock"><span class="warn">⚑ 1 needs you</span> · ● 2 unread</span></div><span class="toast">⚑ docs pass asks</span></div>
+    <div>
+      <span class="eyebrow small">Workflow 5</span>
+      <h2 id="away-h">Leave them running</h2>
+      <p>Get on with something else, in Marmota or another app. Marmota tells you when a session needs you, and never moves your focus on its own.</p>
+    </div>
+  </div>
+  <div class="case">
+    <ol class="steps">
+      <li>When a session you can't see asks something, fails, or replies, a note appears in Marmota's top right corner; while Marmota isn't in front, WezTerm also posts a macOS notification.</li>
+      <li>The status line keeps count: <span class="tag cc">✳ working</span>, <span style="color: var(--accent)">⚑ needs you</span>, <span class="tag co">● unread</span>.</li>
+      <li><kbd>!</kbd> opens the session the note is about; answer it with <kbd>K</kbd>, or <kbd>esc</kbd> to put the note away.</li>
+      <li>Away from your desk? Start the session with <code>&gt;claude rc</code>: Remote Control lets you follow and answer it from the Claude app.</li>
+    </ol>
+  </div>
 </section>
 
 <section aria-labelledby="s8">
-  <div class="step-head"><span class="step-num">8</span><h2 id="s8">Make it yours</h2></div>
+  <div class="step-head"><span class="step-num">4</span><h2 id="s8">Make it yours</h2></div>
   <ul class="plain">
     <li><code>y path-list</code> prints where your settings live, usually <code>~/.config/marmota</code>.</li>
     <li><code>config.toml</code>: your editor, theme, preview settings, <code>codex_command</code>, and <code>cd_on_quit</code> (your shell moves to the folder you quit in).</li>
@@ -304,6 +498,7 @@ y</pre>
 </footer>
 
 </div>
+
 
 </body>
 </html>
