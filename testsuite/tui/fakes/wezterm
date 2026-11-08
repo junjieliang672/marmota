@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+"""Fake `wezterm` CLI for spf TUI tests. Every call is appended to $FAKE_WEZTERM_LOG.
+
+* ``wezterm cli list [--format json]``: prints $FAKE_WEZTERM_LIST (default ``[]``).
+* ``wezterm cli split-pane ...`` / ``wezterm cli spawn ...``: prints a new pane
+  id, counting up from $FAKE_WEZTERM_FIRST_PANE_ID (default 100); the counter
+  lives in $FAKE_WEZTERM_STATE.
+* ``wezterm cli get-text ...``: prints $FAKE_WEZTERM_TEXT if set.
+* other ``cli`` subcommands succeed silently. Subcommands listed in
+  $FAKE_WEZTERM_FAIL (comma or space separated) exit 1 instead.
+"""
+import os
+import sys
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import _fakelib  # noqa: E402  pylint: disable=wrong-import-position
+
+
+def main(argv):
+    _fakelib.log_call("FAKE_WEZTERM_LOG", "wezterm", "wezterm")
+    if argv[:1] == ["--version"]:
+        _fakelib.write_out("wezterm 20240203-110809-5046fc22 (fake)")
+        return 0
+    if argv[:1] != ["cli"]:
+        return 0
+    sub = argv[1] if len(argv) > 1 else ""
+    failing = os.environ.get("FAKE_WEZTERM_FAIL", "").replace(",", " ").split()
+    if sub in failing:
+        sys.stderr.write("fake wezterm: cli %s failed (FAKE_WEZTERM_FAIL)\n" % sub)
+        return 1
+    if sub == "list":
+        _fakelib.write_out(_fakelib.read_source("FAKE_WEZTERM_LIST", "[]"))
+    elif sub in ("split-pane", "spawn"):
+        start = _fakelib.env_int("FAKE_WEZTERM_FIRST_PANE_ID", 100)
+        state = os.environ.get("FAKE_WEZTERM_STATE")
+        pane_id = _fakelib.next_counter(state, start) if state else start
+        _fakelib.write_out(str(pane_id))
+    elif sub == "get-text":
+        _fakelib.write_out(_fakelib.read_source("FAKE_WEZTERM_TEXT", ""))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -1,0 +1,12 @@
+# python venv site packages
+site-packages/
+
+#python venvs
+.venv/
+
+# python pycache
+__pycache__/
+*.pyc
+
+# tui harness screenshots and failure dumps
+tui/artifacts/

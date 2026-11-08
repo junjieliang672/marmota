@@ -1,0 +1,16 @@
+#!/usr/bin/env python3
+"""Fake `pbpaste`: prints $FAKE_CLIPBOARD_FILE (what the fake pbcopy stored)."""
+import os
+import sys
+
+
+def main():
+    path = os.environ.get("FAKE_CLIPBOARD_FILE")
+    if path and os.path.isfile(path):
+        with open(path, "rb") as handle:
+            sys.stdout.buffer.write(handle.read())
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

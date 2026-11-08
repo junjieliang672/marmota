@@ -1,0 +1,327 @@
+package internal
+
+import (
+	"context"
+	"errors"
+	"flag"
+	"fmt"
+	"os"
+	"path/filepath"
+	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	variable "github.com/junjieliang672/marmota/src/config"
+	"github.com/junjieliang672/marmota/src/internal/common"
+	"github.com/junjieliang672/marmota/src/internal/ui/processbar"
+	"github.com/junjieliang672/marmota/src/internal/utils"
+	"github.com/junjieliang672/marmota/src/pkg/claudesession"
+	"github.com/junjieliang672/marmota/src/pkg/codexsession"
+)
+
+/*
+The purpose of this test file is to have the
+(1) common global data for tests
+(2) common setup for tests, and cleanup
+(3) Basic model fuctionality tests
+    - Initialization
+	- Resize
+	- Update
+	- Quitting
+*/
+
+// Helps to have centralized cleanup
+var testDir string //nolint: gochecknoglobals // One-time initialized, and then read-only global test variable
+
+func cleanupTestDir() {
+	err := os.RemoveAll(testDir)
+	if err != nil {
+		fmt.Printf("error while cleaning up test directory, err : %v", err)
+		os.Exit(1)
+	}
+}
+
+func TestMain(m *testing.M) {
+	err := common.PopulateGlobalConfigs()
+	if err != nil {
+		fmt.Printf("error while populating config, err : %v", err)
+		os.Exit(1)
+	}
+
+	// A cleanup before is required in case the previous test run had a panic, and then
+	// deferred cleanup never executed
+
+	// Create testDir
+	testDir = filepath.Join(os.TempDir(), "spf_testdir")
+	cleanupTestDir()
+	if err := os.Mkdir(testDir, 0o755); err != nil {
+		fmt.Printf("error while creating test directory, err : %v", err)
+		os.Exit(1)
+	}
+	defer cleanupTestDir()
+
+	// Unit tests must never run the real claude CLI or read ~/.claude, and
+	// must not talk to the WezTerm the tests happen to run in.
+	_ = os.Unsetenv("WEZTERM_PANE")
+	claudeSessionRunner = func(context.Context, string, ...string) ([]byte, error) {
+		return []byte("[]"), nil
+	}
+	claudeProjectsDir = func() string { return filepath.Join(testDir, "claude-projects") }
+	claudeSessionsAutoRefresh = false
+	seenFile := filepath.Join(testDir, "claude_sessions_seen.json")
+	variable.ClaudeSessionsSeenFile = seenFile                           //nolint:reassign // test isolation
+	variable.AskHistoryFile = filepath.Join(testDir, "ask_history.json") //nolint:reassign // test isolation
+	//nolint:reassign // test isolation
+	variable.ClaudeSessionsOrderFile = filepath.Join(testDir, "claude_sessions_order.json")
+	writeClipboard = func(string) error { return errors.New("tests must not write the clipboard") }
+	runShelfCommand = func(string, ...string) ([]byte, error) { return nil, errors.New("tests must not open apps") }
+	weztermSendText = func(int, string) error { return errors.New("tests must not type into WezTerm") }
+	weztermSendKeys = func(int, string) error { return errors.New("tests must not type into WezTerm") }
+	weztermGetText = func(int) (string, error) { return "", errors.New("tests must not read WezTerm") }
+	// Nor reach the Codex server of the computer they run on.
+	codexHome = func() string { return filepath.Join(testDir, "codex-home") }
+	codexCollect = func(codexsession.Options) ([]claudesession.Session, error) { return nil, codexsession.ErrNoServer }
+	codexSend = func(string, string, string, codexsession.TurnOptions) error {
+		return errors.New("tests must not reach Codex")
+	}
+	codexRename = func(string, string, string) error { return errors.New("tests must not reach Codex") }
+	codexInterrupt = func(string, string) error { return errors.New("tests must not reach Codex") }
+	codexBinary = func() string { return "codex" }
+	terminalNotify = func(string) {} // never write to the terminal the tests run in
+	// Nor write the person's pinned folders, recent files or toggles. Tests
+	// that need these files point them somewhere of their own.
+	variable.PinnedFile = filepath.Join(testDir, "pinned.json")            //nolint:reassign // test isolation
+	variable.RecentEditsFile = filepath.Join(testDir, "recent_edits.json") //nolint:reassign // test isolation
+	variable.ToggleDotFile = filepath.Join(testDir, "toggleDotFile")       //nolint:reassign // test isolation
+	variable.ToggleFooter = filepath.Join(testDir, "toggleFooter")         //nolint:reassign // test isolation
+	variable.LastDirFile = filepath.Join(testDir, "lastdir")               //nolint:reassign // test isolation
+
+	flag.Parse()
+	if testing.Verbose() {
+		utils.SetRootLoggerToStdout(true)
+	} else {
+		utils.SetRootLoggerToDiscarded()
+	}
+	m.Run()
+	// Maybe catch panic
+}
+
+func TestBasic(t *testing.T) {
+	curTestDir := filepath.Join(testDir, "TestBasic")
+	dir1 := filepath.Join(curTestDir, "dir1")
+	dir2 := filepath.Join(curTestDir, "dir2")
+	file1 := filepath.Join(dir1, "file1.txt")
+
+	t.Run("Basic Checks", func(t *testing.T) {
+		utils.SetupDirectories(t, curTestDir, dir1, dir2)
+		utils.SetupFiles(t, file1)
+		t.Cleanup(func() {
+			os.RemoveAll(curTestDir)
+		})
+
+		m := defaultTestModel(dir1)
+
+		// Validate the most of the data stored in model object
+		// Inspect model struct to see what more can be validated.
+		// 1 - File panel location, cursor, render index, etc.
+		// 2 - Directory Items are listed
+		// 3 - sidebar items pinned items are listed
+		// 4 - process panel is empty
+		// 5 - clipboard is empty
+		// 6 - model's dimenstion
+
+		assert.Equal(t, dir1, m.getFocusedFilePanel().location)
+	})
+}
+
+func TestInitialFilePathPositionsCursorWindow(t *testing.T) {
+	curTestDir := t.TempDir()
+	dir1 := filepath.Join(curTestDir, "dir1")
+
+	utils.SetupDirectories(t, curTestDir, dir1)
+
+	var file7 string
+	var file2 string
+	for i := range 10 {
+		f := filepath.Join(dir1, fmt.Sprintf("file%d.txt", i))
+		utils.SetupFiles(t, f)
+		if i == 7 {
+			file7 = f
+		}
+		if i == 2 {
+			file2 = f
+		}
+	}
+
+	m := defaultTestModel(dir1, file2, file7)
+	// View port of 5
+	TeaUpdate(m, tea.WindowSizeMsg{Width: common.MinimumWidth, Height: 10})
+	// Uncomment below to understand the distribution
+	// t.Logf("Heights : %d [%d - [%d] %d]\n", m.fullHeight, m.footerHeight, m.mainPanelHeight,
+	//	m.fileModel.filePanels[2].elementHeight(m.mainPanelHeight))
+	require.Len(t, m.fileModel.filePanels, 3)
+	assert.Equal(t, dir1, m.fileModel.filePanels[0].location)
+	assert.Equal(t, file2, m.fileModel.filePanels[1].getSelectedItem().location)
+	assert.Equal(t, 2, m.fileModel.filePanels[1].cursor)
+	assert.Equal(t, 0, m.fileModel.filePanels[1].render)
+	assert.Equal(t, file7, m.fileModel.filePanels[2].getSelectedItem().location)
+	assert.Equal(t, 7, m.fileModel.filePanels[2].cursor)
+	// render=3: with Height=10, toggleFooter=false (footerHeight=0), statusLine=1,
+	// mainPanelHeight = 10 - 2(border) - 0(footer) - 1(statusLine) = 7,
+	// elementHeight(7) = 7 - 2(path, divider) = 5 (viewport size).
+	// To keep cursor=7 visible: minVisibleRender = 7 - 5 + 1 = 3, so render=3.
+	assert.Equal(t, 3, m.fileModel.filePanels[2].render)
+}
+
+func TestQuit(t *testing.T) {
+	// Test
+	// 1 - Normal quit
+	// 2 - Normal quit with running process causing a warn modal
+	//     2a - Cancelling quit
+	//     2b - Proceeding with the quit
+	// 3 - Cd on quit test that LastDir is written on
+
+	t.Run("Normal Quit", func(t *testing.T) {
+		m := defaultTestModel(testDir)
+		assert.Equal(t, notQuitting, m.modelQuitState)
+		cmd := TeaUpdate(m, utils.TeaKeyMsg(common.Hotkeys.Quit[0]))
+		assert.Equal(t, quitDone, m.modelQuitState)
+		assert.True(t, IsTeaQuit(cmd))
+	})
+	t.Run("Quit with running process", func(t *testing.T) {
+		m := defaultTestModel(testDir)
+		m.processBarModel.AddOrUpdateProcess(processbar.Process{
+			State: processbar.InOperation,
+			Done:  0,
+			Total: 100,
+			ID:    "1",
+		})
+
+		assert.Equal(t, notQuitting, m.modelQuitState)
+		cmd := TeaUpdate(m, utils.TeaKeyMsg(common.Hotkeys.Quit[0]))
+		assert.Equal(t, quitConfirmationInitiated, m.modelQuitState)
+		assert.False(t, IsTeaQuit(cmd))
+
+		// Now we would be asked for confirmation.
+		// Cancel the quit
+		cmd = TeaUpdate(m, utils.TeaKeyMsg(common.Hotkeys.CancelTyping[0]))
+		assert.Equal(t, notQuitting, m.modelQuitState)
+		assert.False(t, IsTeaQuit(cmd))
+
+		// Again trigger quit
+		cmd = TeaUpdate(m, utils.TeaKeyMsg(common.Hotkeys.Quit[0]))
+		assert.Equal(t, quitConfirmationInitiated, m.modelQuitState)
+		assert.False(t, IsTeaQuit(cmd))
+
+		// Confirm this time
+		cmd = TeaUpdate(m, utils.TeaKeyMsg(common.Hotkeys.Confirm[0]))
+		assert.Equal(t, quitDone, m.modelQuitState)
+		assert.True(t, IsTeaQuit(cmd))
+	})
+
+	t.Run("Cd on quit test that LastDir is written on", func(t *testing.T) {
+		lastDirFile := variable.LastDirFile
+		m := defaultTestModel(testDir)
+
+		assert.Equal(t, notQuitting, m.modelQuitState)
+
+		cmd := TeaUpdate(m, utils.TeaKeyMsg(common.Hotkeys.CdQuit[0]))
+
+		assert.Equal(t, quitDone, m.modelQuitState)
+		assert.True(t, IsTeaQuit(cmd))
+
+		data, err := os.ReadFile(lastDirFile)
+		require.NoError(t, err)
+		assert.Equal(t, "cd '"+testDir+"'", string(data), "LastDir file should contain the tempDir path")
+
+		err = os.Remove(lastDirFile)
+		require.NoError(t, err)
+	})
+}
+
+func TestChooserFile(t *testing.T) {
+	// 1 - No quit - blank chooser file
+	// 2 - Quit with valid chooser file
+	//     2a - file preview
+	//     2b - directory preview
+	// 3 - No quit - invalid chooser file
+	curTestDir := filepath.Join(testDir, "TestChooserFile")
+	dir1 := filepath.Join(curTestDir, "dir1")
+	dir2 := filepath.Join(curTestDir, "dir2")
+	file1 := filepath.Join(dir1, "file1.txt")
+	testChooserFile := filepath.Join(dir2, "chooser_file.txt")
+	utils.SetupDirectories(t, curTestDir, dir1, dir2)
+	utils.SetupFiles(t, file1)
+
+	testdata := []struct {
+		name            string
+		chooserFile     string
+		hotkey          string
+		expectedQuit    bool
+		expectedContent string
+	}{
+		{
+			name:            "Open with default app with valid chooser file",
+			chooserFile:     testChooserFile,
+			hotkey:          common.Hotkeys.Confirm[0],
+			expectedQuit:    true,
+			expectedContent: file1,
+		},
+		{
+			name:            "Open with file editor with valid chooser file",
+			chooserFile:     testChooserFile,
+			hotkey:          common.Hotkeys.OpenFileWithEditor[0],
+			expectedQuit:    true,
+			expectedContent: file1,
+		},
+		{
+			name:            "Open with directory editor valid chooser file",
+			hotkey:          common.Hotkeys.OpenCurrentDirectoryWithEditor[0],
+			chooserFile:     testChooserFile,
+			expectedQuit:    true,
+			expectedContent: dir1,
+		},
+		{
+			name:            "Open with file editor with Blank chooser file",
+			chooserFile:     "",
+			hotkey:          common.Hotkeys.OpenFileWithEditor[0],
+			expectedQuit:    false,
+			expectedContent: "",
+		},
+		{
+			name:            "Open with file editor with Invalid chooser file",
+			chooserFile:     filepath.Join(curTestDir, "non_existent_dir", "file.txt"),
+			hotkey:          common.Hotkeys.OpenFileWithEditor[0],
+			expectedQuit:    false,
+			expectedContent: "",
+		},
+	}
+
+	// Must be sequential as we are using global variable chooserfile
+	for _, tt := range testdata {
+		t.Run(tt.name, func(t *testing.T) {
+			m := defaultTestModel(dir1)
+			if tt.expectedQuit {
+				err := os.WriteFile(tt.chooserFile, []byte{}, 0o644)
+				require.NoError(t, err)
+			}
+			variable.SetChooserFile(tt.chooserFile)
+			cmd := TeaUpdate(m, utils.TeaRuneKeyMsg(tt.hotkey))
+
+			if tt.expectedQuit {
+				assert.Equal(t, quitDone, m.modelQuitState)
+				assert.True(t, IsTeaQuit(cmd))
+				assert.FileExists(t, tt.chooserFile)
+				data, err := os.ReadFile(tt.chooserFile)
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedContent, string(data))
+			} else {
+				assert.Equal(t, notQuitting, m.modelQuitState)
+				assert.False(t, IsTeaQuit(cmd))
+			}
+		})
+	}
+}

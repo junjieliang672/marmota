@@ -1,0 +1,21 @@
+#!/usr/bin/env python3
+"""Fake `open` (macOS) / `xdg-open`: logs argv instead of launching GUI apps.
+
+Exit code: $FAKE_OPEN_EXIT (default 0).
+"""
+import os
+import sys
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import _fakelib  # noqa: E402  pylint: disable=wrong-import-position
+
+
+def main():
+    name = os.path.basename(sys.argv[0])
+    _fakelib.log_call("FAKE_OPEN_LOG", name, name)
+    return _fakelib.env_int("FAKE_OPEN_EXIT", 0)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

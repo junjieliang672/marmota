@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>*,*::before,*::after{box-sizing:border-box} body{margin:0} img{max-width:100%}</style>
+</head>
+<body>
+<title>Getting Started with Marmota</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column; the screen sketch and key tables may run wider, each in its own scroll box */
+:root {
+  --bg: #F4F6FA;
+  --surface: #FFFFFF;
+  --ink: #1B1F2B;
+  --muted: #565D73;
+  --line: #DCE1EC;
+  --accent: #9A5B22;
+  --cc: #B8502A;
+  --co: #2F63CF;
+  --key-bg: #EEF1F7;
+  --term-bg: #1A1B26;
+  --term-panel: #1F2335;
+  --term-fg: #C0CAF5;
+  --term-dim: #8A92B5;
+  --term-line: #3B4261;
+  --term-hi: #7AA2F7;
+  --term-cc: #F0A07A;
+  --term-co: #7AA2F7;
+  --term-warn: #E0AF68;
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+  --font-body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #13141C; --surface: #1B1D2A; --ink: #DDE2F3; --muted: #A3ABC6; --line: #2C3044;
+    --accent: #E3A468; --cc: #F0A07A; --co: #8FB0F8; --key-bg: #262A3B; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #13141C; --surface: #1B1D2A; --ink: #DDE2F3; --muted: #A3ABC6; --line: #2C3044;
+  --accent: #E3A468; --cc: #F0A07A; --co: #8FB0F8; --key-bg: #262A3B; color-scheme: dark;
+}
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.6; }
+.page { max-width: 880px; margin: 0 auto; padding-inline: 20px; padding-block: 48px 72px; display: flex; flex-direction: column; gap: 56px; }
+header { display: flex; flex-direction: column; gap: 18px; }
+.brand { display: flex; align-items: center; gap: 16px; }
+.brand svg { flex: none; }
+.eyebrow { font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+h1 { font-family: var(--font-display); font-size: clamp(34px, 6vw, 52px); line-height: 1.05; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--font-display); font-size: 28px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-size: 17px; margin: 0; }
+p { margin: 0; max-width: 66ch; }
+.lede { font-size: 19px; color: var(--muted); }
+section { display: flex; flex-direction: column; gap: 18px; }
+.step-head { display: flex; align-items: baseline; gap: 14px; }
+.step-num { font-family: var(--font-mono); font-size: 15px; color: var(--accent); font-weight: 600; }
+kbd { font-family: var(--font-mono); font-size: 0.85em; background: var(--key-bg); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
+code { font-family: var(--font-mono); font-size: 0.9em; }
+pre { margin: 0; background: var(--term-bg); color: var(--term-fg); border-radius: 12px; padding: 18px 20px; overflow-x: auto; font-family: var(--font-mono); font-size: 14px; line-height: 1.6; }
+pre .c { color: var(--term-dim); }
+.tag { font-family: var(--font-mono); font-weight: 600; }
+.tag.cc { color: var(--cc); }
+.tag.co { color: var(--co); }
+.note { border: 1px solid var(--line); background: var(--surface); border-radius: 12px; padding: 14px 18px; color: var(--muted); max-width: 66ch; }
+.note strong { color: var(--ink); }
+ul.plain { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; max-width: 66ch; }
+.keys-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+table.keys { border-collapse: collapse; width: 100%; min-width: 480px; font-size: 15px; }
+table.keys th, table.keys td { text-align: left; padding: 10px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.keys tr:last-child td { border-bottom: none; }
+table.keys th { font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+table.keys td:first-child { width: 34%; }
+
+/* The screen sketch: drawn like the terminal it stands for, dark in both themes */
+.screen-wrap { overflow-x: auto; }
+.screen { min-width: 620px; background: var(--term-bg); color: var(--term-fg); border-radius: 14px; padding: 14px; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.45; display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: auto auto auto; gap: 8px; }
+.box { border: 1px solid var(--term-line); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; min-width: 0; position: relative; }
+.box.hi { border-color: var(--term-hi); }
+.box .t { color: var(--term-dim); }
+.box .dim { color: var(--term-dim); }
+.files { grid-column: 1 / 2; min-height: 150px; }
+.preview { grid-column: 2 / 4; min-height: 150px; }
+.sessions { grid-column: 1 / 2; }
+.details { grid-column: 2 / 3; }
+.ask { grid-column: 3 / 4; }
+.statusline { grid-column: 1 / 4; color: var(--term-dim); padding: 2px 4px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.screen .cc { color: var(--term-cc); font-weight: 600; }
+.screen .co { color: var(--term-co); font-weight: 600; }
+.screen .warn { color: var(--term-warn); }
+.pin { position: absolute; top: -9px; right: 10px; background: var(--term-hi); color: var(--term-bg); font-weight: 600; border-radius: 999px; font-size: 11px; padding: 0 7px; }
+.legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; }
+.legend div { display: flex; gap: 10px; min-width: 0; }
+.legend .chip { flex: none; font-family: var(--font-mono); font-size: 12px; font-weight: 600; background: var(--co); color: var(--surface); border-radius: 999px; height: 20px; min-width: 20px; display: inline-flex; align-items: center; justify-content: center; margin-top: 3px; }
+.states { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.state { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+.state .g { font-size: 20px; line-height: 1; }
+.state span:last-child { color: var(--muted); font-size: 14px; }
+footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--muted); font-size: 14px; display: flex; flex-direction: column; gap: 6px; }
+a { color: var(--co); }
+a:focus-visible, kbd:focus-visible { outline: 2px solid var(--co); outline-offset: 2px; }
+@media (max-width: 640px) {
+  .legend, .states { grid-template-columns: minmax(0, 1fr); }
+  .lede { font-size: 17px; }
+}
+</style>
+
+<div class="page">
+
+<header>
+  <div class="brand">
+    <svg width="76" height="60" viewBox="0 0 28 22" role="img" aria-label="Marmota logo: a marmot in a terminal window">
+      <rect x="0.5" y="0.5" width="27" height="21" rx="3" fill="#1A1B26" stroke="#3B4261" stroke-width="1"></rect>
+      <circle cx="3.4" cy="3.2" r="0.9" fill="#F7768E"></circle>
+      <circle cx="6" cy="3.2" r="0.9" fill="#E0AF68"></circle>
+      <circle cx="8.6" cy="3.2" r="0.9" fill="#9ECE6A"></circle>
+      <path d="M3.5 11 L6.5 13.5 L3.5 16" stroke="#7AA2F7" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"></path>
+      <g transform="translate(9.5 4.2) scale(0.9)">
+        <ellipse cx="9" cy="10" rx="7.5" ry="7" fill="#CD853F"></ellipse>
+        <ellipse cx="3" cy="4" rx="2.2" ry="2" fill="#CD853F"></ellipse>
+        <ellipse cx="15" cy="4" rx="2.2" ry="2" fill="#CD853F"></ellipse>
+        <ellipse cx="3" cy="4" rx="1.2" ry="1" fill="#FFB6C1"></ellipse>
+        <ellipse cx="15" cy="4" rx="1.2" ry="1" fill="#FFB6C1"></ellipse>
+        <ellipse cx="9" cy="12" rx="4" ry="3.5" fill="#FFEFD5"></ellipse>
+        <ellipse cx="3.5" cy="11" rx="1.5" ry="1" fill="#FF9999" opacity="0.5"></ellipse>
+        <ellipse cx="14.5" cy="11" rx="1.5" ry="1" fill="#FF9999" opacity="0.5"></ellipse>
+        <ellipse cx="6" cy="9" rx="2" ry="2.2" fill="#1A1A1A"></ellipse>
+        <ellipse cx="12" cy="9" rx="2" ry="2.2" fill="#1A1A1A"></ellipse>
+        <circle cx="6.8" cy="8.3" r="0.8" fill="#FFFFFF"></circle>
+        <circle cx="12.8" cy="8.3" r="0.8" fill="#FFFFFF"></circle>
+        <ellipse cx="9" cy="11.5" rx="0.8" ry="0.5" fill="#8B4513"></ellipse>
+        <path d="M7 13 Q9 15 11 13" stroke="#8B4513" stroke-width="0.5" fill="none"></path>
+        <rect x="8.2" y="13" width="0.7" height="1" rx="0.2" fill="#FFFFFF"></rect>
+        <rect x="9.1" y="13" width="0.7" height="1" rx="0.2" fill="#FFFFFF"></rect>
+      </g>
+    </svg>
+    <span class="eyebrow">A tour for your first session</span>
+  </div>
+  <h1>Getting started with Marmota</h1>
+  <p class="lede">Marmota is a terminal file manager that works beside your Claude Code and Codex sessions; you start it with <code>y</code>. You browse files on top; at the foot you see every session that runs, what each one is doing, and you can write to any of them without leaving your files.</p>
+  <p class="note"><strong>You need</strong> a Mac, <a href="https://wezterm.org">WezTerm</a> (y opens sessions in its panes), and <a href="https://claude.com/claude-code">Claude Code</a>, the <a href="https://github.com/openai/codex">Codex CLI</a>, or both.</p>
+</header>
+
+<section aria-labelledby="s1">
+  <div class="step-head"><span class="step-num">1</span><h2 id="s1">Install it and start it</h2></div>
+  <pre><span class="c"># the first time, build.sh installs everything: Go, WezTerm, a Nerd Font, the y command</span>
+git clone https://github.com/junjieliang672/marmota.git
+cd marmota
+./build.sh
+
+<span class="c"># then, in a new terminal (WezTerm)</span>
+y</pre>
+  <p><code>build.sh</code> builds the program into <code>bin/y</code>, adds a short block to your shell config that puts it on your PATH, and gives WezTerm its look: the pane you type in stays bright and a blue edge marks it. Run <code>./build.sh</code> again whenever you pull new changes; it keeps your settings and adds any new ones.</p>
+</section>
+
+<section aria-labelledby="s2">
+  <div class="step-head"><span class="step-num">2</span><h2 id="s2">What is on the screen</h2></div>
+  <div class="screen-wrap">
+    <div class="screen" role="img" aria-label="Sketch of the y screen: file panels and a preview on top; the Sessions, Details and Ask boxes at the foot; the status line below">
+      <div class="box files hi"><span class="pin">A</span>
+        <span class="t">╭ Marmota 3/9</span>
+        <span>▌ build.sh</span>
+        <span class="dim">  CLAUDE.md</span>
+        <span class="dim">  README.md <span class="cc">✳</span></span>
+        <span class="dim">  src/ <span class="cc">✳2</span></span>
+      </div>
+      <div class="box preview"><span class="pin">B</span>
+        <span class="t">╭ README.md</span>
+        <span># Marmota</span>
+        <span class="dim">A terminal file manager that works beside</span>
+        <span class="dim">your Claude Code and Codex sessions.</span>
+      </div>
+      <div class="box sessions"><span class="pin">C</span>
+        <span class="t">╭ ✳ Sessions</span>
+        <span>1 <span class="cc">✳</span> <span class="cc">cc</span> fix the login</span>
+        <span class="dim">    Edit(login.go)</span>
+        <span>2 <span class="warn">⚑</span> <span class="co">co</span> docs pass</span>
+        <span class="warn">    asks: run make docs</span>
+      </div>
+      <div class="box details"><span class="pin">D</span>
+        <span class="t">╭ Details</span>
+        <span class="dim">FILE  README.md · 4 KB</span>
+        <span class="dim">MAC   cpu ▮▮▯▯ mem ▮▮▮▯</span>
+        <span class="dim">OPS   nothing running</span>
+      </div>
+      <div class="box ask"><span class="pin">E</span>
+        <span class="t">╭ Ask</span>
+        <span>→ fix the login</span>
+        <span class="dim">K write</span>
+        <span class="dim">you: "tests too?"</span>
+      </div>
+      <div class="statusline"><span>K:ask  @:send  !:sessions  &gt;:agent  ?:help</span><span><span class="cc">✳ 1 working</span> · <span class="warn">⚑ 1 needs you</span></span></div>
+    </div>
+  </div>
+  <div class="legend">
+    <div><span class="chip">A</span><p><strong>File panels.</strong> Your folders. <kbd>tab</kbd> moves to the next panel, <kbd>n</kbd> opens another. A <span class="tag cc">✳</span> marks a file a running session changed.</p></div>
+    <div><span class="chip">B</span><p><strong>Preview.</strong> The file under the cursor; while you are in the Sessions box, the selected session's conversation.</p></div>
+    <div><span class="chip">C</span><p><strong>Sessions box.</strong> Every running session, <span class="tag cc">cc</span> for Claude Code and <span class="tag co">co</span> for Codex. <kbd>!</kbd> goes in and out.</p></div>
+    <div><span class="chip">D</span><p><strong>Details.</strong> The file, your Mac's cpu, memory and disk, and file operations under way. <kbd>M</kbd> focuses it.</p></div>
+    <div><span class="chip">E</span><p><strong>Ask box.</strong> Where you write to a session, or start a new one. <kbd>K</kbd> opens it.</p></div>
+    <div><span class="chip">F</span><p><strong>Status line.</strong> The keys you can press now, and how many sessions are working, need you or have unread replies. <kbd>F</kbd> hides the boxes at the foot.</p></div>
+  </div>
+</section>
+
+<section aria-labelledby="s3">
+  <div class="step-head"><span class="step-num">3</span><h2 id="s3">Move through your files</h2></div>
+  <div class="keys-wrap">
+    <table class="keys">
+      <thead><tr><th scope="col">Keys</th><th scope="col">What they do</th></tr></thead>
+      <tbody>
+        <tr><td><kbd>j</kbd> <kbd>k</kbd> or arrows</td><td>Down and up the list; <kbd>g</kbd> and <kbd>G</kbd> jump to the top and bottom</td></tr>
+        <tr><td><kbd>l</kbd> / <kbd>enter</kbd> · <kbd>h</kbd> / <kbd>backspace</kbd></td><td>Open the folder or file · go to the parent folder</td></tr>
+        <tr><td><kbd>z</kbd> · <kbd>s</kbd></td><td>Jump to a folder you use often (zoxide) · the popup with pinned folders, sessions and recent files</td></tr>
+        <tr><td><kbd>/</kbd> · <kbd>f</kbd></td><td>Filter this folder · search inside it</td></tr>
+        <tr><td><kbd>space</kbd></td><td>Select the item under the cursor (<kbd>A</kbd> selects all)</td></tr>
+        <tr><td><kbd>ctrl+c</kbd> <kbd>ctrl+x</kbd> <kbd>v</kbd></td><td>Copy, cut, paste</td></tr>
+        <tr><td><kbd>a</kbd> · <kbd>r</kbd> · <kbd>ctrl+d</kbd></td><td>Create · rename · move to the Trash</td></tr>
+        <tr><td><kbd>e</kbd> · <kbd>p</kbd></td><td>Open in your editor · copy the path</td></tr>
+        <tr><td><kbd>?</kbd> · <kbd>q</kbd></td><td>Every key, with what it does · quit</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section aria-labelledby="s4">
+  <div class="step-head"><span class="step-num">4</span><h2 id="s4">Start a session beside your files</h2></div>
+  <p>Press <kbd>&gt;</kbd> for Agent mode and type one of these; the session opens in a WezTerm pane next to Marmota, in the folder you are in.</p>
+  <div class="keys-wrap">
+    <table class="keys">
+      <tbody>
+        <tr><td><code>claude</code></td><td>Claude Code</td></tr>
+        <tr><td><code>claude rc</code></td><td>Claude Code with Remote Control on, so you can follow it from your phone</td></tr>
+        <tr><td><code>codex</code></td><td>The Codex CLI</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Press <kbd>@</kbd> in a file panel to type the selected files into that session as mentions, then switch to its pane and say what to do with them.</p>
+</section>
+
+<section aria-labelledby="s5">
+  <div class="step-head"><span class="step-num">5</span><h2 id="s5">Keep an eye on your sessions</h2></div>
+  <p>Press <kbd>!</kbd>. The Sessions box takes the keyboard and lands on the session that most needs you. Each row shows how the session stands, which program it runs in, its name and its age; the line under it says what it is doing.</p>
+  <div class="states">
+    <div class="state"><span class="g tag cc">✳</span><strong>Working</strong><span>It is replying or running a tool.</span></div>
+    <div class="state"><span class="g" style="color: var(--accent)">⚑</span><strong>Needs you</strong><span>It asks for a permission or an answer.</span></div>
+    <div class="state"><span class="g tag co">●</span><strong>Unread</strong><span>It replied since you last looked.</span></div>
+    <div class="state"><span class="g" style="color: var(--muted)">○</span><strong>Waiting</strong><span>It is idle, ready for your next prompt.</span></div>
+  </div>
+  <div class="keys-wrap">
+    <table class="keys">
+      <thead><tr><th scope="col">In the Sessions box</th><th scope="col">What it does</th></tr></thead>
+      <tbody>
+        <tr><td><kbd>j</kbd> <kbd>k</kbd> · <kbd>enter</kbd></td><td>Move between sessions · show the session's pane beside Marmota</td></tr>
+        <tr><td><kbd>W</kbd> · <kbd>]</kbd> <kbd>[</kbd></td><td>The files this session changed · the next and previous change in the preview's diff</td></tr>
+        <tr><td><kbd>V</kbd></td><td>Pin the preview to this session while you browse files</td></tr>
+        <tr><td><kbd>r</kbd> · <kbd>w</kbd> · <kbd>x</kbd></td><td>Rename · fork into a new git worktree · stop (it asks first)</td></tr>
+        <tr><td><kbd>m</kbd> · <kbd>n</kbd></td><td>Mention this Claude Code session in the Ask box (Codex sessions have no name to mention) · write to a new session</td></tr>
+        <tr><td><kbd>!</kbd> or <kbd>esc</kbd></td><td>Back to your files</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section aria-labelledby="s6">
+  <div class="step-head"><span class="step-num">6</span><h2 id="s6">Ask without leaving your files</h2></div>
+  <p>Press <kbd>K</kbd>. What you write goes to the session the Sessions box is on: typed into a Claude Code session's prompt, or sent to Codex, which runs it after what it is doing. On a new session (<kbd>n</kbd> in the Sessions box, or a folder with none), sending starts one in the background and keeps the keyboard with you.</p>
+  <div class="keys-wrap">
+    <table class="keys">
+      <thead><tr><th scope="col">In the Ask box</th><th scope="col">What it does</th></tr></thead>
+      <tbody>
+        <tr><td><kbd>enter</kbd></td><td>Send</td></tr>
+        <tr><td><kbd>tab</kbd></td><td>For a new session: Claude Code or Codex (Claude Code unless you switch)</td></tr>
+        <tr><td><kbd>ctrl+o</kbd> · <kbd>ctrl+t</kbd></td><td>The model · the effort (medium unless you choose). For a running Codex session they change from your next message.</td></tr>
+        <tr><td><kbd>shift+tab</kbd></td><td>The permission mode a new session runs in: bypass, accept edits, auto, plan or manual</td></tr>
+        <tr><td><kbd>↑</kbd> <kbd>↓</kbd> · <kbd>ctrl+u</kbd></td><td>Your earlier messages to this session · clear what you wrote</td></tr>
+        <tr><td><kbd>esc</kbd></td><td>Close the box; your draft stays for next time</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>In a file panel, <kbd>m</kbd> adds the file under the cursor (or the selection) to your draft, so the session knows exactly which file you mean.</p>
+</section>
+
+<section aria-labelledby="s7">
+  <div class="step-head"><span class="step-num">7</span><h2 id="s7">Answer a session that needs you</h2></div>
+  <p>When a session asks something, its row shows <span style="color: var(--accent)">⚑</span>, the status line counts it, and the preview shows the question as the session draws it, options included. Press <kbd>K</kbd> and your keys go to that question: <kbd>y</kbd>, <kbd>enter</kbd>, the arrows, <kbd>esc</kbd>, whatever it takes. <kbd>ctrl+k</kbd> gives the keyboard back to the list.</p>
+</section>
+
+<section aria-labelledby="s8">
+  <div class="step-head"><span class="step-num">8</span><h2 id="s8">Make it yours</h2></div>
+  <ul class="plain">
+    <li><code>y path-list</code> prints where your settings live, usually <code>~/.config/marmota</code>.</li>
+    <li><code>config.toml</code>: your editor, theme, preview settings, <code>codex_command</code>, and <code>cd_on_quit</code> (your shell moves to the folder you quit in).</li>
+    <li><code>hotkeys.toml</code>: every key. If you prefer Vim keys, copy <code>src/superfile_config/vimHotkeys.toml</code> over it.</li>
+    <li>Themes: set <code>theme</code> to the name of any file in the <code>theme</code> folder.</li>
+  </ul>
+</section>
+
+<footer>
+  <span>Marmota is written by Junjie Liang. It is adapted from <a href="https://github.com/yorukot/superfile">superfile</a> by Yorukot, under the MIT License.</span>
+  <span>Questions and ideas: <a href="https://github.com/junjieliang672/marmota/issues">github.com/junjieliang672/marmota/issues</a></span>
+</footer>
+
+</div>
+
+</body>
+</html>

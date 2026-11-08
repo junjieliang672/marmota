@@ -1,0 +1,45 @@
+*.log
+bin/
+dist/
+.idea/
+
+# generated types
+.astro/
+
+# dependencies
+node_modules/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Go test coverage reports
+coverage.out
+coverage.html
+
+# environment variables
+.env
+.env.production
+.direnv
+
+# Python virtual environments
+venv/
+.venv/
+testsuite/venv/
+testsuite/.venv/
+
+# macOS-specific files
+.DS_Store
+
+# kingjj Project Knowledge Base — local agent workspace
+.knowledge/
+
+# Agents' local settings (user-specific paths, hooks, webhooks): never published
+.claude/
+.codex/
+.auto-claude/
+
+# Git worktrees created by sessions forked from superfile
+.worktrees/

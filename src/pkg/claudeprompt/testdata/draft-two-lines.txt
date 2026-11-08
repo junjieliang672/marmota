@@ -1,0 +1,51 @@
+
+  Wren was a young vixen, copper-red and thin, born in a spring of floods. She had not yet learned
+  what the older foxes knew: that winter was something to survive and nothing more. When the first
+  snow fell, she didn't curl into her den. She went out walking.
+
+  She walked the path to the stream and memorized it by the shape of the drifts. She found the
+  hollow where the rabbits slept, a soft dip beside a buried log. She noted where the badger's
+  tunnel breathed warm air into the cold, melting a small dark circle in the white. Each night she
+  walked farther, and each night she remembered more.
+
+  The older foxes laughed at her. "Snow keeps nothing," said Bracken, a grizzled dog-fox with a torn
+  ear. "Tomorrow it falls again, and your paths are gone."
+
+  "Then I'll walk them again," said Wren.
+
+  In the deepest part of January, a blizzard came that lasted four days. When it ended, Hollow Wood
+  was unrecognizable. Even the trees seemed to have moved. The foxes emerged from their dens, hungry
+  and confused, sniffing at a landscape that had become a stranger.
+
+  Bracken stood at the edge of the clearing for a long time. He was old, and his nose wasn't what it
+  had been, and he could not find the stream.
+
+  Wren came up beside him, her breath steaming.
+
+  "This way," she said.
+
+  She led him past a drift that hid the fallen oak, around a hummock that covered a sharp stone, and
+  down a gentle slope she had walked forty times. There was the stream, black and moving under a
+  skin of ice. Bracken drank for a long time.
+
+  When he lifted his head, he looked at her differently.
+
+  "You kept it," he said. "The snow tried to take the wood, and you kept it."
+
+  Wren didn't answer. She was already looking toward the trees, where three other foxes stood
+  uncertainly at the clearing's edge.
+
+  She trotted toward them, leaving a line of small, careful footprints behind her. They formed a new
+  path across the white.
+
+[38:2::102:102:102m✻[39m [38:2::102:102:102mWorked for 12s · done 11:42 AM
+
+[48:2::240:240:240m❯[39m [38:2::0:0:0m/cd /private/tmp/spf-e2e-b87hogr0/project[39m[K
+[38:2::102:102:102m[49m  ⎿  [39mMoved to (B[0;1m/private/tmp/spf-e2e-b87hogr0/project
+(B[0m                                                                             [38:2::102:102:102mctrl+g to edit in Vim
+[38:2::138:138:138m─────────────────────────────────────────────────────────────────────────────────────── Stash test ─
+[39m❯ fix the sidebar width
+  and its icons
+[38:2::138:138:138m────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m  [38:2::171:43:63m⏵⏵ bypass permissions on[38:2::102:102:102m (shift+tab to cycle)
+[39m

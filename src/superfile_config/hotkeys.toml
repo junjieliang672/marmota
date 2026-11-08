@@ -1,0 +1,162 @@
+##############################################
+#                                            #
+#           Superfile Configuration          #
+#                                            #
+##############################################
+
+# This contains the hotkey config file for superfile; ? in superfile lists
+# every key with what it does.
+
+###############################################################################
+#                                Global hotkeys                               #
+###############################################################################
+
+# Note: These hotkeys should be unique.
+
+#-- Basic Actions
+confirm = ['enter', 'right', 'l']
+cd_quit = ['Q', '']
+quit = ['q', '']
+
+#-- Navigation
+list_down = ['down', 'j']
+list_up = ['up', 'k']
+list_top = ['g', '']
+list_bottom = ['G', '']
+page_down = ['pgdown','']
+page_up = ['pgup','']
+
+#-- File Panel Controls
+close_file_panel = ['w', '']
+create_new_file_panel = ['n', '']
+next_file_panel = ['tab', 'L']
+open_sort_options_menu = ['o', '']
+pinned_directory = ['t', '']
+previous_file_panel = ['shift+left', 'H']
+toggle_file_preview_panel = ['ctrl+f', '']
+toggle_reverse_sort = ['R', '']
+
+#-- Focus Manipulation
+focus_on_metadata = ['M', '']
+focus_on_sidebar = ['s', '']
+jump_to_unread_session = ['!', '']
+send_to_agent = ['@', '']
+move_session_here = ['=', '']
+open_ask_bar = ['K', 'ctrl+k']
+move_pinned_item = ['m', '']
+next_sidebar_section = ['{', '']
+prev_sidebar_section = ['}', '']
+
+#-- File/Dir Creation/Renaming
+file_panel_item_create = ['a', '']
+file_panel_item_rename = ['r', '']
+
+#-- Main File Operations
+copy_items = ['ctrl+c', '']
+cut_items = ['ctrl+x', '']
+delete_items = ['ctrl+d', 'delete', '']
+paste_items = ['v', '']
+permanently_delete_items = ['D', '']
+
+#-- Archive Manipulation
+compress_file = ['ctrl+a', '']
+extract_file = ['ctrl+e', '']
+
+#-- Editor Actions
+open_current_directory_with_editor = ['ctrl+t', '']
+send_to_shelf = ['Y', '']
+show_session_files = ['W', '']
+diff_next_change = [']', '']
+diff_previous_change = ['[', '']
+pin_viewer = ['V', '']
+open_file_with_editor = ['e', '']
+open_file_with_second_editor = ['E', '']
+
+#-- Other Actions
+change_panel_mode = ['ctrl+shift+m', '']
+copy_path = ['p', '']
+copy_parent_path = ['P', '']
+copy_present_working_directory = ['c', '']
+open_command_line = [':', '']
+open_help_menu = ['?', '']
+open_agent_prompt = ['>', '']
+open_zoxide = ['z', '']
+toggle_dot_file = ['.', '']
+toggle_footer = ['F', '']
+
+#-- PDF Preview Navigation
+pdf_next_page = ['alt+shift+right', '']
+pdf_previous_page = ['alt+shift+left', '']
+pdf_first_page = ['B', '']
+
+#-- iCloud Operations (macOS only)
+icloud_filter_menu = ['i', '']
+icloud_refresh_status = ['I', '']
+icloud_download = ['alt+d', '']
+icloud_evict = ['alt+e', '']
+icloud_upload = ['alt+u', '']
+
+###############################################################################
+#                                Typing hotkeys                               #
+###############################################################################
+
+# Note: These hotkeys can override all hotkeys.
+
+confirm_typing = ['enter', '']
+cancel_typing = ['ctrl+c', 'esc']
+
+###############################################################################
+#                            Mode-Specific Hotkeys                            #
+###############################################################################
+
+# Note: These hotkeys can conflict with other modes, but not with global
+# hotkeys.
+
+#-- Normal Mode Actions
+parent_directory = ['h', 'left', 'backspace']
+search_bar = ['/', '']
+search_in_folder = ['f', '']
+pin_parent_folder = ['T', '']
+
+#-- Selection Mode Actions
+file_panel_select_mode_items_select_down = ['shift+down', '']
+file_panel_select_mode_items_select_up = ['shift+up', '']
+file_panel_select_all_items = ['A', '']
+
+#-- Selection Mode Single-Key Operations (yazi-style)
+select_mode_toggle_selection = [' ', '']
+select_mode_copy = ['c', '']
+select_mode_delete = ['d', '']
+select_mode_cut = ['x', '']
+select_mode_paste = ['v', '']
+select_mode_zip = ['z', '']
+select_mode_extract = ['ctrl+e', '']
+manage_tags = ['t', '']
+
+###############################################################################
+#                           Sessions box hotkeys                              #
+###############################################################################
+
+# Note: These only work while the Sessions box at the foot (jump_to_unread_session)
+# has the keyboard, so they can reuse keys from other sections.
+
+session_new = ['n', '']
+session_mention = ['m', '']
+session_rename = ['r', '']
+session_fork = ['w', '']
+session_stop = ['x', '']
+
+###############################################################################
+#                              Ask bar hotkeys                                #
+###############################################################################
+
+# Note: These only work while the Ask bar (open_ask_bar) has the keyboard. It
+# takes typing, so use keys that don't type text.
+
+ask_choose_agent = ['tab', '']
+ask_choose_model = ['ctrl+o', '']
+ask_choose_effort = ['ctrl+t', '']
+ask_choose_permission_mode = ['shift+tab', '']
+ask_clear = ['ctrl+u', '']
+ask_previous = ['ctrl+p', '']
+ask_next = ['ctrl+n', '']

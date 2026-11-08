@@ -1,0 +1,51 @@
+  Carrow Point's signature, the light's own name spelled out in fire.
+
+  At dawn, the coast guard found the trawler (B[0m[3mMargaret Anne(B[0m anchored safely in the lee of Gull
+  Island. Her captain said he had lost his instruments in the storm and was steering blind toward
+  the rocks when he saw it: three seconds of light, seven of darkness. He said he had known exactly
+  where he was.
+
+  The automated system was installed in April, as scheduled. Elias packed his logbooks into two
+  cardboard boxes and moved to a cottage in the village with a window facing the point.
+
+  Every night, he still watches the light turn. Three seconds on, seven dark. The machine keeps
+  perfect time.
+
+  Sometimes, though, he swears it hesitates on the dark beat. It's never more than a heartbeat, as
+  if the lighthouse is holding its breath, waiting for footsteps on the stairs.
+
+  ---
+
+  (B[0m[3mThe background [38:2::87:105:247msleep 30[39m from earlier is still running. I'll say "done" when it finishes.
+
+(B[0m[38:2::102:102:102m✻[39m [38:2::102:102:102mWorked for 19s · done 11:17 AM
+
+[38:2::44:122:57m⏺[39m Background command "Wait 30 seconds in the background" completed (exit code 0)
+
+[38:2::0:0:0m⏺[39m done
+
+[38:2::102:102:102m✻[39m [38:2::102:102:102mSautéed for 2s · done 11:17 AM[39m
+
+[38:2::102:102:102m[48:2::240:240:240m❯[39m [38:2::0:0:0m/rename fix @READ[39m [49m
+[38:2::102:102:102m  ⎿  [39mSession renamed to: fix @READ
+
+[38:2::102:102:102m[48:2::240:240:240m❯[39m [38:2::0:0:0m/rename Stash test[39m [49m
+[38:2::102:102:102m  ⎿  [39mSession renamed to: Stash test
+
+[38:2::102:102:102m[48:2::240:240:240m❯ [38:2::0:0:0mfirst lineUse the AskUserQuestion tool to ask me whether I prefer red or blue. Nothing else.[39m[K
+[38:2::102:102:102m[49m────────────────────────────────────────────────────────────────────────────────────────────────────
+[38:2::255:255:255m[48:2::87:105:247m ☐ Color 
+
+(B[0;1m[38:2::0:0:0mDo you prefer red or blue?
+
+(B[0m[38:2::87:105:247m❯[39m [38:2::102:102:102m1.[39m [38:2::87:105:247mRed
+[39m     [38:2::102:102:102mYou prefer red.
+[39m  [38:2::102:102:102m2.[39m Blue
+     [38:2::102:102:102mYou prefer blue.
+[39m  [38:2::102:102:102m3. Type something.
+────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m  4. Chat about this
+
+[38:2::102:102:102mEnter to select · ↑/↓ to navigate · Esc to cancel
+[38:2::138:138:138m─────────────────────────────────────────────────────────────────────────────────────── Stash test ─
+[39m

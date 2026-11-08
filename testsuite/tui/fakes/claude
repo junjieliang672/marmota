@@ -1,0 +1,33 @@
+#!/usr/bin/env python3
+"""Fake `claude` CLI for spf TUI tests.
+
+* ``claude --version``: prints a fixed version.
+* ``claude agents --json [--all] [--cwd P]``: prints $FAKE_CLAUDE_AGENTS_JSON
+  (default ``[]``). Logged to $FAKE_CLAUDE_QUERY_LOG, not $FAKE_CLAUDE_LOG.
+* anything else: appends argv to $FAKE_CLAUDE_LOG and exits 0.
+"""
+import os
+import sys
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import _fakelib  # noqa: E402  pylint: disable=wrong-import-position
+
+VERSION = "2.1.318 (Claude Code)"
+
+
+def main(argv):
+    if argv[:1] in (["--version"], ["-v"]):
+        _fakelib.log_call("FAKE_CLAUDE_QUERY_LOG", "claude", "claude-queries")
+        _fakelib.write_out(VERSION)
+        return 0
+    if argv[:1] == ["agents"] and "--json" in argv[1:]:
+        _fakelib.log_call("FAKE_CLAUDE_QUERY_LOG", "claude", "claude-queries")
+        _fakelib.write_out(_fakelib.read_source("FAKE_CLAUDE_AGENTS_JSON", "[]"))
+        return 0
+    _fakelib.log_call("FAKE_CLAUDE_LOG", "claude", "claude")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -1,0 +1,224 @@
+##############################################
+#                                            #
+#           Superfile Configuration          #
+#                                            #
+##############################################
+
+# This contains the root config file for superfile; each setting says what it
+# does. y path-list prints where this file is.
+
+###############################################################################
+#                                   Defaults                                  #
+###############################################################################
+
+#-- File Editor (e key)
+# Default: $EDITOR environment variable, or:
+#   - macOS: "open -a TextEdit"
+#   - Windows: "notepad"
+#   - Linux: "nano"
+editor = "nvim"
+
+#-- Second Editor (E key)
+# Leave blank to use the same as 'editor'
+second_editor = "neovide"
+
+#-- Directory Editor
+# Default:
+#   - macOS: "open"
+#   - Windows: "explorer"
+#   - Linux: "vi"
+dir_editor = ""
+
+#-- Shelf App
+# The macOS app the send_to_shelf key (Y) hands the selected files to, so you
+# can drag them from its shelf into another app. Any app name `open -a` takes.
+shelf_app = "Yoink"
+
+#-- Codex
+# The codex program Codex sessions start with. Leave blank for the newest
+# one that runs, from PATH or the ChatGPT app. Don't add -c or --config:
+# with one, Codex runs the session on a server of its own, where superfile
+# can't see it.
+codex_command = ""
+
+#-- cd on quit
+# Should we cd the shell to the last directory open in superfile when the
+# program exits? 
+cd_on_quit = false
+
+#-- File Preview
+# Should we open a file preview by default whenever selection-hovering over a
+# file?
+default_open_file_preview = true
+
+#-- Image Preview
+# Should we open an image preview by default whenever selection-hovering over an
+# image?
+show_image_preview = true
+
+#-- File Info Footer
+# Should we display a footer in the file panel that provides more file information?
+show_panel_footer_info = true
+
+#-- Default Directory
+# The initial path that the file panel should navigate to when superfile is
+# opened. This setting understands relative paths such as ".", "..", etc.
+default_directory = "."
+
+#-- File Size Units
+# true: SI decimal units of 1000 (kB, MB, GB).
+# false: IEC binary units of 1024 (KiB, MiB, GiB).
+file_size_use_si = false
+
+#-- Default File Sort Type
+# (0: Name, 1: Size, 2: Date Modified, 3: Type).
+default_sort_type = 0
+
+#-- Sort Order Reversing
+# true: Descending.
+# false: Ascending.
+sort_order_reversed = false
+
+#-- Case-Sensitive Sorting (only for Name Sort)
+# An uppercase "B" comes before a lowercase "a" if true.
+case_sensitive_sort = false
+
+#-- Exit Shell on Success
+# Whether to exit the shell on successful command execution.
+shell_close_on_success = false
+
+#-- Debug Mode
+debug = false
+
+#-- Ignore Missing Config Fields
+# Whether to silence any warnings about missing config fields.
+ignore_missing_fields = false
+
+###############################################################################
+#                                   Styling                                   #
+###############################################################################
+
+#-- Theme
+# Put your theme's name here!
+theme = "catppuccin-mocha"
+
+#-- Code Previewer
+# Whether to use the builtin syntax highlighting with chroma or use bat. Values: "" for builtin chroma, "bat" for bat
+code_previewer = ""
+
+#-- Nerd Fonts Support
+# Whether to enable support for Nerd Fonts symbols.
+# Requires:  Font patched with the Nerd Fonts patch.
+nerdfont = true
+
+#-- Show checkbox icons in select mode
+# Requires: nerdfont = true
+show_select_icons = true
+
+#-- Transparent Background Support
+# Set to true to enable background transparency.
+# Requires: terminal support for colour transparency
+transparent_background = false
+
+#-- File Preview Panel Width
+# Width of the file preview panel will be 1/n of the total width.
+# Values recommended to be in 2–10.
+# Default (0): Use the same width as file picker panel.
+file_preview_width = 0
+
+#-- Border
+# Make sure to add strings that are exactly one character wide!
+# Use ' ' for borderless.
+border_top = '─'
+border_bottom = '─'
+border_left = '│'
+border_right = '│'
+border_top_left = '╭'
+border_top_right = '╮'
+border_bottom_left = '╰'
+border_bottom_right = '╯'
+border_middle_left = '├'
+border_middle_right = '┤'
+
+###############################################################################
+#                                   Plugins                                   #
+###############################################################################
+
+# This section is for using plugins with superfile, external addons that extend
+# the default capabilities of the program.
+
+#-- Detailed Metadata
+# Requires: exiftool
+metadata = false
+
+#-- MD5 Checksum Generation
+# Requires: md5sum
+enable_md5_checksum = false
+#
+#-- Zoxide Support - Smart directory navigation!
+# Requires: zoxide
+zoxide_support = true
+
+###############################################################################
+#                              UI Enhancements                                #
+###############################################################################
+
+#-- Bottom Status Line
+# Show a bottom status line displaying useful hotkeys for quick reference
+show_status_line = true
+
+###############################################################################
+#                         Directory Preview Settings                          #
+###############################################################################
+
+#-- Tree View for Directories
+# Enable tree structure view for directory previews (shows nested folders/files)
+dir_preview_tree_view = true
+
+#-- Tree Maximum Depth
+# How deep to traverse directories in tree view
+# 0: List only (no nesting), -1: Unlimited, 2: Default (recommended)
+dir_preview_max_depth = 2
+
+#-- Maximum Files to Show (Root Level)
+# Limit number of files/directories shown at the root level
+# 0: No limit, 20: Default (shows more at top level)
+dir_preview_max_files = 20
+
+#-- Maximum Files in Nested Directories
+# Limit files shown in subdirectories to prevent overwhelming the view
+# Large folders won't dominate the preview when nested
+# 0: Use same as root level, 5: Default (recommended for clarity)
+dir_preview_max_files_nested = 5
+
+#-- Show Hidden Files in Preview
+# Whether to display hidden files (starting with .) in directory previews
+dir_preview_show_hidden = false
+
+#-- Compact Tree Symbols
+# Use compact tree drawing characters (saves horizontal space)
+dir_preview_compact_tree = false
+
+#-- Show File Counts
+# Display counts of files and subdirectories in tree view
+dir_preview_show_count = true
+
+###############################################################################
+#                         IME Integration (macOS)                             #
+###############################################################################
+
+#-- Hold the Input Method in ASCII Mode
+# With a CJK input method active, single-letter hotkeys (j, k, a, r, /) never
+# reach superfile at all: the input method swallows them into its composition
+# buffer first. When this is on, superfile asks the input method to pass keys
+# through while it is in hotkey mode, and releases that request as soon as a
+# text field (rename, search, prompt, zoxide) takes focus, so you can still
+# type Chinese where it matters.
+# Needs an input method that honours the ascii-hold protocol, such as MarmotIM.
+# Has no effect on Linux or Windows.
+ime_ascii_hold = true
+
+#-- Request Directory
+# Where the ascii-hold request files are written.
+# Empty uses ~/Library/Application Support/MarmotIM/ascii-hold
+ime_ascii_hold_dir = ""

@@ -1,0 +1,74 @@
+#!/bin/sh
+# Stand-in for the claude CLI in live WezTerm tests.
+#
+#   claude agents --json        prints every registered fake session
+#   claude [--resume ID | --session-id ID] ... [-- PROMPT]
+#                               registers a session for this terminal, writes a
+#                               transcript (with PROMPT as the first message),
+#                               then draws a prompt box and takes what is
+#                               typed there (fake_prompt.py)
+#   claude attach NAME          waits
+#
+# FAKE_CLAUDE_REG is the registry folder; CLAUDE_CONFIG_DIR holds transcripts.
+set -eu
+reg="${FAKE_CLAUDE_REG:?}"
+mkdir -p "$reg"
+
+if [ "${1:-}" = "agents" ]; then
+	printf '['
+	first=1
+	for f in "$reg"/*.json; do
+		[ -e "$f" ] || continue
+		pid=$(sed -n 's/.*"pid":"\([0-9]*\)".*/\1/p' "$f")
+		kill -0 "$pid" 2>/dev/null || { rm -f "$f"; continue; }
+		[ $first -eq 1 ] || printf ','
+		first=0
+		cat "$f"
+	done
+	printf ']\n'
+	exit 0
+fi
+
+if [ "${1:-}" = "attach" ]; then
+	exec sleep 600
+fi
+
+id=""
+remote=""
+prompt="hello from the live test"
+while [ $# -gt 0 ]; do
+	case "$1" in
+	--resume | --session-id) id="$2"; shift ;;
+	--remote-control) remote=1 ;;
+	--) prompt="${2:-}"; break ;;
+	esac
+	shift
+done
+[ -n "$id" ] || id="fake-$(date +%s)-$$"
+n=$(ls "$reg"/*.json 2>/dev/null | wc -l | tr -d ' ')
+title="local$((n + 1))"
+[ -z "$remote" ] || title="remote$((n + 1))"
+
+cwd=$(pwd)
+slug=$(printf "%s" "$cwd" | sed "s/[^A-Za-z0-9]/-/g")
+dir="$CLAUDE_CONFIG_DIR/projects/$slug"
+mkdir -p "$dir"
+transcript="$dir/$id.jsonl"
+now=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
+{
+	printf '{"type":"ai-title","aiTitle":"%s","sessionId":"%s"}\n' "$title" "$id"
+	content=$(/usr/bin/python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$prompt")
+	printf '{"type":"user","message":{"role":"user","content":%s},"timestamp":"%s","cwd":"%s","sessionId":"%s"}\n' "$content" "$now" "$cwd" "$id"
+	printf '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Ready."}]},"timestamp":"%s"}\n' "$now"
+	printf '{"type":"system","subtype":"turn_duration","durationMs":5,"timestamp":"%s"}\n' "$now"
+	[ -z "$remote" ] || printf '{"type":"bridge-session","sessionId":"%s","bridgeSessionId":"cse_test"}\n' "$id"
+} >>"$transcript"
+
+# milliseconds, as Claude Code records them: sessions started in the same
+# second must still sort newest first
+started=$(/usr/bin/python3 -c 'import time; print(int(time.time() * 1000))')
+printf '{"pid":"%s","cwd":"%s","kind":"interactive","startedAt":"%s","sessionId":"%s","name":"%s","status":"idle"}' \
+	"$$" "$cwd" "$started" "$id" "$title" >"$reg/$id.json"
+printf '%s\n' "$transcript" >"$reg/$id.transcript"
+# The prompt box superfile reads before it types into a session.
+exec /usr/bin/python3 "$(dirname "$0")/fake_prompt.py" "$id"

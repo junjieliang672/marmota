@@ -1,0 +1,66 @@
+# Catppuccin Mocha, styled like the AI-native superfile mockup: lavender
+# borders on whatever has focus, blue folders, and a highlighted cursor row.
+# Based on the catppuccin-mocha theme.
+
+code_syntax_highlight = "catppuccin-mocha"
+
+# ========= Border =========
+file_panel_border = "#6c7086"
+sidebar_border = "#1e1e2e"
+footer_border = "#6c7086"
+
+# ========= Border Active =========
+file_panel_border_active = "#b4befe"
+sidebar_border_active = "#b4befe"
+footer_border_active = "#b4befe"
+modal_border_active = "#b4befe"
+
+# ========= Background (bg) =========
+full_screen_bg = "#1e1e2e"
+file_panel_bg = "#1e1e2e"
+sidebar_bg = "#1e1e2e"
+footer_bg = "#1e1e2e"
+modal_bg = "#1e1e2e"
+
+# ========= Foreground (fg) =========
+full_screen_fg = "#a6adc8"
+file_panel_fg = "#a6adc8"
+sidebar_fg = "#a6adc8"
+footer_fg = "#a6adc8"
+modal_fg = "#a6adc8"
+
+# ========= Special Color =========
+cursor = "#98d0fd"
+correct = "#a6e3a1"
+error = "#f38ba8"
+hint = "#89dceb"
+cancel = "#eba0ac"
+# Gradient color can only have two color!
+gradient_color = ["#89b4fa", "#cba6f7"]
+
+# ========= File Panel Special Items =========
+file_panel_top_directory_icon = "#89b4fa"
+file_panel_top_path = "#89b4fa"
+file_panel_item_selected_fg = "#89dceb"
+file_panel_item_selected_bg = "#1e1e2e"
+# The cursor row is a highlighted bar; folders are blue.
+file_panel_cursor_fg = "#98d0fd"
+file_panel_cursor_bg = "#313244"
+file_panel_directory_fg = "#89b4fa"
+
+# ========= Sidebar Special Items =========
+sidebar_title = "#89dceb"
+sidebar_item_selected_fg = "#98d0fd"
+sidebar_item_selected_bg = "#1e1e2e"
+# Section dividers blend into the background, as in the mockup.
+sidebar_divider = "#1e1e2e"
+
+# ========= Modal Special Items =========
+modal_cancel_fg = "#383838"
+modal_cancel_bg = "#eba0ac"
+modal_confirm_fg = "#383838"
+modal_confirm_bg = "#89dceb"
+
+# ========= Help Menu =========
+help_menu_hotkey = "#89dceb"
+help_menu_title = "#b4befe"
