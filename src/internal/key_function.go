@@ -170,11 +170,19 @@ func (m *model) mainKey(msg string) tea.Cmd { //nolint:gocyclo,cyclop,funlen,mai
 	case slices.Contains(common.Hotkeys.PinViewer, msg):
 		return m.togglePinViewer()
 
-	case slices.Contains(common.Hotkeys.DiffNextChange, msg):
+	// In a session's files (W) the diff keys go through its changes; they
+	// share [ and ] with the session keys.
+	case m.touchedLayer() != nil && slices.Contains(common.Hotkeys.DiffNextChange, msg):
 		m.jumpDiffChange(1)
 
-	case slices.Contains(common.Hotkeys.DiffPreviousChange, msg):
+	case m.touchedLayer() != nil && slices.Contains(common.Hotkeys.DiffPreviousChange, msg):
 		m.jumpDiffChange(-1)
+
+	case slices.Contains(common.Hotkeys.NextSession, msg):
+		return m.stepDockSession(1)
+
+	case slices.Contains(common.Hotkeys.PreviousSession, msg):
+		return m.stepDockSession(-1)
 
 	case slices.Contains(common.Hotkeys.SendToShelf, msg):
 		return m.sendToShelf()

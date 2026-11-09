@@ -149,6 +149,16 @@ func getHelpMenuData() []helpMenuModalData {
 			hotkeyWorkType: globalType,
 		},
 		{
+			hotkey:         common.Hotkeys.NextSession,
+			description:    "Sessions box at the foot, on the next session (from the files: after the one it was last on); round at the end",
+			hotkeyWorkType: globalType,
+		},
+		{
+			hotkey:         common.Hotkeys.PreviousSession,
+			description:    "Sessions box at the foot, on the previous session; in a session's files (W) these two go through the diff instead",
+			hotkeyWorkType: globalType,
+		},
+		{
 			hotkey:         common.Hotkeys.SendToAgent,
 			description:    "Send the selection to the session beside Marmota",
 			hotkeyWorkType: globalType,
@@ -560,12 +570,12 @@ func getHelpMenuData() []helpMenuModalData {
 		},
 		{
 			hotkey:         common.Hotkeys.DiffNextChange,
-			description:    "In a session's files: the diff's next change",
+			description:    "In a session's files (W): the diff's next change",
 			hotkeyWorkType: normalType,
 		},
 		{
 			hotkey:         common.Hotkeys.DiffPreviousChange,
-			description:    "In a session's files: the diff's previous change",
+			description:    "In a session's files (W): the diff's previous change",
 			hotkeyWorkType: normalType,
 		},
 		{

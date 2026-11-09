@@ -66,6 +66,7 @@ y
 | Key | What it does |
 | --- | --- |
 | `!` | Sessions box: in and out |
+| `[` · `]` | Sessions box, on the next · previous session (after `W`: the diff's next · previous change) |
 | `K` | Ask box: write to the selected session (or `n` in the Sessions box for a new one) |
 | `tab` · `ctrl+o` · `ctrl+t` · `shift+tab` | In the Ask box: Claude Code or Codex · model · effort · permission mode |
 | `>` | Agent mode: `claude`, `claude rc`, `codex` |

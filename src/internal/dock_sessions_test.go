@@ -208,3 +208,38 @@ func TestSAndZOpenTheirPopupsFromTheSessionsBox(t *testing.T) {
 	assert.True(t, m.zoxideModal.IsOpen(), "z: the zoxide popup")
 	assert.Equal(t, nonePanelFocus, m.focusPanel)
 }
+
+func TestBracketsStepThroughTheSessions(t *testing.T) {
+	m := dockTestModel(t)
+	first, second := m.dockSessions()[0].ID, m.dockSessions()[1].ID
+	next := func() { pressKey(m, common.Hotkeys.NextSession[0]) }
+	previous := func() { pressKey(m, common.Hotkeys.PreviousSession[0]) }
+
+	next()
+	assert.Equal(t, dockSessionsFocus, m.focusPanel, "the Sessions box has the keyboard")
+	assert.Equal(t, first, m.sessions.list.SelectedID(), "never in the box yet: the first")
+	next()
+	assert.Equal(t, second, m.sessions.list.SelectedID())
+	next()
+	assert.Equal(t, first, m.sessions.list.SelectedID(), "round from the last to the first")
+	previous()
+	assert.Equal(t, second, m.sessions.list.SelectedID(), "and back")
+
+	pressKey(m, "esc")
+	require.Equal(t, nonePanelFocus, m.focusPanel)
+	previous()
+	assert.Equal(t, dockSessionsFocus, m.focusPanel)
+	assert.Equal(t, first, m.sessions.list.SelectedID(), "from the files: before the one the box was last on")
+}
+
+func TestBracketsInASessionsFilesGoThroughTheDiff(t *testing.T) {
+	m, _ := sessionFilesModel(t)
+	pressKey(m, common.Hotkeys.ShowSessionFiles[0])
+	require.NotNil(t, m.touchedLayer())
+
+	pressKey(m, common.Hotkeys.DiffNextChange[0])
+	pressKey(m, common.Hotkeys.DiffPreviousChange[0])
+
+	assert.Equal(t, nonePanelFocus, m.focusPanel, "the keys stayed with the diff")
+	assert.NotNil(t, m.touchedLayer())
+}

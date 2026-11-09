@@ -157,6 +157,8 @@ type HotkeysType struct {
 	FocusOnSidebar      []string `toml:"focus_on_sidebar"`
 	FocusOnMetaData     []string `toml:"focus_on_metadata"`
 	JumpToUnreadSession []string `toml:"jump_to_unread_session"`
+	NextSession         []string `toml:"next_session"`
+	PreviousSession     []string `toml:"previous_session"`
 	SendToAgent         []string `toml:"send_to_agent"`
 	MoveSessionHere     []string `toml:"move_session_here"`
 	OpenAskBar          []string `toml:"open_ask_bar"`

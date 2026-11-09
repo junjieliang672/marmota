@@ -137,6 +137,31 @@ func (m *model) focusDockSessionsOn(id string) tea.Cmd {
 	return tea.Batch(append(cmds, m.sessionsSelectionChanged())...)
 }
 
+// stepDockSession gives the Sessions box the keyboard on the next session
+// (step 1) or the previous one (-1): from the files, next to the session the
+// box was last on, else the first or the last. It goes round at the ends.
+func (m *model) stepDockSession(step int) tea.Cmd {
+	m.refreshSessionsList()
+	sessions := m.dockSessions()
+	if len(sessions) == 0 {
+		return m.focusDockSessions() // says how to start one
+	}
+	from := m.dock.lastID
+	if m.focusPanel == dockSessionsFocus {
+		from = m.sessions.list.SelectedID()
+	}
+	at := slices.IndexFunc(sessions, func(s claudesession.Session) bool { return s.ID == from })
+	switch {
+	case at < 0 && step > 0:
+		at = 0
+	case at < 0:
+		at = len(sessions) - 1
+	default:
+		at = ((at+step)%len(sessions) + len(sessions)) % len(sessions)
+	}
+	return m.focusDockSessionsOn(sessions[at].ID)
+}
+
 // leaveDockSessions gives the keyboard back to what had it before !.
 func (m *model) leaveDockSessions() {
 	if m.sessions.list.IsRenaming() {
@@ -188,6 +213,10 @@ func (m *model) dockSessionsKey(msg tea.KeyMsg) tea.Cmd {
 	case slices.Contains(common.Hotkeys.JumpToUnreadSession, key), isLeaveKey(key):
 		m.leaveDockSessions()
 		return nil
+	case slices.Contains(common.Hotkeys.NextSession, key):
+		return m.stepDockSession(1)
+	case slices.Contains(common.Hotkeys.PreviousSession, key):
+		return m.stepDockSession(-1)
 	case slices.Contains(common.Hotkeys.ListUp, key):
 		selectAt(at - 1)
 	case slices.Contains(common.Hotkeys.ListDown, key):
