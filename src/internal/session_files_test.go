@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/junjieliang672/marmota/src/internal/common"
+	"github.com/junjieliang672/marmota/src/pkg/claudesession"
 )
 
 func TestRenderUnifiedDiff(t *testing.T) {
@@ -136,6 +137,25 @@ func TestTheDiffPreview(t *testing.T) {
 	view = diffText(created)
 	assert.Contains(t, view, "created it")
 	assert.Contains(t, view, "+package a")
+}
+
+// A file the session first changed in the turn under way: its backup is
+// there, but the transcript names it only when the next turn starts.
+func TestTheDiffOfAFileChangedThisTurn(t *testing.T) {
+	m, dir := sessionFilesModel(t)
+	pressKey(m, common.Hotkeys.ShowSessionFiles[0])
+	layer := m.touchedLayer()
+	require.NotNil(t, layer)
+	config := filepath.Dir(claudeProjectsDir())
+	readme := filepath.Join(dir, "README.md")
+	require.NoError(t, os.WriteFile(readme, []byte("# a\n\nnew line\n"), 0o600))
+	history := filepath.Join(config, "file-history", layer.session.id)
+	require.NoError(t, os.WriteFile(filepath.Join(history, claudesession.PathHash(readme)+"@v1"),
+		[]byte("# a\n"), 0o600))
+
+	view := diffText(buildDiffView(config, layer.session, readme, 60))
+	assert.Contains(t, view, "as it was before")
+	assert.Contains(t, view, "+new line")
 }
 
 func TestAFileChangedByShellCommandsShowsThoseChanges(t *testing.T) {

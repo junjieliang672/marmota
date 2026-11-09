@@ -22,20 +22,23 @@ var Models = []string{"", "opus", "sonnet", "haiku", "fable"} //nolint:gocheckno
 var Efforts = []string{"", "low", "medium", "high", "xhigh", "max"} //nolint:gochecknoglobals // fixed list
 
 // PermissionModes are the modes a session the Ask bar starts can run in,
-// bypass (superfile's default) first.
+// bypass (Marmota's default) first.
 //
 //nolint:gochecknoglobals // fixed list
 var PermissionModes = []string{"bypassPermissions", "acceptEdits", "auto", "plan", "manual"}
 
-// PermissionModeLabel is how the bar names a permission mode.
+// PermissionModeLabel is how the bar names a permission mode. Transcripts
+// record manual as "default", Claude Code's own name for it.
 func PermissionModeLabel(mode string) string {
 	switch mode {
 	case "acceptEdits":
 		return "accept edits"
-	case "auto", "plan", "manual":
-		return mode
-	default:
+	case "default", "manual":
+		return "manual"
+	case "", "bypassPermissions":
 		return "bypass"
+	default:
+		return mode
 	}
 }
 

@@ -318,6 +318,12 @@ func buildDiffView(configDir string, ref touchedSessionRef, path string, width i
 	}
 	changes := cachedChanges(ref.transcript, ref.cwd)
 	hash, known := changes.hashes[path]
+	if !known {
+		// Changed this turn: the transcript names its backup only next turn.
+		if _, ok := claudesession.OriginalFile(configDir, ref.id, claudesession.PathHash(path)); ok {
+			hash, known = claudesession.PathHash(path), true
+		}
+	}
 	switch {
 	case !known && len(changes.shell[path]) > 0:
 		return shellDiffView(path, changes.shell[path], width)

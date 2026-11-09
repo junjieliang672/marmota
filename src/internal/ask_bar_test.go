@@ -120,7 +120,7 @@ func TestANewSessionStartsInTheBackground(t *testing.T) {
 	assert.Contains(
 		t,
 		startCommand(t, wez),
-		" -- claude --session-id n-1 --dangerously-skip-permissions --effort medium -- 'group the logos\n\n<superfile-context>\ncwd:",
+		" -- claude --session-id n-1 --dangerously-skip-permissions --effort medium -- 'group the logos\n\n<marmota-context>\ncwd:",
 	)
 	assert.Equal(t, managedAgentHiddenWorkspace, wez.panes[wez.nextPane].Workspace, "in the hidden workspace")
 	assert.Equal(t, 1, wez.panes[20].TabID, "the session beside Marmota stays")
@@ -288,7 +288,7 @@ func TestSendingToARunningSessionTypesIntoItsPane(t *testing.T) {
 	}
 
 	require.NotEmpty(t, pane.keys)
-	assert.True(t, strings.HasPrefix(pane.keys[1], "paste:also update the docs\n\n<superfile-context>"),
+	assert.True(t, strings.HasPrefix(pane.keys[1], "paste:also update the docs\n\n<marmota-context>"),
 		pane.keys[1])
 	input, _, sent := pane.state()
 	require.Len(t, sent, 1, "then enter sends it")

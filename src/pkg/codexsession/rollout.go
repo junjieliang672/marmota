@@ -153,7 +153,7 @@ func (s *Summary) applyEvent(p rolloutPayload, ts time.Time) {
 		}
 		switch p.Item.Type {
 		case "UserMessage":
-			if text := singleLine(claudesession.StripSuperfileContext(p.Item.text())); text != "" {
+			if text := singleLine(claudesession.StripContext(p.Item.text())); text != "" {
 				s.LastPrompt = truncateRunes(text, maxPromptRunes)
 			}
 		case "FileChange":
@@ -358,7 +358,7 @@ func applyTurnLine(turns []claudesession.Turn, line []byte) []claudesession.Turn
 	at := parseTime(r.Timestamp)
 	it := p.Item
 	if it.Type == "UserMessage" {
-		if prompt := strings.TrimSpace(claudesession.StripSuperfileContext(it.text())); prompt != "" {
+		if prompt := strings.TrimSpace(claudesession.StripContext(it.text())); prompt != "" {
 			turns = append(turns, claudesession.Turn{Prompt: prompt, At: at})
 		}
 		return turns

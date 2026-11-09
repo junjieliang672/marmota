@@ -2,6 +2,8 @@ package claudesession
 
 import (
 	"bufio"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -14,6 +16,9 @@ import (
 // and later versions follow. The transcript's file-history-snapshot records
 // say which hash is which file (from @v2 on: v1 itself is never named). A
 // file the session created has no @v1.
+//
+// The snapshot naming a file comes at the start of the next turn, so a file
+// first changed in the current turn is found by PathHash instead.
 
 // BackupHashes maps each file a session's transcript backs up, as an
 // absolute path, to the hash its backups are named by. Paths the transcript
@@ -56,6 +61,13 @@ func BackupHashes(transcriptPath, cwd string) (map[string]string, error) {
 		}
 	}
 	return hashes, sc.Err()
+}
+
+// PathHash is the hash Claude Code names a file's backups by: the first 16
+// hex digits of the sha256 of its absolute path.
+func PathHash(path string) string {
+	sum := sha256.Sum256([]byte(path))
+	return hex.EncodeToString(sum[:8])
 }
 
 // OriginalFile is the backup of a file as it was before the session first

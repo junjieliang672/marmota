@@ -362,7 +362,7 @@ def main() -> int:
 
         new_id = wait_for("the new session", lambda: asked_session("what is in here?"))
         transcript = Path((registry / f"{new_id}.transcript").read_text().strip()).read_text()
-        assert "@assets/ what is in here?\\n\\n<superfile-context>\\ncwd:" in transcript, transcript
+        assert "@assets/ what is in here?\\n\\n<marmota-context>\\ncwd:" in transcript, transcript
         asked_pane = wait_for("the new session in the hidden workspace", hidden_new_pane)
         started.append(asked_pane["pane_id"])
         stays_put("sending to a new session")

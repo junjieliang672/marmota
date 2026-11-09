@@ -34,6 +34,11 @@ func TestBackupHashesAndOriginals(t *testing.T) {
 	assert.False(t, ok, "no @v1: the session created it")
 }
 
+func TestPathHash(t *testing.T) {
+	// The naming checked against Claude Code's own backups on 2026-11-08.
+	assert.Equal(t, "6caa1272ac3870ca", PathHash("/repo/README.md"))
+}
+
 func TestShellHunks(t *testing.T) {
 	transcript := filepath.Join(t.TempDir(), "s.jsonl")
 	line := `{"type":"user","timestamp":"2026-11-07T10:00:00Z","toolUseResult":{"bashEditDiff":{"files":[` +

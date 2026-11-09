@@ -236,7 +236,7 @@ func TestSendToClaudePromptReportsAQuestion(t *testing.T) {
 
 func TestSendToClaudePromptSendsALongRequest(t *testing.T) {
 	f := newFakeClaudePane(t)
-	request := "also update the docs\n\n<superfile-context>\ncwd: ~/work\n</superfile-context>"
+	request := "also update the docs\n\n<marmota-context>\ncwd: ~/work\n</marmota-context>"
 	_, err := sendToClaudePrompt(20, request)
 	require.NoError(t, err, "it shows as [Pasted text #1 +4 lines]")
 	_, _, sent := f.state()

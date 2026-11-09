@@ -175,7 +175,7 @@ func writeFrameRaw(w io.Writer, op byte, fin bool, data []byte) {
 
 const testRollout = `{"timestamp":"2026-11-08T09:13:55.042Z","type":"session_meta","payload":{"id":"t1","cwd":"/w/repo"}}
 {"timestamp":"2026-11-08T09:13:55.900Z","type":"turn_context","payload":{"model":"gpt-6.1-sol","effort":"low"}}
-{"timestamp":"2026-11-08T09:13:55.980Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"UserMessage","content":[{"type":"text","text":"fix the login <superfile-context>folder: /w/repo</superfile-context>"}]}}}
+{"timestamp":"2026-11-08T09:13:55.980Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"UserMessage","content":[{"type":"text","text":"fix the login <marmota-context>folder: /w/repo</marmota-context>"}]}}}
 {"timestamp":"2026-11-08T09:13:58.042Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"AgentMessage","content":[{"type":"Text","text":"Looking at it."}],"phase":"commentary"}}}
 {"timestamp":"2026-11-08T09:13:59.395Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"CommandExecution","command":["/bin/zsh","-lc","go test ./..."]}}}
 {"timestamp":"2026-11-08T09:14:00.000Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"FileChange","changes":{"/w/repo/login.go":{"type":"update","unified_diff":"@@ -3,2 +3,2 @@\n ctx\n-old\n+new\n","move_path":null}}}}}

@@ -169,8 +169,8 @@ func TestTheAskBoxStartsACodexSession(t *testing.T) {
 	assert.Equal(t, st.paneID, m.codex.panes["t1"], "its pane is known")
 	assert.Equal(t, "t1", m.ask.folderSessions[dir], "it is the folder's session")
 	require.Len(t, cx.sent, 2)
-	assert.True(t, strings.HasPrefix(cx.sent[0], "t1: group the logos\n\n<superfile-context>"), cx.sent[0])
-	assert.True(t, strings.HasPrefix(cx.sent[1], "t1: and the icons\n\n<superfile-context>"), cx.sent[1])
+	assert.True(t, strings.HasPrefix(cx.sent[0], "t1: group the logos\n\n<marmota-context>"), cx.sent[0])
+	assert.True(t, strings.HasPrefix(cx.sent[1], "t1: and the icons\n\n<marmota-context>"), cx.sent[1])
 	assert.Equal(t, []codexsession.TurnOptions{{Effort: "medium"}, {Effort: "medium"}}, cx.turns,
 		"medium, not the effort Codex's config.toml sets")
 	assert.Equal(t, "Sent to Group the logos", m.claude.flash)
@@ -269,7 +269,7 @@ func TestACodexStartGetsTheChosenModelAndEffort(t *testing.T) {
 		Live: true, Status: claudesession.StatusIdle, StartedAt: st.began}}
 	runCmd(t, m, m.applyAskStartTick(askStartTickMsg{id: st.id}))
 	require.Len(t, cx.sent, 1)
-	assert.True(t, strings.HasPrefix(cx.sent[0], "t1: group the logos\n\n<superfile-context>"), cx.sent[0])
+	assert.True(t, strings.HasPrefix(cx.sent[0], "t1: group the logos\n\n<marmota-context>"), cx.sent[0])
 	assert.Equal(t, []codexsession.TurnOptions{{Effort: "max", Reviewer: "auto_review"}}, cx.turns)
 }
 
@@ -348,7 +348,7 @@ func TestSendingToACodexSessionGoesThroughCodex(t *testing.T) {
 	assert.Equal(t, []codexsession.TurnOptions{{Model: "gpt-6-luna", Effort: "medium"}}, cx.turns)
 
 	require.Len(t, cx.sent, 1, "not typed into its pane: Codex takes it while it works")
-	assert.True(t, strings.HasPrefix(cx.sent[0], "t1: also update the docs\n\n<superfile-context>"))
+	assert.True(t, strings.HasPrefix(cx.sent[0], "t1: also update the docs\n\n<marmota-context>"))
 	assert.Regexp(t, `notes: +`+regexp.QuoteMeta(filepath.Join(dir, "AGENTS.md")), cx.sent[0], "Codex's notes are AGENTS.md")
 	assert.Equal(t, "Sent to fix sidebar", m.claude.flash)
 }

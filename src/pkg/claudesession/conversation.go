@@ -73,7 +73,7 @@ func applyTurnLine(turns []Turn, line []byte) []Turn {
 		if r.IsMeta {
 			return turns
 		}
-		if p := strings.TrimSpace(StripSuperfileContext(userPromptText(r.Message.Content))); p != "" {
+		if p := strings.TrimSpace(StripContext(userPromptText(r.Message.Content))); p != "" {
 			turns = append(turns, Turn{Prompt: p, At: parseTime(r.Timestamp)})
 		}
 	case recordAssistant:

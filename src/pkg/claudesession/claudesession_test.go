@@ -372,9 +372,11 @@ func TestPromptsLeaveOutSuperfilesContext(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "group the logos into logos/", sum.LastPrompt)
 
-	assert.Equal(t, "a  b", StripSuperfileContext("a "+ContextOpenTag+"x"+ContextCloseTag+" b"))
-	assert.Equal(t, "cut ", StripSuperfileContext("cut "+ContextOpenTag+"never closed"))
-	assert.Equal(t, "plain", StripSuperfileContext("plain"))
+	assert.Equal(t, "a  b", StripContext("a "+ContextOpenTag+"x"+ContextCloseTag+" b"))
+	assert.Equal(t, "cut ", StripContext("cut "+ContextOpenTag+"never closed"))
+	assert.Equal(t, "plain", StripContext("plain"))
+	assert.Equal(t, "older ", StripContext("older <superfile-context>\ncwd: ~/r\n</superfile-context>"),
+		"blocks from before the rename are left out too")
 }
 
 // Claude Code lists a `claude -p` run, such as superfile's Ask bar starts, as
@@ -495,7 +497,7 @@ func TestConversationReadsTheLastTurns(t *testing.T) {
 		`{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"ok"}]}}`,
 		`{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Moved them."}]}}`,
 		`{"type":"user","isMeta":true,"message":{"role":"user","content":"<system-reminder>x</system-reminder>"}}`,
-		`{"type":"user","message":{"role":"user","content":"add a test\n\n<superfile-context>\ncwd: ~/r\n</superfile-context>"}}`,
+		`{"type":"user","message":{"role":"user","content":"add a test\n\n<marmota-context>\ncwd: ~/r\n</marmota-context>"}}`,
 		`{"type":"assistant","isSidechain":true,"message":{"role":"assistant","content":[{"type":"text","text":"a subagent"}]}}`,
 		`{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Added one."}]}}`,
 	}
@@ -519,8 +521,8 @@ func TestConversationReadsTheLastTurns(t *testing.T) {
 // between pasted_content tags.
 func TestAPastedPromptIsAPrompt(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "s.jsonl")
-	pasted := `\n\n<pasted_content id=\"7bde\">\nadd a test\n\n<superfile-context>\ncwd: ~/r\n` +
-		`</superfile-context>\n</pasted_content id=\"7bde\">\n`
+	pasted := `\n\n<pasted_content id=\"7bde\">\nadd a test\n\n<marmota-context>\ncwd: ~/r\n` +
+		`</marmota-context>\n</pasted_content id=\"7bde\">\n`
 	lines := []string{
 		`{"type":"user","message":{"role":"user","content":"first"}}`,
 		`{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"One."}]}}`,

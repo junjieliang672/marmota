@@ -24,18 +24,18 @@ func TestContextBlock(t *testing.T) {
 		InGit: true, GitBranch: "main", GitChanged: 1, Notes: "/home/me/repo/CLAUDE.md",
 	}
 	block := c.Block("/home/me")
-	assert.Equal(t, `<superfile-context>
+	assert.Equal(t, `<marmota-context>
 cwd:      ~/repo/asset
 cursor:   logo.png
 selected: 2 items: logo.png, logo-white.png
 view:     sorted by name ↑, hidden files shown
 git:      main · 1 changed
 notes:    ~/repo/CLAUDE.md
-</superfile-context>`, block)
+</marmota-context>`, block)
 
 	assert.Equal(
 		t,
-		"<superfile-context>\ncwd:      /tmp\n</superfile-context>",
+		"<marmota-context>\ncwd:      /tmp\n</marmota-context>",
 		Context{Folder: "/tmp"}.Block("/home/me"),
 	)
 }
@@ -51,8 +51,8 @@ func TestContextBlockCountsALargeSelection(t *testing.T) {
 
 func TestPromptLeavesOutTheContextWhenShown(t *testing.T) {
 	prompt := Prompt("  group the logos  ", Context{Folder: "/f", Cursor: "a"}, "")
-	assert.True(t, strings.HasPrefix(prompt, "group the logos\n\n<superfile-context>"))
-	assert.Equal(t, "group the logos", strings.TrimSpace(claudesession.StripSuperfileContext(prompt)))
+	assert.True(t, strings.HasPrefix(prompt, "group the logos\n\n<marmota-context>"))
+	assert.Equal(t, "group the logos", strings.TrimSpace(claudesession.StripContext(prompt)))
 }
 
 func TestPermissionModes(t *testing.T) {
@@ -63,6 +63,8 @@ func TestPermissionModes(t *testing.T) {
 	assert.Equal(t, "accept edits", PermissionModeLabel("acceptEdits"))
 	assert.Equal(t, "bypass", PermissionModeLabel("bypassPermissions"))
 	assert.Equal(t, "manual", PermissionModeLabel("manual"))
+	assert.Equal(t, "manual", PermissionModeLabel("default"), "as a transcript records manual")
+	assert.Equal(t, "dontAsk", PermissionModeLabel("dontAsk"), "a mode it doesn't know keeps its name")
 }
 
 func TestModelLabel(t *testing.T) {

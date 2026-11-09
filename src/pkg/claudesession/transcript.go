@@ -165,31 +165,42 @@ func (s *Summary) apply(r record) {
 }
 
 func (s *Summary) setPrompt(p string) {
-	if p = singleLine(StripSuperfileContext(p)); p != "" {
+	if p = singleLine(StripContext(p)); p != "" {
 		s.LastPrompt = truncateRunes(p, maxPromptRunes)
 	}
 }
 
-// ContextOpenTag and ContextCloseTag wrap the context block superfile adds
-// to the requests it sends (package claudeask writes it).
+// ContextOpenTag and ContextCloseTag wrap the context block Marmota adds to
+// the requests it sends (package claudeask writes it).
 const (
-	ContextOpenTag  = "<superfile-context>"
-	ContextCloseTag = "</superfile-context>"
+	ContextOpenTag  = "<marmota-context>"
+	ContextCloseTag = "</marmota-context>"
 )
 
-// StripSuperfileContext leaves out the context blocks superfile added to a
-// prompt, so a prompt reads as what the person typed.
-func StripSuperfileContext(text string) string {
+// The tags Marmota wrote before it was renamed: transcripts from then still
+// hold them.
+const (
+	oldContextOpenTag  = "<superfile-context>"
+	oldContextCloseTag = "</superfile-context>"
+)
+
+// StripContext leaves out the context blocks Marmota added to a prompt, so
+// a prompt reads as what the person typed.
+func StripContext(text string) string {
+	return stripBlocks(stripBlocks(text, ContextOpenTag, ContextCloseTag), oldContextOpenTag, oldContextCloseTag)
+}
+
+func stripBlocks(text, open, closing string) string {
 	for {
-		start := strings.Index(text, ContextOpenTag)
+		start := strings.Index(text, open)
 		if start < 0 {
 			return text
 		}
-		end := strings.Index(text[start:], ContextCloseTag)
+		end := strings.Index(text[start:], closing)
 		if end < 0 {
 			return text[:start]
 		}
-		text = text[:start] + text[start+end+len(ContextCloseTag):]
+		text = text[:start] + text[start+end+len(closing):]
 	}
 }
 
@@ -407,7 +418,7 @@ func userPromptText(raw json.RawMessage) string {
 var pastedTag = regexp.MustCompile(`</?pasted_content(?:\s+id="[^"]*")?>`)
 
 func promptOrEmpty(text string) string {
-	text = singleLine(StripSuperfileContext(pastedTag.ReplaceAllString(text, "")))
+	text = singleLine(StripContext(pastedTag.ReplaceAllString(text, "")))
 	if text == "" || strings.HasPrefix(text, "<") {
 		// <command-name>, <local-command-stdout>, <task-notification> …
 		return ""

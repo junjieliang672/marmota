@@ -154,7 +154,7 @@ func toSession(t thread, tracker *Tracker) claudesession.Session {
 		s.Title = singleLine(*t.Name)
 	}
 	if s.Title == "" {
-		s.Title = truncateRunes(singleLine(claudesession.StripSuperfileContext(t.Preview)), titleRunes)
+		s.Title = truncateRunes(singleLine(claudesession.StripContext(t.Preview)), titleRunes)
 	}
 	if t.ForkedFromID != nil {
 		s.ForkedFrom = *t.ForkedFromID
