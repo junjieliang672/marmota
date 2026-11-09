@@ -1,0 +1,14 @@
+#!/bin/sh
+# The real claude, with your own settings and sign-in. `claude agents --json`
+# lists only the sessions in $DEMO, so yours stay out of the screenshots.
+unset CLAUDE_CONFIG_DIR
+here=$(cd "$(dirname "$0")" && pwd)
+real=$(PATH=$(printf '%s' "$PATH" | tr ':' '\n' | grep -vx "$here" | paste -sd: -) command -v claude)
+if [ "${1:-}" = "agents" ]; then
+	"$real" "$@" | DEMO=${DEMO:?} /usr/bin/python3 -c '
+import json, os, sys
+demo = os.environ["DEMO"].rstrip("/") + "/"
+print(json.dumps([a for a in json.load(sys.stdin) if a.get("cwd", "").startswith(demo)]))'
+	exit 0
+fi
+exec "$real" "$@"

@@ -1,0 +1,4 @@
+[
+  ["[\\w.+-]+@[\\w-]+\\.[\\w.]+", "alex@example.com"],
+  ["week: \\d+% left, resets in \\d+d\\d*h?", "week: 64% left, resets in 3d"]
+]

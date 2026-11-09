@@ -116,6 +116,7 @@ Key message types: `PasteOperationMsg`, `DeleteOperationMsg`, `FilePreviewUpdate
 
 - Unit and model tests never run the real `claude` CLI: `TestMain` in `src/internal/model_test.go` swaps in a fake runner, and makes the WezTerm and clipboard seams fail unless a test fakes them (`newFakeWezterm`, `newFakeClaudePane`).
 - `python3 testsuite/live/wezterm_sessions_test.py --binary ./bin/y` drives a real Marmota inside WezTerm, in a workspace your window doesn't show, with a fake `claude` from `testsuite/live/fakes/`. Its sessions draw a prompt box like Claude Code's (`fake_prompt.py`), since Marmota reads it before typing into a session.
+- The tutorial's screenshots (`docs/shots`) are real sessions on demo projects; `testsuite/shots/README.md` says how to retake them without your own sessions or machine showing.
 
 ## Platform-Specific Notes
 
