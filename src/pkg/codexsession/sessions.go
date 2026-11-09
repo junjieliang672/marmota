@@ -1,6 +1,7 @@
 package codexsession
 
 import (
+	"context"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -109,7 +110,7 @@ func Collect(o Options) ([]claudesession.Session, error) {
 		// which takes some 200 ms each time.
 		"useStateDbOnly": true,
 	}, &recent); err != nil {
-		return out, nil //nolint:nilerr // the loaded ones are listed
+		return withRemoteControl(out, o), nil //nolint:nilerr // the loaded ones are listed
 	}
 	for _, t := range recent.Data {
 		if listed[t.ID] || !wanted(t) || time.Unix(t.UpdatedAt, 0).Before(o.Since) {
@@ -121,7 +122,40 @@ func Collect(o Options) ([]claudesession.Session, error) {
 		listed[t.ID] = true
 		out = append(out, toSession(t, o.Tracker))
 	}
-	return out, nil
+	return withRemoteControl(out, o), nil
+}
+
+// withRemoteControl marks every session when the server has Remote Control
+// on: it is the server's, not a session's, and the ChatGPT app then reaches
+// every session the server runs.
+func withRemoteControl(sessions []claudesession.Session, o Options) []claudesession.Session {
+	if len(sessions) == 0 || !remoteControlOn(o.Home, o.Timeout) {
+		return sessions
+	}
+	for i := range sessions {
+		sessions[i].RemoteControl = true
+	}
+	return sessions
+}
+
+// remoteControlOn says whether the server's Remote Control is on: connected,
+// or still connecting. Disabled, errored, or a server that doesn't know the
+// method (it is experimental) is off.
+func remoteControlOn(home string, timeout time.Duration) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	c, err := dialExperimental(ctx, SocketPath(home))
+	if err != nil {
+		return false
+	}
+	defer c.Close()
+	var st struct {
+		Status string `json:"status"`
+	}
+	if c.Call("remoteControl/status/read", map[string]any{}, &st) != nil {
+		return false
+	}
+	return st.Status == "connected" || st.Status == "connecting"
 }
 
 // wanted leaves out the sessions Codex runs for itself: subagents, and

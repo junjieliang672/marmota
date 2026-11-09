@@ -104,6 +104,7 @@ func (s *Model) HandleSearchBarKey(msg string) tea.Cmd {
 type SessionEntry struct {
 	ID, Title string
 	Codex     bool
+	Remote    bool // Remote Control is on
 }
 
 // SetSessions sets the live sessions listed after Recent.
@@ -111,7 +112,7 @@ func (s *Model) SetSessions(entries []SessionEntry) {
 	s.sessions = s.sessions[:0]
 	for _, e := range entries {
 		s.sessions = append(s.sessions, directory{Name: e.Title, Location: SessionLocationPrefix + e.ID,
-			Codex: e.Codex})
+			Codex: e.Codex, Remote: e.Remote})
 	}
 }
 
@@ -136,7 +137,8 @@ func (s *Model) withSessions(dirs []directory, query string) []directory {
 func (s *Model) sessionsSignal() uint64 {
 	h := fnv.New64a()
 	for _, d := range s.sessions {
-		_, _ = h.Write([]byte(d.Location + "\x00" + d.Name + "\x00" + strconv.FormatBool(d.Codex) + "\x00"))
+		_, _ = h.Write([]byte(d.Location + "\x00" + d.Name + "\x00" + strconv.FormatBool(d.Codex) + "\x00" +
+			strconv.FormatBool(d.Remote) + "\x00"))
 	}
 	return h.Sum64()
 }

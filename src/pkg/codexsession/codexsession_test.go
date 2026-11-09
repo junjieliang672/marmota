@@ -71,6 +71,7 @@ func (f *fakeServer) serve(conn net.Conn) {
 	sum := sha1.Sum([]byte(req.Header.Get("Sec-Websocket-Key") + wsGUID)) //nolint:gosec // the protocol's
 	_, _ = io.WriteString(conn, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"+
 		"Sec-WebSocket-Accept: "+base64.StdEncoding.EncodeToString(sum[:])+"\r\n\r\n")
+	experimental := false // as the real server: some methods want the hello to ask for them
 	for {
 		data, err := readClientFrame(r)
 		if err != nil {
@@ -91,9 +92,15 @@ func (f *fakeServer) serve(conn net.Conn) {
 		writeServerFrame(conn, wsOpPing, []byte("hi"))
 		writeServerFrame(conn, wsOpText, []byte(`{"method":"account/updated","params":{}}`))
 		reply := map[string]any{"id": *msg.ID, "result": answer}
-		if msg.Method == "initialize" {
+		capabilities, _ := msg.Params["capabilities"].(map[string]any)
+		switch {
+		case msg.Method == "initialize":
+			experimental = capabilities["experimentalApi"] == true
 			reply["result"] = map[string]any{}
-		} else if !ok {
+		case strings.HasPrefix(msg.Method, "remoteControl/") && !experimental:
+			reply = map[string]any{"id": *msg.ID, "error": map[string]any{"code": -32600,
+				"message": msg.Method + " requires experimentalApi capability"}}
+		case !ok:
 			reply = map[string]any{"id": *msg.ID, "error": map[string]any{"code": -1, "message": "unknown " + msg.Method}}
 		}
 		data, _ = json.Marshal(reply)
@@ -421,4 +428,26 @@ func TestTheNewestCodexThatRunsIsChosen(t *testing.T) {
 	assert.Equal(t, "/app/codex", got)
 	assert.Equal(t, "codex", newestBinary([]string{"/nvm/codex"}, func(string) []int { return nil }))
 	assert.Equal(t, []int{0, 160, 0}, parseVersion("codex-cli 0.160.0\n"))
+}
+
+// Remote Control is the server's: while it is on, every session the server
+// lists is marked.
+func TestCollectMarksSessionsWhenRemoteControlIsOn(t *testing.T) {
+	now := time.Now().Unix()
+	for _, tc := range []struct {
+		status string
+		on     bool
+	}{{"connected", true}, {"connecting", true}, {"disabled", false}, {"errored", false}} {
+		home, _ := startFakeServer(t, map[string]any{
+			"thread/loaded/list": map[string]any{"data": []string{"t1"}},
+			"thread/read": map[string]any{"thread": map[string]any{"id": "t1", "cwd": "/w/repo",
+				"createdAt": now, "updatedAt": now, "status": map[string]any{"type": "idle"}}},
+			"thread/list":               map[string]any{"data": []map[string]any{}},
+			"remoteControl/status/read": map[string]any{"status": tc.status, "serverName": "mac"},
+		})
+		sessions, err := Collect(Options{Home: home})
+		require.NoError(t, err)
+		require.Len(t, sessions, 1)
+		assert.Equal(t, tc.on, sessions[0].RemoteControl, tc.status)
+	}
 }

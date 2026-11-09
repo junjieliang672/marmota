@@ -145,7 +145,13 @@ func (s *Model) directoryLine(i int, n sidebarNumbering, curFilePanelFileLocatio
 	if session { // cc or co: which program the session runs in
 		tag = common.AgentTag(s.directories[i].Codex, renderStyle.GetBackground()) + renderStyle.Render(" ")
 	}
-	line := st.Text.Render(cursor+" ") + st.Faint.Render(lineNumber) + tag + renderStyle.Render(name)
+	head := st.Text.Render(cursor+" ") + st.Faint.Render(lineNumber) + tag
+	mark := ""
+	if session && s.directories[i].Remote { // Remote Control: the name gives way to the mark
+		mark = renderStyle.Render(" ") + common.RemoteControlMark(renderStyle.GetBackground())
+		name = ansi.Truncate(name, max(1, common.SidebarWidth-ansi.StringWidth(head)-ansi.StringWidth(mark)), "…")
+	}
+	line := head + renderStyle.Render(name) + mark
 	if pad := common.SidebarWidth - ansi.StringWidth(line); picked && pad > 0 {
 		line += st.Text.Render(strings.Repeat(" ", pad)) // the bar spans the row
 	}

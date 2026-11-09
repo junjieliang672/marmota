@@ -66,7 +66,8 @@ func (m *model) sidebarPopupRender() string {
 func (m *model) syncSidebarSessions() {
 	var entries []sidebar.SessionEntry
 	for _, s := range m.dockSessions() {
-		entries = append(entries, sidebar.SessionEntry{ID: s.ID, Title: s.DisplayTitle(), Codex: s.IsCodex()})
+		entries = append(entries, sidebar.SessionEntry{ID: s.ID, Title: s.DisplayTitle(), Codex: s.IsCodex(),
+			Remote: s.RemoteControl})
 	}
 	m.sidebarModel.SetSessions(entries)
 	m.sidebarModel.UpdateDirectories()

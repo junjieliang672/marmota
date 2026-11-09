@@ -81,6 +81,10 @@ def screen(pane_id: int) -> str:
 DOCK_ROW = re.compile(r"^│([▌ ]) (\d+) \S cc (.+?)(?:\s{2,}|│)")
 
 
+# The mark of a session with Remote Control on, with a Nerd Font (the default).
+REMOTE_MARK = "\U000F011C"
+
+
 def dock_rows(pane_id: int) -> list[tuple[str, str, bool]]:
     """The Sessions box's rows, as (number, title, selected)."""
     rows = []
@@ -261,6 +265,12 @@ def main() -> int:
         assert any("local1" in t for t in titles) and any("remote2" in t for t in titles), \
             f"the box doesn't show both sessions: {titles}"
         assert (pane_by_id(second["pane_id"]) or {}).get("tab_id") == spf_tab, "! switched before enter"
+        # The rc session runs with Remote Control: its row carries the phone.
+        rows = {title: line for line in screen(spf).splitlines() if (m := DOCK_ROW.search(line))
+                for title in [m.group(3)]}
+        remote_row = next(line for title, line in rows.items() if "remote2" in title)
+        local_row = next(line for title, line in rows.items() if "local1" in title)
+        assert REMOTE_MARK in remote_row and REMOTE_MARK not in local_row, (remote_row, local_row)
         select_session(spf, "local1")
         type_keys(spf, "\r")
         wait_for("enter to show the first session beside Marmota",
@@ -271,7 +281,8 @@ def main() -> int:
         assert (pane_by_id(first["pane_id"]) or {}).get("is_active"), "enter didn't put the keyboard in the session"
         type_keys(spf, "\x1b")  # esc: back to the files
         wait_for("the files again", lambda: not in_sessions_box(spf))
-        print("ok   ! listed both sessions in the Sessions box; enter on the other switched to it, focused "
+        print("ok   ! listed both sessions in the Sessions box, the rc one with the Remote Control mark; "
+              "enter on the other switched to it, focused "
               "it and parked the rc one in the hidden workspace")
 
         # 5. a new turn in the now-hidden rc session is unread, and ! jumps to it

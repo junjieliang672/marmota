@@ -71,6 +71,16 @@ const (
 // Dial connects to the server at sock and says hello. The connection gives
 // up at the context's deadline.
 func Dial(ctx context.Context, sock string) (*Client, error) {
+	return dial(ctx, sock, false)
+}
+
+// dialExperimental is Dial for the methods the server marks experimental,
+// such as remoteControl/status/read: the hello asks for them.
+func dialExperimental(ctx context.Context, sock string) (*Client, error) {
+	return dial(ctx, sock, true)
+}
+
+func dial(ctx context.Context, sock string, experimental bool) (*Client, error) {
 	if _, err := os.Stat(sock); err != nil {
 		return nil, ErrNoServer
 	}
@@ -88,9 +98,11 @@ func Dial(ctx context.Context, sock string) (*Client, error) {
 		return nil, err
 	}
 	var hello json.RawMessage
-	if err := c.Call("initialize", map[string]any{
-		"clientInfo": map[string]string{"name": "marmota", "version": "1"},
-	}, &hello); err != nil {
+	hi := map[string]any{"clientInfo": map[string]string{"name": "marmota", "version": "1"}}
+	if experimental {
+		hi["capabilities"] = map[string]any{"experimentalApi": true}
+	}
+	if err := c.Call("initialize", hi, &hello); err != nil {
 		conn.Close()
 		return nil, err
 	}

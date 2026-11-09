@@ -13,6 +13,8 @@ type directory struct {
 	EditedAt int64  `json:"edited_at,omitempty"`
 	// Codex is set for a session row that runs in Codex.
 	Codex bool `json:"-"`
+	// Remote is set for a session row with Remote Control on.
+	Remote bool `json:"-"`
 }
 
 // SortInfo holds the active sort state for display in the sidebar.

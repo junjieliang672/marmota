@@ -243,3 +243,27 @@ func TestBracketsInASessionsFilesGoThroughTheDiff(t *testing.T) {
 	assert.Equal(t, nonePanelFocus, m.focusPanel, "the keys stayed with the diff")
 	assert.NotNil(t, m.touchedLayer())
 }
+
+func TestTheSessionsBoxMarksRemoteControl(t *testing.T) {
+	nerdfont := common.Config.Nerdfont
+	t.Cleanup(func() { common.Config.Nerdfont = nerdfont })
+	common.Config.Nerdfont = false
+	m := dockTestModel(t)
+	remote := m.dockSessions()[0]
+	for i := range m.claude.snapshot.Live {
+		if m.claude.snapshot.Live[i].ID == remote.ID {
+			m.claude.snapshot.Live[i].RemoteControl = true
+		}
+	}
+	m.refreshSessionsList()
+
+	box := ansi.Strip(m.dockSessionsRender())
+	var marked []string
+	for _, line := range strings.Split(box, "\n") {
+		if strings.Contains(line, " rc ") {
+			marked = append(marked, line)
+		}
+	}
+	require.Len(t, marked, 1, "one row is marked:\n%s", box)
+	assert.Contains(t, marked[0], remote.DisplayTitle(), "the row of the session with Remote Control")
+}
