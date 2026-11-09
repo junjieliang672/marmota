@@ -594,7 +594,9 @@ type claudeMovedMsg struct {
 	// asks is set when the session asks first whether to work in a folder
 	// it hasn't worked in.
 	asks bool
-	err  error
+	// codexID is the Codex session moved.
+	codexID string
+	err     error
 }
 
 // moveClaudeSessionHere moves the session beside superfile to the folder the
@@ -611,13 +613,10 @@ func (m *model) moveClaudeSessionHere() tea.Cmd {
 
 // moveClaudeSessionTo moves a running session to the folder the file panel
 // shows, by typing Claude Code's /cd into it. The conversation goes on
-// there, and its transcript moves along.
+// there, and its transcript moves along. Codex has no /cd: its server moves
+// the session, from its next turn on.
 func (m *model) moveClaudeSessionTo(s claudesession.Session) tea.Cmd {
 	title := s.DisplayTitle()
-	if s.IsCodex() {
-		m.flashClaude("Codex sessions can't move to another folder")
-		return nil
-	}
 	if !s.Live {
 		m.flashClaude(title + " has ended; resume it to move it")
 		return nil
@@ -635,6 +634,17 @@ func (m *model) moveClaudeSessionTo(s claudesession.Session) tea.Cmd {
 	m.flashClaude("Moving " + title + " to " + tildePath(folder) + "…")
 	msg := claudeMovedMsg{title: title, folder: folder, paneID: pane.PaneID,
 		queued: s.Status == claudesession.StatusWorking}
+	if s.IsCodex() {
+		// Its pane's title names the folder it leaves until Codex sets it
+		// again: the pane is known by the session from here on.
+		m.recordCodexPane(s.ID, pane.PaneID)
+		home := codexHome()
+		msg.codexID = s.ID
+		return func() tea.Msg {
+			msg.err = codexMove(home, msg.codexID, folder)
+			return msg
+		}
+	}
 	return func() tea.Msg {
 		// /cd takes the rest of the line as the path, spaces and all.
 		box, err := sendToClaudePrompt(msg.paneID, "/cd "+folder)
@@ -646,6 +656,20 @@ func (m *model) moveClaudeSessionTo(s claudesession.Session) tea.Cmd {
 
 func (m *model) applyClaudeMoved(msg claudeMovedMsg) {
 	where := tildePath(msg.folder)
+	if msg.codexID != "" && msg.err == nil {
+		// Codex's list says the folder it started in, and its rollout the
+		// old one until its next turn: the list shows the new one now.
+		if m.codex.moved == nil {
+			m.codex.moved = make(map[string]string)
+		}
+		m.codex.moved[msg.codexID] = msg.folder
+		for i := range m.claude.snapshot.Live {
+			if s := &m.claude.snapshot.Live[i]; s.ID == msg.codexID {
+				s.Cwd = msg.folder
+			}
+		}
+		m.refreshSessionsList()
+	}
 	switch {
 	case msg.err != nil:
 		slog.Error("Could not move the Claude session", "session", msg.title, "error", msg.err)

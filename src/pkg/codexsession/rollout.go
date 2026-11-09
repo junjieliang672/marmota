@@ -20,8 +20,8 @@ import (
 // A rollout is a session's log: one JSON record a line, each
 // {timestamp, type, payload}. The records superfile reads:
 //
-//	session_meta                  the folder; a fork's history_base
-//	turn_context                  the model and effort of the turn
+//	session_meta                  the folder it started in; a fork's history_base
+//	turn_context                  the folder, model and effort of the turn
 //	event_msg/item_completed      UserMessage, AgentMessage, CommandExecution,
 //	                              FileChange (each file's unified_diff)
 //	event_msg/task_complete       a turn ended (completed_at, unix seconds)
@@ -122,6 +122,9 @@ func (s *Summary) apply(line []byte) {
 			s.Cwd = p.Cwd
 		}
 	case "turn_context":
+		if p.Cwd != "" { // moved, it works elsewhere from its next turn
+			s.Cwd = p.Cwd
+		}
 		if p.Model != "" {
 			s.Model = p.Model
 		}

@@ -204,7 +204,9 @@ func toSession(t thread, tracker *Tracker) claudesession.Session {
 	if err != nil {
 		return s
 	}
-	if s.Cwd == "" {
+	if sum.Cwd != "" {
+		// The list keeps the folder it started in; its rollout says where
+		// its last turn ran, after a move (see Move).
 		s.Cwd = sum.Cwd
 	}
 	if sum.LastActivity.After(s.LastActivity) {
@@ -277,6 +279,21 @@ func Send(home, id, text string, o TurnOptions) error {
 		params["approvalsReviewer"] = o.Reviewer
 	}
 	return c.Call("turn/start", params, nil)
+}
+
+// Move has a session work in dir from its next turn on: commands run there,
+// and its window shows it. Codex has no /cd; its server's settings do it,
+// and they are experimental. The server's list keeps the folder the session
+// started in; the next turn's record in its rollout says the new one.
+func Move(home, id, dir string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+	c, err := dialExperimental(ctx, SocketPath(home))
+	if err != nil {
+		return err
+	}
+	defer c.Close()
+	return c.Call("thread/settings/update", map[string]any{"threadId": id, "cwd": dir}, nil)
 }
 
 // Rename names a session, as Codex's own rename does.

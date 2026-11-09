@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -545,11 +546,53 @@ func TestACodexSessionsDiffIsWhatItRecorded(t *testing.T) {
 	assert.Contains(t, strings.Join(none.header, "\n"), "Codex recorded no change to this file.")
 }
 
-func TestCodexMentionsAndMovesSayWhyNot(t *testing.T) {
+func TestCodexMentionsSayWhyNot(t *testing.T) {
 	m := newClaudeTestModel(t)
 	s := claudesession.Session{ID: "t1", Agent: claudesession.AgentCodex, Title: "x", Live: true}
 	m.mentionClaudeSession(s)
 	assert.Equal(t, "Codex sessions have no name other sessions can mention", m.claude.flash)
-	assert.Nil(t, m.moveClaudeSessionTo(s))
-	assert.Equal(t, "Codex sessions can't move to another folder", m.claude.flash)
+}
+
+// = moves a Codex session through Codex's server, which has no /cd, and its
+// pane stays its own though the pane's title still names the old folder.
+func TestEqualsMovesACodexSessionHere(t *testing.T) {
+	m := newClaudeTestModel(t)
+	newFakeWezterm(t, superfileTab())
+	here := m.getFocusedFilePanel().location
+	pane := weztermPane{PaneID: 31, TabID: 5, Title: "fix the login | web", TTYName: "/dev/ttys031"}
+	m.claude.panes = append(m.claude.panes, pane)
+	s := claudesession.Session{ID: "t1", Agent: claudesession.AgentCodex, Title: "fix the login", Cwd: "/w/web",
+		Live: true, Status: claudesession.StatusWorking, TTY: pane.TTYName}
+	var moved []string
+	move := codexMove
+	t.Cleanup(func() { codexMove = move })
+	codexMove = func(_, id, dir string) error {
+		moved = append(moved, id+": "+dir)
+		return nil
+	}
+
+	m.claude.snapshot.Live = []claudesession.Session{s}
+	runCmd(t, m, m.moveClaudeSessionTo(s))
+	assert.Equal(t, []string{"t1: " + here}, moved)
+	assert.Equal(t, "fix the login moves to "+tildePath(here)+" once it's done replying", m.claude.flash,
+		"from its next turn on")
+	assert.Equal(t, 31, m.codex.panes["t1"], "its pane is known by the session")
+	assert.Equal(t, here, m.claude.snapshot.Live[0].Cwd, "listed in its new folder at once")
+
+	// Codex's list says the old folder until its next turn's record in its
+	// rollout says the new one.
+	m.claude.snapshot.Live = nil
+	m.mergeCodexSessions([]claudesession.Session{s})
+	require.Len(t, m.claude.snapshot.Live, 1)
+	assert.Equal(t, here, m.claude.snapshot.Live[0].Cwd)
+	moved1 := s
+	moved1.Cwd = here
+	m.claude.snapshot.Live = nil
+	m.mergeCodexSessions([]claudesession.Session{moved1})
+	assert.Empty(t, m.codex.moved, "the rollout caught up")
+
+	codexMove = func(string, string, string) error { return errors.New("no server") }
+	s.Status = claudesession.StatusIdle
+	runCmd(t, m, m.moveClaudeSessionTo(s))
+	assert.Equal(t, "Couldn't move fix the login: no server", m.claude.flash)
 }

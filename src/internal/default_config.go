@@ -165,7 +165,7 @@ func getHelpMenuData() []helpMenuModalData {
 		},
 		{
 			hotkey:         common.Hotkeys.MoveSessionHere,
-			description:    "Move the session beside Marmota (in the Sessions box, the selected one) here, with /cd",
+			description:    "Move the session beside Marmota (in the Sessions box, the selected one) here: Claude Code's /cd; Codex from its next turn",
 			hotkeyWorkType: globalType,
 		},
 		{

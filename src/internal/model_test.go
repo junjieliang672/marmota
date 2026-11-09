@@ -89,6 +89,7 @@ func TestMain(m *testing.M) {
 	}
 	codexRename = func(string, string, string) error { return errors.New("tests must not reach Codex") }
 	codexInterrupt = func(string, string) error { return errors.New("tests must not reach Codex") }
+	codexMove = func(string, string, string) error { return errors.New("tests must not reach Codex") }
 	codexBinary = func() string { return "codex" }
 	terminalNotify = func(string) {} // never write to the terminal the tests run in
 	// Nor write the person's pinned folders, recent files or toggles. Tests

@@ -34,6 +34,7 @@ var (
 	codexSend      = codexsession.Send      //nolint:gochecknoglobals // test seam
 	codexRename    = codexsession.Rename    //nolint:gochecknoglobals // test seam
 	codexInterrupt = codexsession.Interrupt //nolint:gochecknoglobals // test seam
+	codexMove      = codexsession.Move      //nolint:gochecknoglobals // test seam
 	codexBinary    = codexsession.Binary    //nolint:gochecknoglobals // test seam
 )
 
@@ -50,6 +51,9 @@ type codexState struct {
 	// restored is set once panes are read back from the agent panes'
 	// state, which keeps them for the next superfile.
 	restored bool
+	// moved is the folder = moved a session to, by id, until its rollout
+	// says so: from its next turn.
+	moved map[string]string
 }
 
 // codexFork is a fork superfile started in a pane.
@@ -113,6 +117,13 @@ func (m *model) mergeCodexSessions(sessions []claudesession.Session) {
 		return iKnown && !jKnown
 	})
 	for _, s := range sessions {
+		if dir, ok := m.codex.moved[s.ID]; ok {
+			if sameDir(s.Cwd, dir) {
+				delete(m.codex.moved, s.ID) // its rollout says so now
+			} else {
+				s.Cwd = dir
+			}
+		}
 		if pane, ok := m.codexPane(s, claimed); ok {
 			s.TTY = pane.TTYName
 			claimed[pane.PaneID] = true

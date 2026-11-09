@@ -222,6 +222,15 @@ func TestSummaryReadsTheRollout(t *testing.T) {
 	assert.Equal(t, "2026-11-08T09:21:00Z", sum.LastTurnEnd.UTC().Format(time.RFC3339), "an interrupted turn ends it too")
 }
 
+// Moved (see Move), a session's next turn runs in another folder: its
+// rollout's latest turn record says which.
+func TestSummaryTakesTheFolderOfTheLastTurn(t *testing.T) {
+	sum, err := NewTracker().Summary(writeRollout(t, testRollout+
+		`{"timestamp":"2026-11-08T09:20:00Z","type":"turn_context","payload":{"cwd":"/w/api","model":"gpt-6.1-sol"}}`+"\n"))
+	require.NoError(t, err)
+	assert.Equal(t, "/w/api", sum.Cwd)
+}
+
 func TestConversationMakesTurns(t *testing.T) {
 	turns, err := Conversation(writeRollout(t, testRollout), 0)
 	require.NoError(t, err)
