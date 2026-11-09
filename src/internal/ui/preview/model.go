@@ -25,8 +25,6 @@ import (
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/yorukot/ansichroma"
-
 	"github.com/junjieliang672/marmota/src/config/icon"
 	filepreview "github.com/junjieliang672/marmota/src/pkg/file_preview"
 )
@@ -473,7 +471,7 @@ func (m *Model) textContent(itemPath string, width, lines int) (string, string) 
 		}
 		fileContent, err = getBatSyntaxHighlightedContent(itemPath, lines, background, m.batCmd)
 	} else {
-		fileContent, err = ansichroma.HightlightString(fileContent, format.Config().Name,
+		fileContent, err = highlightCode(fileContent, format.Config().Name,
 			common.Theme.CodeSyntaxHighlightTheme, background)
 	}
 	if err != nil {

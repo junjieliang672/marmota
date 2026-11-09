@@ -20,4 +20,3 @@ Things that cost time before:
 - Started from inside Claude Code, the `CLAUDE*` variables reach the sessions, and Claude Code turns transcripts off for them, so Marmota can't follow them. `start.sh` clears them.
 - Codex's socket lives in its home, and macOS caps socket paths at 104 bytes. In a deep folder Codex sessions never get listed (`connect: invalid argument`).
 - A first session in a folder asks whether you trust it; answer in its pane.
-- Marmota's markdown preview misdraws `<word>` inside indented code blocks, and inline code at the end of a line. Keep markdown previews out of shots until that is fixed.
