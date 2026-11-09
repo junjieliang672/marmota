@@ -29,6 +29,7 @@ import (
 	variable "github.com/junjieliang672/marmota/src/config"
 	zoxideui "github.com/junjieliang672/marmota/src/internal/ui/zoxide"
 	"github.com/junjieliang672/marmota/src/pkg/codexsession"
+	filepreview "github.com/junjieliang672/marmota/src/pkg/file_preview"
 	stringfunction "github.com/junjieliang672/marmota/src/pkg/string_function"
 )
 
@@ -1083,8 +1084,11 @@ func (m *model) View() string {
 
 	filePreview := m.filePreviewPanelRender()
 	if m.previewShowsASession() {
-		// The preview shows the session the Sessions box is on.
-		filePreview = m.dockSessionPreview(m.fileModel.filePreview.GetWidth(), m.fileModel.filePreview.GetHeight())
+		// The preview shows the session the Sessions box is on. An image
+		// the file preview drew, such as a PDF's page, stays on the screen
+		// over it until cleared; back in the files, it is drawn again.
+		filePreview = m.dockSessionPreview(m.fileModel.filePreview.GetWidth(),
+			m.fileModel.filePreview.GetHeight()) + filepreview.ClearKittyImages()
 	}
 
 	mainPanel := lipgloss.JoinHorizontal(0, sidebar, filePanel, filePreview)

@@ -224,6 +224,30 @@ func TestSAndZOpenTheirPopupsFromTheSessionsBox(t *testing.T) {
 	assert.Equal(t, nonePanelFocus, m.focusPanel, "opened from the files, it goes back to them")
 }
 
+// A PDF's page, a picture or a video's frame is an image the terminal keeps
+// on the screen until it is told to clear it: the session preview clears
+// it, or it shows over the session, and so does a hidden preview.
+func TestTheSessionPreviewClearsTheFilesImage(t *testing.T) {
+	t.Setenv("TERM_PROGRAM", "WezTerm")
+	m := dockTestModel(t)
+	m.fileModel.filePreview.SetOpen(true)
+	m.setFilePreviewPanelSize()
+	clear := "\x1b_Ga=d\x1b\\"
+
+	bang(m)
+	require.True(t, m.previewShowsASession())
+	assert.Contains(t, m.View(), clear)
+
+	// Hidden, the preview draws nothing but that.
+	pressKey(m, "esc")
+	m.fileModel.filePreview.SetContent("a page")
+	m.toggleFilePreviewPanel()
+	require.False(t, m.fileModel.filePreview.IsOpen())
+	view := m.View()
+	assert.NotContains(t, view, "a page")
+	assert.Contains(t, view, clear)
+}
+
 func TestBracketsStepThroughTheSessions(t *testing.T) {
 	m := dockTestModel(t)
 	first, second := m.dockSessions()[0].ID, m.dockSessions()[1].ID

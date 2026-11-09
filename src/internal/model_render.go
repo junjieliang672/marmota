@@ -603,6 +603,11 @@ func (m *model) sortOptionsRender() string {
 }
 
 func (m *model) filePreviewPanelRender() string {
+	if !m.fileModel.filePreview.IsOpen() {
+		// Hidden, it draws nothing; an image it showed, such as a PDF's
+		// page, would stay over the files until cleared.
+		return filepreview.ClearKittyImages()
+	}
 	if m.fileModel.renaming && m.fileModel.filePreview.IsOpen() {
 		selectedItem := m.getFocusedFilePanel().getSelectedItemPtr()
 		if selectedItem != nil && strings.EqualFold(filepath.Ext(selectedItem.location), ".pdf") {
