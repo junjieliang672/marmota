@@ -96,9 +96,9 @@ func (m *model) sessionsHere() string {
 }
 
 // sessionsGroups lays out the sessions the list shows: those running in a
-// WezTerm pane, the only ones it can bring beside superfile and type into.
-// Finished sessions, and those in another terminal or in the background,
-// aren't listed.
+// WezTerm pane, the only ones it can bring beside superfile and type into,
+// and those the Ask box started that aren't listed yet. Finished sessions,
+// and those in another terminal or in the background, aren't listed.
 func (m *model) sessionsGroups() ([]claudeSessionsGroup, string) {
 	var shown []claudesession.Session
 	for _, s := range m.claude.snapshot.Live {
@@ -106,6 +106,7 @@ func (m *model) sessionsGroups() ([]claudeSessionsGroup, string) {
 			shown = append(shown, s)
 		}
 	}
+	shown = append(shown, m.startingSessions()...)
 	groups := m.claudeSessionsOrder().groups(shown)
 	return groups, hereFolder(m.getFocusedFilePanel().location, groups)
 }
@@ -183,11 +184,18 @@ func (m *model) sessionState(s claudesession.Session) sessionsui.State {
 
 // selectedSession is the session the list's cursor is on.
 func (m *model) selectedSession() (claudesession.Session, bool) {
-	id := m.sessions.list.SelectedID()
+	return m.findSession(m.sessions.list.SelectedID())
+}
+
+// findSession is a listed session, or the row of one the Ask box started.
+func (m *model) findSession(id string) (claudesession.Session, bool) {
 	if id == "" {
 		return claudesession.Session{}, false
 	}
-	return m.claude.snapshot.Find(id)
+	if s, ok := m.claude.snapshot.Find(id); ok {
+		return s, true
+	}
+	return m.startingSession(m.ask.starts[id])
 }
 
 // sessionsSelectionChanged catches up with the selected session: its

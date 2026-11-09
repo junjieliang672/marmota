@@ -64,25 +64,31 @@ type sessionChange struct {
 
 // askStart is a session the Ask bar started in the background, watched until
 // Claude Code lists it, and while what you sent it meanwhile waits for its
-// first reply. In a folder Claude Code doesn't trust yet, it first asks
-// whether to, in its pane: the pane then comes in beside superfile to be
-// answered.
+// first reply. Until it is listed the Sessions box shows it as a row of its
+// own, with what it asks first, such as whether to trust its folder (see
+// starting_sessions.go).
 type askStart struct {
 	id     string
 	paneID int
 	folder string
 	polls  int
-	// shown is set once its pane has come in beside superfile.
-	shown bool
+	// title is what you asked it, to name its row.
+	title string
+	// asks is what its pane asks before it starts, "" for nothing, since
+	// asksSince; dialog is that question and its choices, as they show.
+	asks      string
+	asksSince time.Time
+	dialog    []string
 	// listed is set once Claude Code lists it.
 	listed bool
 	// queued is what you sent it before its first reply, oldest first.
 	queued []askQueued
-	// codex is set for a Codex session, whose id isn't known until it is
-	// found: the first in its folder since began (see findCodexStart).
-	// turn is what its first prompts sent through Codex's server set.
-	codex bool
+	// began is when it was started. codex is set for a Codex session, whose
+	// id isn't known until it is found: the first in its folder since began
+	// (see findCodexStart). turn is what its first prompts sent through
+	// Codex's server set.
 	began time.Time
+	codex bool
 	turn  codexsession.TurnOptions
 }
 
@@ -104,10 +110,8 @@ type askStartTickMsg struct {
 
 const (
 	// askStartPoll is how often superfile looks at a session the Ask bar
-	// started; after askStartPolls looks it shows the session anyway, and
-	// after askStartGiveUp it stops looking.
+	// started; after askStartGiveUp looks it stops.
 	askStartPoll   = time.Second
-	askStartPolls  = 10
 	askStartGiveUp = 600
 )
 
@@ -135,7 +139,11 @@ func (m *model) freshGitStatusCmd() tea.Cmd {
 
 // askSending says what sending does, for the Ask bar to show.
 func (m *model) askSending() askui.Sending {
-	if m.awaitedAskStart() != nil {
+	if st := m.awaitedAskStart(); st != nil {
+		if st.asks != "" {
+			return askui.Sending{Text: "it asks you something first (" + firstKey(common.Hotkeys.OpenAskBar) +
+				" in the list); sent once it has replied", Fixed: true}
+		}
 		return askui.Sending{Text: "sent once the new session has replied", Fixed: true}
 	}
 	mode := "⏵⏵ " + claudeask.PermissionModeLabel(m.sessions.composer.PermissionMode())
@@ -307,20 +315,20 @@ func (m *model) startSession(folder, id, question string) (tea.Cmd, error) {
 	if m.ask.starts == nil {
 		m.ask.starts = make(map[string]*askStart)
 	}
-	m.ask.starts[id] = &askStart{id: id, paneID: paneID, folder: folder}
+	m.ask.starts[id] = &askStart{id: id, paneID: paneID, folder: folder, title: oneLine(c.Value()),
+		began: time.Now()}
 	m.flashClaude("Started a background session in " + folderName(folder))
 	return m.watchAskStart(id), nil
 }
 
 // awaitedAskStart is the session the bar started that it writes to, while
-// what you send it waits for its first reply, or nil. Until Claude Code
-// lists it the list stays on New, unless you choose another row; listed, it
-// is selected, and what you send joins what already waits.
+// what you send it waits for its first reply, or nil: its row, or New until
+// the row is there; once it is listed, while something already waits.
 func (m *model) awaitedAskStart() *askStart {
 	if m.sessions.list.NewSelected() {
 		return m.ask.starts[m.sessions.pendingSelect]
 	}
-	if st := m.ask.starts[m.sessions.list.SelectedID()]; st != nil && len(st.queued) > 0 {
+	if st := m.ask.starts[m.sessions.list.SelectedID()]; st != nil && (!st.listed || len(st.queued) > 0) {
 		return st
 	}
 	return nil
@@ -361,8 +369,8 @@ func (m *model) watchAskStart(id string) tea.Cmd {
 
 // applyAskStartTick watches a session the Ask bar started until Claude Code
 // lists it, and types in what you sent it meanwhile once it has replied.
-// One that first asks whether its folder is trusted, or isn't listed in
-// time, comes in beside superfile with the keyboard, to be answered there.
+// Until then it reads what the session asks first, such as whether its
+// folder is trusted, for its row and the preview.
 func (m *model) applyAskStartTick(msg askStartTickMsg) tea.Cmd {
 	st := m.ask.starts[msg.id]
 	if st == nil {
@@ -401,28 +409,25 @@ func (m *model) applyAskStartTick(msg askStartTickMsg) tea.Cmd {
 		m.giveBackQueued(st.queued, "The new session in "+folderName(st.folder)+" hasn't started")
 		return nil
 	}
-	screen := strings.ToLower(msg.screen)
-	asksTrust := strings.Contains(screen, "trust this folder") || strings.Contains(screen, "do you trust")
-	if !st.shown && (asksTrust || st.polls >= askStartPolls) {
-		st.shown = true
-		m.showStartingSession(st, asksTrust)
-	}
-	return m.watchAskStart(st.id)
+	dialog, asks := startDialog(msg.screen)
+	return tea.Batch(m.watchAskStart(st.id), m.setStartDialog(st, dialog, asks))
 }
 
 // endAskStart stops watching a session the bar started.
 func (m *model) endAskStart(st *askStart) {
 	delete(m.ask.starts, st.id)
+	if q := m.sessions.question; q.start && q.id == st.id {
+		m.forgetClaudeQuestion()
+	}
 	if m.sessions.pendingSelect == st.id {
 		m.sessions.pendingSelect = ""
-		m.refreshSessionsList()
 	}
+	m.refreshSessionsList()
 }
 
 // showStartingSession brings a session the bar started in beside superfile,
-// with the keyboard: it asks whether its folder is trusted, or hasn't
-// started on its own.
-func (m *model) showStartingSession(started *askStart, asksTrust bool) {
+// with the keyboard: enter on its row, to see all it shows.
+func (m *model) showStartingSession(started *askStart) {
 	superfilePaneID, err := currentWeztermPaneID()
 	if err == nil {
 		err = m.foregroundManagedPane(superfilePaneID, started.paneID)
@@ -432,13 +437,10 @@ func (m *model) showStartingSession(started *askStart, asksTrust bool) {
 	}
 	if err != nil {
 		slog.Error("Could not show the new session", "pane", started.paneID, "error", err)
+		m.flashClaude("Couldn't bring the new session beside Marmota: " + err.Error())
 		return
 	}
-	if asksTrust {
-		m.flashClaude("The new session asks whether you trust " + folderName(started.folder))
-	} else {
-		m.flashClaude("The new session hasn't started yet: here it is")
-	}
+	m.flashClaude("The new session in " + folderName(started.folder) + " is beside Marmota")
 }
 
 // sendQueued types what you sent a new session before its first reply into

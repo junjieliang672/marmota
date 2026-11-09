@@ -229,7 +229,7 @@ func (m *model) dockAskRender(width int) string {
 	height := m.footerHeight + common.BorderPadding
 	open := m.dockAskOpen()
 	r := ui.DefaultFooterRenderer(height, width, open)
-	target, _ := m.claude.snapshot.Find(m.dockAskTarget())
+	target, _ := m.findSession(m.dockAskTarget())
 	title := "Ask"
 	if open {
 		name := m.newSessionName()

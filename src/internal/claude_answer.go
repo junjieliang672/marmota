@@ -37,9 +37,11 @@ type claudeQuestion struct {
 	gen    int
 	id     string
 	paneID int
-	// codex is set for a Codex session, which draws its questions its way.
-	codex bool
-	lines []string
+	// codex is set for a Codex session, which draws its questions its way;
+	// start for a session that hasn't started, whose pane the Ask box's
+	// watch reads (see setStartDialog).
+	codex, start bool
+	lines        []string
 	// reading and ticking say a read is under way, or one is due, so only
 	// one loop reads the pane.
 	reading, ticking bool
@@ -51,6 +53,8 @@ type claudeQuestion struct {
 type claudeQuestionMsg struct {
 	gen   int
 	lines []string
+	// asks is what a session that hasn't started asks.
+	asks string
 	// over is set when the pane shows its prompt again: there is no
 	// question any more.
 	over bool
@@ -72,6 +76,14 @@ func (m *model) watchClaudeQuestion() tea.Cmd {
 	var pane weztermPane
 	asking := ok && m.sessionsShown() && !m.sessions.list.NewSelected() && s.Live &&
 		s.Status == claudesession.StatusWaiting
+	if st := m.unlistedStart(s.ID); asking && st != nil {
+		if !q.start || q.id != st.id {
+			m.forgetClaudeQuestion()
+			q.id, q.paneID, q.start = st.id, st.paneID, true
+		}
+		q.lines = st.dialog
+		return nil // the start's watch reads its pane
+	}
 	if asking {
 		pane, asking = m.weztermPaneForSession(s)
 	}
@@ -104,11 +116,15 @@ func (m *model) readClaudeQuestion() tea.Cmd {
 		return nil
 	}
 	q.reading = true
-	gen, paneID, codex := q.gen, q.paneID, q.codex
+	gen, paneID, codex, start := q.gen, q.paneID, q.codex, q.start
 	return func() tea.Msg {
 		screen, err := weztermGetText(paneID)
 		if err != nil {
 			return claudeQuestionMsg{gen: gen, err: err}
+		}
+		if start {
+			lines, asks := startDialog(screen)
+			return claudeQuestionMsg{gen: gen, lines: lines, asks: asks}
 		}
 		lines, over := claudeQuestionLines(screen)
 		if codex {
@@ -124,6 +140,12 @@ func (m *model) applyClaudeQuestion(msg claudeQuestionMsg) tea.Cmd {
 		return nil
 	}
 	q.reading = false
+	if q.start {
+		if st := m.unlistedStart(q.id); st != nil && msg.err == nil {
+			return m.setStartDialog(st, msg.lines, msg.asks)
+		}
+		return nil // the start's watch reads its pane from here on
+	}
 	switch {
 	case msg.err != nil:
 		slog.Debug("Could not read the question off the session's pane", "error", msg.err)

@@ -89,7 +89,7 @@ func (m *model) dockPick(sessions []claudesession.Session) string {
 		if m.sessionState(s) != sessionsui.NeedsYou {
 			continue
 		}
-		if at := m.claude.waitingSince[s.ID]; newest == "" || at.After(newestAt) {
+		if at := m.needsYouSince(s.ID); newest == "" || at.After(newestAt) {
 			newest, newestAt = s.ID, at
 		}
 	}
@@ -204,6 +204,9 @@ func (m *model) dockSessionsKey(msg tea.KeyMsg) tea.Cmd {
 	count, _ := strconv.Atoi(m.dock.jumpCount)
 	m.dock.jumpCount = ""
 
+	if st := m.unlistedStart(list.SelectedID()); st != nil && m.startingSessionKey(st, key) {
+		return nil
+	}
 	sessions := m.dockSessions()
 	at := slices.IndexFunc(sessions, func(s claudesession.Session) bool { return s.ID == list.SelectedID() })
 	prev := list.SelectedID()
@@ -289,6 +292,24 @@ func (m *model) popupClosed() tea.Cmd {
 	}
 	m.dock.popupFrom = false
 	return m.focusDockSessionsOn(m.dock.lastID)
+}
+
+// startingSessionKey handles the keys that act on a session on the row of
+// one that hasn't started: enter brings it beside Marmota; there is nothing
+// yet to rename, fork, stop, mention or move. It reports whether it took
+// the key.
+func (m *model) startingSessionKey(st *askStart, key string) bool {
+	switch {
+	case slices.Contains(common.Hotkeys.Confirm, key):
+		m.showStartingSession(st)
+	case slices.Contains(common.Hotkeys.SessionMention, key), slices.Contains(common.Hotkeys.SessionRename, key),
+		slices.Contains(common.Hotkeys.SessionFork, key), slices.Contains(common.Hotkeys.SessionStop, key),
+		slices.Contains(common.Hotkeys.MoveSessionHere, key), slices.Contains(common.Hotkeys.ShowSessionFiles, key):
+		m.flashClaude("It hasn't started yet: " + firstKey(common.Hotkeys.Confirm) + " brings it beside Marmota")
+	default:
+		return false
+	}
+	return true
 }
 
 // dockRender is the dock: the Sessions box, Details and the Ask box; the

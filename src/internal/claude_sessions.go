@@ -199,6 +199,7 @@ func (m *model) applyClaudeSessionsSnapshot(msg claudeSessionsSnapshotMsg) tea.C
 		m.claude.panes = msg.panes
 	}
 	m.mergeCodexSessions(msg.codex)
+	askBarTarget, started := m.settleCodexStarts(askBarTarget)
 	all := append(append([]claudesession.Session(nil), m.claude.snapshot.Live...), m.claude.snapshot.Past...)
 	order := m.claudeSessionsOrder()
 	if order.update(all, m.claudeSessionsDay()) {
@@ -214,7 +215,7 @@ func (m *model) applyClaudeSessionsSnapshot(msg claudeSessionsSnapshotMsg) tea.C
 	m.syncSidebarSessions()
 	m.keepAskBarTarget(askBarTarget)
 	m.keepViewerPin()
-	cmds := []tea.Cmd{m.scheduleClaudeSessionsRefresh(), m.updateClaudeInbox()}
+	cmds := []tea.Cmd{m.scheduleClaudeSessionsRefresh(), m.updateClaudeInbox(), started}
 	if m.sessionsShown() {
 		m.loadSessionsConversation()
 		cmds = append(cmds, m.watchClaudeQuestion())

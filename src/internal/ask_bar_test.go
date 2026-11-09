@@ -17,6 +17,7 @@ import (
 
 	variable "github.com/junjieliang672/marmota/src/config"
 	"github.com/junjieliang672/marmota/src/internal/common"
+	sessionsui "github.com/junjieliang672/marmota/src/internal/ui/sessions"
 	"github.com/junjieliang672/marmota/src/internal/ui/sidebar"
 	"github.com/junjieliang672/marmota/src/internal/utils"
 	"github.com/junjieliang672/marmota/src/pkg/claudesession"
@@ -354,33 +355,8 @@ func startCommand(t *testing.T, wez *fakeWezterm) string {
 	return ""
 }
 
-// In a folder Claude Code doesn't trust yet, the new session first asks
-// whether to: its pane comes in beside Marmota, with the keyboard, to be
-// answered.
-func TestANewSessionAskingToTrustItsFolderComesBesideSuperfile(t *testing.T) {
-	ownAskHistory(t)
-	m := newClaudeTestModel(t)
-	wez := newFakeWezterm(t, superfileTab())
-	newAskID(t, "n-1")
-	ask(t, m, "group the logos")
-	require.Contains(t, m.ask.starts, "n-1")
-	paneID := m.ask.starts["n-1"].paneID
-	require.NotZero(t, paneID)
-
-	trust := askStartTickMsg{id: "n-1", screen: "Quick safety check\n ❯ No, exit\n   Yes, I trust this folder"}
-	assert.NotNil(t, m.applyAskStartTick(trust), "it is watched until listed")
-
-	assert.Equal(t, 1, wez.panes[paneID].TabID, "it is beside Marmota")
-	assert.Equal(t, paneID, wez.active, "with the keyboard")
-	assert.Equal(t, "The new session asks whether you trust "+filepath.Base(m.getFocusedFilePanel().location),
-		m.claude.flash)
-	commands := len(wez.commands)
-	m.applyAskStartTick(trust)
-	assert.Len(t, wez.commands, commands, "it is brought in once")
-}
-
-// Once Claude Code lists the new session it answers in the background; one
-// that isn't listed in time comes in beside Marmota all the same.
+// Once Claude Code lists the new session it answers in the background; until
+// then the Sessions box shows it as starting.
 func TestTheAskBarWatchesItsNewSessionUntilItIsListed(t *testing.T) {
 	ownAskHistory(t)
 	m := newClaudeTestModel(t)
@@ -390,20 +366,17 @@ func TestTheAskBarWatchesItsNewSessionUntilItIsListed(t *testing.T) {
 	paneID := m.ask.starts["n-1"].paneID
 
 	assert.NotNil(t, m.applyAskStartTick(askStartTickMsg{id: "n-1", screen: "starting"}), "it looks again")
+	rows := m.dockSessions()
+	require.Len(t, rows, 1, "its row shows before it is listed")
+	assert.Equal(t, "group the logos", rows[0].DisplayTitle())
+	assert.Equal(t, sessionsui.Working, m.sessionState(rows[0]))
+	assert.Contains(t, viewText(m), "starting")
+
 	m.claude.snapshot.Live = []claudesession.Session{{ID: "n-1", Live: true}}
 	assert.Nil(t, m.applyAskStartTick(askStartTickMsg{id: "n-1", screen: "working"}))
 	assert.Empty(t, m.ask.starts, "listed, it is no longer watched")
+	assert.Empty(t, m.startingSessions())
 	assert.Equal(t, managedAgentHiddenWorkspace, wez.panes[paneID].Workspace, "and stays in the background")
-
-	newAskID(t, "n-2")
-	m.claude.snapshot.Live = nil
-	ask(t, m, "group the icons")
-	slow := m.ask.starts["n-2"].paneID
-	m.ask.starts["n-2"].polls = askStartPolls - 1
-	TeaUpdate(m, askStartTickMsg{id: "n-2", screen: "starting"})
-	assert.Equal(t, 1, wez.panes[slow].TabID, "not listed in time, it comes in beside Marmota")
-	assert.Equal(t, slow, wez.active, "with the keyboard")
-	assert.Equal(t, "The new session hasn't started yet: here it is", m.claude.flash)
 }
 
 // What you send while the new session starts waits for its first reply, then

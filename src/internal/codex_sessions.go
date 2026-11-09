@@ -487,7 +487,7 @@ func (m *model) startCodexSession(folder, id, question string) (tea.Cmd, error) 
 	home, _ := os.UserHomeDir()
 	c := &m.sessions.composer
 	model, _ := c.Choices()
-	st := &askStart{id: id, folder: folder, codex: true, turn: codexsession.TurnOptions{
+	st := &askStart{id: id, folder: folder, codex: true, title: oneLine(c.Value()), turn: codexsession.TurnOptions{
 		Effort: c.CodexStartEffort(), Reviewer: codexsession.PermissionReviewer(c.PermissionMode()),
 	}}
 	st.queued = []askQueued{{
@@ -528,8 +528,31 @@ func (m *model) codexStartFound(st *askStart, s claudesession.Session) tea.Cmd {
 	}
 	m.saveAskHistory()
 	m.attachCodexPane(s.ID, st.paneID)
+	onRow := !m.sessions.list.NewSelected() && m.sessions.list.SelectedID() == old
 	m.refreshSessionsList()
+	if onRow { // its row becomes the session's
+		m.sessions.list.Select(s.ID)
+	}
 	return m.sendQueued(s.DisplayTitle(), st)
+}
+
+// settleCodexStarts settles the Codex starts whose sessions a refresh found,
+// before the list is laid out: the row of each becomes its session's. It
+// returns what the Ask box writes to, renamed if it was one of them.
+func (m *model) settleCodexStarts(askBarTarget string) (string, tea.Cmd) {
+	var cmds []tea.Cmd
+	for _, st := range m.ask.starts {
+		if !st.codex {
+			continue
+		}
+		if s, ok := m.findCodexStart(st); ok {
+			if askBarTarget == st.id {
+				askBarTarget = s.ID
+			}
+			cmds = append(cmds, m.codexStartFound(st, s))
+		}
+	}
+	return askBarTarget, tea.Batch(cmds...)
 }
 
 // attachCodexPane notes the pane a Codex session runs in, and shows it there

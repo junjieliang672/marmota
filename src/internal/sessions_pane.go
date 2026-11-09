@@ -25,6 +25,9 @@ func (m *model) sessionsPaneView() askui.Session {
 	if !ok || m.sessions.list.NewSelected() {
 		return m.newSessionPaneView()
 	}
+	if st := m.unlistedStart(s.ID); st != nil {
+		return m.startingSessionPaneView(st)
+	}
 	state := m.sessionState(s)
 	title := s.DisplayTitle()
 	if s.Name != "" && s.Name != title {
@@ -70,7 +73,7 @@ func (m *model) sessionStateWords(s claudesession.Session, state sessionsui.Stat
 	now := time.Now()
 	switch state {
 	case sessionsui.NeedsYou:
-		if age := waitingAge(now, m.claude.waitingSince[s.ID]); age != "" {
+		if age := waitingAge(now, m.needsYouSince(s.ID)); age != "" {
 			return "needs you " + age
 		}
 		return "needs you"
@@ -102,7 +105,7 @@ func (m *model) questionPaneView(s claudesession.Session, v *askui.Session) {
 // newSessionPaneView says what sending to a new session (n) does.
 func (m *model) newSessionPaneView() askui.Session {
 	if st := m.awaitedAskStart(); st != nil {
-		return m.startingSessionPaneView(st.folder)
+		return m.startingSessionPaneView(st)
 	}
 	here := m.sessionsHere()
 	mode := claudeask.PermissionModeLabel(m.sessions.composer.PermissionMode())
@@ -122,22 +125,41 @@ func (m *model) newSessionPaneView() askui.Session {
 	}
 }
 
-// startingSessionPaneView is a session the Ask bar started in folder, until
-// Claude Code lists it.
-func (m *model) startingSessionPaneView(folder string) askui.Session {
-	return askui.Session{
+// startingSessionPaneView is a session the Ask bar started, until Claude
+// Code lists it: what it asks first, if anything, and only that of its
+// screen.
+func (m *model) startingSessionPaneView(st *askStart) askui.Session {
+	v := askui.Session{
 		Glyph:      "+",
 		GlyphColor: lipgloss.Color(common.Theme.Correct),
-		Title:      "New session in " + folderName(folder),
+		Title:      firstNonEmpty(st.title, "New session in "+folderName(st.folder)),
 		State:      "starting",
-		Folder:     tildePath(folder),
-		Branch:     gitBranch(folder),
+		Folder:     tildePath(st.folder),
+		Branch:     gitBranch(st.folder),
 		AboutTitle: "Starting",
 		About: []string{
-			"Your question started it in the background. It shows here once it is listed, in a moment.",
-			"What you send it now waits for its first reply, and is typed into it then.",
+			"Your question started it in the background. It is listed once it has started, in a moment.",
+			"What you send it now waits for its first reply, and is typed into it then. `" +
+				firstKey(common.Hotkeys.Confirm) + "` brings it beside Marmota.",
 		},
 	}
+	if st.asks == "" {
+		return v
+	}
+	v.Glyph, v.GlyphColor = sessionsui.Symbol(sessionsui.NeedsYou), sessionsui.StateColor(sessionsui.NeedsYou)
+	v.State = "needs you"
+	if age := waitingAge(time.Now(), st.asksSince); age != "" {
+		v.State += " " + age
+	}
+	v.About = []string{"It starts once you answer. `" + firstKey(common.Hotkeys.Confirm) +
+		"` brings it beside Marmota, to see all it shows."}
+	v.Question, v.Answering = st.dialog, m.sessions.focus == sessionsFocusAnswer
+	if q := m.sessions.question; !q.start || q.id != st.id {
+		// Not its row: the Ask box writes to it while the list is on New.
+		v.Question, v.QuestionNote = nil, "Asks: "+st.asks+"\nIn the Sessions box, "+
+			firstKey(common.Hotkeys.OpenAskBar)+" on its row answers it."
+	}
+	return v
 }
 
 // gitBranch is the branch checked out where dir is, the commit when none

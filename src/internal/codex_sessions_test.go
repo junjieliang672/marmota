@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/junjieliang672/marmota/src/internal/common"
+	sessionsui "github.com/junjieliang672/marmota/src/internal/ui/sessions"
 	"github.com/junjieliang672/marmota/src/internal/utils"
 	"github.com/junjieliang672/marmota/src/pkg/claudesession"
 	"github.com/junjieliang672/marmota/src/pkg/codexsession"
@@ -177,9 +178,9 @@ func TestTheAskBoxStartsACodexSession(t *testing.T) {
 }
 
 // Codex asks whether to trust a git repository it hasn't seen before its
-// session starts: the new session comes in beside Marmota to be answered,
-// as Claude Code's does.
-func TestACodexStartAskingToTrustItsFolderComesBesideSuperfile(t *testing.T) {
+// session starts: its row says so, as a Claude Code one's does, and its pane
+// stays in the background.
+func TestACodexStartAsksToTrustItsFolderInItsRow(t *testing.T) {
 	ownAskHistory(t)
 	m := newClaudeTestModel(t)
 	wez := newFakeWezterm(t, superfileTab())
@@ -191,16 +192,16 @@ func TestACodexStartAskingToTrustItsFolderComesBesideSuperfile(t *testing.T) {
 		st = s
 	}
 
-	m.applyAskStartTick(askStartTickMsg{id: st.id, screen: `  Folder access
-  /w/repo
-  Trust this folder? Codex can read, edit, and run files here, subject to your
-  permission settings.
-› 1. Trust and continue
-  2. Back to Agent Command Center
-  enter continue · esc back`})
-	assert.Equal(t, st.paneID, wez.active, "beside Marmota, with the keyboard")
-	assert.Equal(t, "The new session asks whether you trust "+filepath.Base(m.getFocusedFilePanel().location),
-		m.claude.flash)
+	m.applyAskStartTick(askStartTickMsg{id: st.id, screen: codexTrustScreen})
+	assert.NotEqual(t, st.paneID, wez.active, "the keyboard stays in Marmota")
+	assert.Equal(t, managedAgentHiddenWorkspace, wez.panes[st.paneID].Workspace)
+	rows := m.dockSessions()
+	require.Len(t, rows, 1)
+	assert.True(t, rows[0].IsCodex())
+	assert.Equal(t, sessionsui.NeedsYou, m.sessionState(rows[0]))
+	assert.Equal(t, "Trust this folder?", rows[0].PendingTool)
+	assert.Equal(t, "The new session in "+filepath.Base(m.getFocusedFilePanel().location)+
+		" asks: Trust this folder? "+common.Hotkeys.OpenAskBar[0]+" in the Sessions box answers it", m.claude.flash)
 }
 
 // tab chooses whether a new session runs in Claude Code or Codex. The box
