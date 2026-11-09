@@ -135,9 +135,16 @@ func FetchGitStatus(dir string) GitStatus {
 	}
 	status.IsGitRepo = true
 
-	// Get branch name
-	_, branchOutput, _ := utils.ExecuteCommand(gitTimeout, dir, "git", "rev-parse", "--abbrev-ref", "HEAD")
-	status.BranchName = strings.TrimSpace(branchOutput)
+	// The branch. symbolic-ref names it before its first commit too, where
+	// rev-parse fails, its error mixed into the output; rev-parse says HEAD
+	// for a detached one.
+	if code, out, _ := utils.ExecuteCommand(gitTimeout, dir, "git", "symbolic-ref", "--short", "-q",
+		"HEAD"); code == 0 {
+		status.BranchName = strings.TrimSpace(out)
+	} else if code, out, _ := utils.ExecuteCommand(gitTimeout, dir, "git", "rev-parse", "--abbrev-ref",
+		"HEAD"); code == 0 {
+		status.BranchName = strings.TrimSpace(out)
+	}
 
 	// Get status using porcelain format
 	_, porcelainOutput, _ := utils.ExecuteCommand(gitStatusTimeout, dir, "git", "status", "--porcelain")
