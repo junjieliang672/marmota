@@ -907,6 +907,9 @@ func (m *model) updateFilePanelsState(msg tea.Msg) tea.Cmd {
 	case m.zoxideModal.IsOpen():
 		action, cmd = m.zoxideModal.HandleUpdate(msg)
 		m.applyZoxideModalAction(action)
+		if _, none := action.(common.NoAction); !m.zoxideModal.IsOpen() && none {
+			cmd = tea.Batch(cmd, m.popupClosed())
+		}
 	}
 
 	// TODO : This is like duct taping a bigger problem

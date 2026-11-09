@@ -192,21 +192,36 @@ func TestEscFromTheAskBoxGoesBackToTheFiles(t *testing.T) {
 }
 
 // s and z open their popups from the Sessions box too; the popups go to
-// folders, so the files have the keyboard behind them.
+// folders, so the files have the keyboard behind them. Closed without going
+// anywhere, they give it back to the Sessions box, on the same session.
 func TestSAndZOpenTheirPopupsFromTheSessionsBox(t *testing.T) {
 	m := dockTestModel(t)
 	bang(m)
 	require.Equal(t, dockSessionsFocus, m.focusPanel)
+	on := m.sessions.list.SelectedID()
 
 	pressKey(m, common.Hotkeys.FocusOnSidebar[0])
 	assert.Equal(t, sidebarFocus, m.focusPanel, "s: the sidebar popup")
 	pressKey(m, "esc")
-	assert.Equal(t, nonePanelFocus, m.focusPanel, "esc: the files")
+	assert.Equal(t, dockSessionsFocus, m.focusPanel, "esc: back to the Sessions box")
+	assert.Equal(t, on, m.sessions.list.SelectedID())
 
-	bang(m)
+	pressKey(m, common.Hotkeys.FocusOnSidebar[0])
+	pressKey(m, common.Hotkeys.FocusOnSidebar[0])
+	assert.Equal(t, dockSessionsFocus, m.focusPanel, "s again closes it the same way")
+
 	pressKey(m, common.Hotkeys.OpenZoxide[0])
 	assert.True(t, m.zoxideModal.IsOpen(), "z: the zoxide popup")
 	assert.Equal(t, nonePanelFocus, m.focusPanel)
+	pressKey(m, "esc")
+	assert.False(t, m.zoxideModal.IsOpen())
+	assert.Equal(t, dockSessionsFocus, m.focusPanel, "esc: back to the Sessions box")
+
+	pressKey(m, "esc")
+	require.Equal(t, nonePanelFocus, m.focusPanel)
+	pressKey(m, common.Hotkeys.FocusOnSidebar[0])
+	pressKey(m, "esc")
+	assert.Equal(t, nonePanelFocus, m.focusPanel, "opened from the files, it goes back to them")
 }
 
 func TestBracketsStepThroughTheSessions(t *testing.T) {

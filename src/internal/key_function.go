@@ -69,7 +69,11 @@ func (m *model) mainKey(msg string) tea.Cmd { //nolint:gocyclo,cyclop,funlen,mai
 		m.toggleFilePreviewPanel()
 
 	case slices.Contains(common.Hotkeys.FocusOnSidebar, msg):
+		closing := m.focusPanel == sidebarFocus
 		m.focusOnSideBar()
+		if closing {
+			return m.popupClosed()
+		}
 
 	case slices.Contains(common.Hotkeys.CopyPath, msg):
 		if m.pathsCopyable() {
@@ -141,6 +145,7 @@ func (m *model) mainKey(msg string) tea.Cmd { //nolint:gocyclo,cyclop,funlen,mai
 	case slices.Contains(common.Hotkeys.OpenAgentPrompt, msg):
 		m.promptModal.Open(false)
 	case slices.Contains(common.Hotkeys.OpenZoxide, msg):
+		m.dock.popupFrom = false // opened from the files
 		return m.zoxideModal.Open()
 
 	case slices.Contains(common.Hotkeys.OpenHelpMenu, msg):
@@ -387,10 +392,10 @@ func (m *model) sidebarKey(msg string) tea.Cmd {
 	if m.focusPanel == sidebarFocus && slices.Contains(common.Hotkeys.CancelTyping, msg) {
 		if m.sidebarModel.IsSearchActive() {
 			m.sidebarModel.ClearSearch() // esc clears a search first
-		} else {
-			m.focusOnSideBar() // then closes the popup
+			return nil
 		}
-		return nil
+		m.focusOnSideBar() // then closes the popup
+		return m.popupClosed()
 	}
 	// enter on a session goes to it in the Sessions box.
 	if id, ok := sidebar.SessionID(m.sidebarModel.GetCurrentDirectoryLocation()); ok &&

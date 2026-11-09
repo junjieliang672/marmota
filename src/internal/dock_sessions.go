@@ -42,6 +42,9 @@ type dockState struct {
 	// pinned is V: the preview shows the session the box is on while the
 	// keyboard is in the files.
 	pinned bool
+	// popupFrom is set while the s or z popup the box opened is open:
+	// closed without going anywhere, it gives the keyboard back to the box.
+	popupFrom bool
 }
 
 const (
@@ -260,12 +263,15 @@ func (m *model) dockSessionsKey(msg tea.KeyMsg) tea.Cmd {
 	case slices.Contains(common.Hotkeys.PinViewer, key):
 		return m.togglePinViewer()
 	case slices.Contains(common.Hotkeys.FocusOnSidebar, key):
-		// The s and z popups go to folders: they act on the files.
+		// The s and z popups go to folders: they act on the files. Closed
+		// with esc, they give the keyboard back here.
 		m.leaveDockSessions()
 		m.focusOnSideBar()
+		m.dock.popupFrom = true
 		return nil
 	case slices.Contains(common.Hotkeys.OpenZoxide, key):
 		m.leaveDockSessions()
+		m.dock.popupFrom = true
 		return m.zoxideModal.Open()
 	}
 	if list.SelectedID() != prev {
@@ -273,6 +279,16 @@ func (m *model) dockSessionsKey(msg tea.KeyMsg) tea.Cmd {
 		return m.sessionsSelectionChanged()
 	}
 	return nil
+}
+
+// popupClosed gives the keyboard back to the Sessions box when the s or z
+// popup it opened was closed without going to a folder.
+func (m *model) popupClosed() tea.Cmd {
+	if !m.dock.popupFrom {
+		return nil
+	}
+	m.dock.popupFrom = false
+	return m.focusDockSessionsOn(m.dock.lastID)
 }
 
 // dockRender is the dock: the Sessions box, Details and the Ask box; the

@@ -240,6 +240,7 @@ func (m *model) focusOnSideBar() {
 	} else {
 		m.focusPanel = sidebarFocus
 		m.fileModel.filePanels[m.filePanelFocusIndex].isFocused = false
+		m.dock.popupFrom = false // opened from the files
 	}
 }
 
