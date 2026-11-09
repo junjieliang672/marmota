@@ -517,6 +517,40 @@ func TestConversationReadsTheLastTurns(t *testing.T) {
 	assert.Equal(t, "add a test", last[0].Prompt)
 }
 
+// A screenshot a tool took can be a megabyte: the turn's prompt is then
+// before the tail Conversation reads, and the reply after it still shows,
+// under that prompt.
+func TestATurnCutByTheTailKeepsItsPrompt(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "s.jsonl")
+	image := strings.Repeat("A", conversationTail+cutPromptChunk)
+	lines := []string{
+		`{"type":"user","message":{"role":"user","content":"first"}}`,
+		`{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"One."}]}}`,
+		`{"type":"user","message":{"role":"user","content":"look at the page"},"timestamp":"2026-11-08T21:59:50Z"}`,
+		`{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Screenshot","input":{}}]}}`,
+		`{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":[{"type":"image","source":{"data":"` + image + `"}}]}]}}`,
+		`{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"It shows the ledger."}]}}`,
+	}
+	writeFile(t, path, strings.Join(lines, "\n")+"\n")
+
+	turns, err := Conversation(path, 10)
+	require.NoError(t, err)
+	require.Len(t, turns, 1)
+	assert.Equal(t, "look at the page", turns[0].Prompt)
+	assert.Equal(t, "It shows the ledger.", turns[0].Reply)
+	assert.Equal(t, "2026-11-08T21:59:50Z", turns[0].At.UTC().Format(time.RFC3339))
+
+	// Nothing said between the cut and the next prompt: no cut turn.
+	writeFile(t, path, strings.Join(append(lines[:5:5],
+		`{"type":"user","message":{"role":"user","content":"and the totals"}}`,
+		`{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"40."}]}}`,
+	), "\n")+"\n")
+	turns, err = Conversation(path, 10)
+	require.NoError(t, err)
+	require.Len(t, turns, 1)
+	assert.Equal(t, "and the totals", turns[0].Prompt)
+}
+
 // Claude Code records text pasted into its prompt, as superfile types it,
 // between pasted_content tags.
 func TestAPastedPromptIsAPrompt(t *testing.T) {

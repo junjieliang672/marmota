@@ -288,10 +288,13 @@ func conversation(path string, end int64, limit, forks int) ([]claudesession.Tur
 	}
 	start := max(0, end-conversationTail)
 	reader := bufio.NewReaderSize(io.NewSectionReader(f, start, end-start), 64*1024) //nolint:mnd // read buffer
-	if start > 0 {
-		_, _ = reader.ReadBytes('\n') // the cut first line
-	}
 	var turns []claudesession.Turn
+	first := start
+	if start > 0 {
+		cut, _ := reader.ReadBytes('\n') // the cut first line
+		first += int64(len(cut))
+		turns = []claudesession.Turn{{}} // see claudesession.SettleCutTurn
+	}
 	for {
 		line, err := reader.ReadBytes('\n')
 		if line = bytes.TrimSpace(line); len(line) > 0 {
@@ -300,6 +303,15 @@ func conversation(path string, end int64, limit, forks int) ([]claudesession.Tur
 		if err != nil {
 			break
 		}
+	}
+	if start > 0 {
+		turns = claudesession.SettleCutTurn(f, first, turns, limit, `"UserMessage"`,
+			func(line []byte) (claudesession.Turn, bool) {
+				if t := applyTurnLine(nil, line); len(t) == 1 {
+					return t[0], true
+				}
+				return claudesession.Turn{}, false
+			})
 	}
 	if forks > 0 && (limit <= 0 || len(turns) < limit) {
 		if base := forkedHistory(f); base != nil {

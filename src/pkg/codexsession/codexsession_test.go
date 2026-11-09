@@ -232,6 +232,22 @@ func TestConversationMakesTurns(t *testing.T) {
 	assert.False(t, turns[0].RepliedAt.IsZero())
 }
 
+// An MCP tool's result can be a megabyte, such as a Computer Use
+// screenshot: the turn's prompt is then before the tail Conversation reads,
+// and the replies after it still show, under that prompt.
+func TestATurnCutByTheTailKeepsItsPrompt(t *testing.T) {
+	big := strings.Repeat("A", conversationTail)
+	turns, err := Conversation(writeRollout(t, testRollout+
+		`{"timestamp":"2026-11-08T21:59:50Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"UserMessage","content":[{"type":"text","text":"open the ledger"}]}}}`+"\n"+
+		`{"timestamp":"2026-11-08T21:59:58Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"McpToolCall","server":"computer","tool":"screenshot","result":"`+big+`"}}}`+"\n"+
+		`{"timestamp":"2026-11-08T22:00:10Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"McpToolCall","server":"computer","tool":"click"}}}`+"\n"+
+		`{"timestamp":"2026-11-08T22:00:12Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"AgentMessage","content":[{"type":"Text","text":"It holds three ledgers."}]}}}`+"\n"), 0)
+	require.NoError(t, err)
+	require.Len(t, turns, 1)
+	assert.Equal(t, "open the ledger", turns[0].Prompt)
+	assert.Equal(t, "It holds three ledgers.", turns[0].Reply)
+}
+
 // A fork's rollout keeps no copy of the conversation it continues: its
 // turns follow those of the session it was forked from, said before the
 // fork, from that session's rollout of another day.
