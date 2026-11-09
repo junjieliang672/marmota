@@ -35,7 +35,9 @@ type Session struct {
 	// Folder is where it works, Branch the git branch there.
 	Folder, Branch string
 	Error          string
-	// Now is the tool it is running.
+	// Now is what it is doing while it works: the tool it runs, else
+	// "working"; "" when it isn't working. It is the conversation's last
+	// line, so it changes in place as tools come and go.
 	Now string
 	// Question is what it asks you, as its pane draws it; Answering says
 	// the keys go to it. QuestionNote says how to answer, or why it can't
@@ -141,9 +143,6 @@ func layoutSession(s Session, composerLines, width, height, scroll int) ([]strin
 	room := max(1, height-composerChrome-composerLines)
 
 	head := factLines(s, inner, st)
-	if s.Now != "" {
-		head = append(gap(head), section("Now", "", inner, st), st.now.Render(ansi.Truncate("✳ "+s.Now, inner, "…")))
-	}
 	head = append(head, questionLines(s, inner, st)...)
 	if s.AboutTitle != "" {
 		head = append(gap(head), section(s.AboutTitle, "", inner, st))
@@ -312,9 +311,13 @@ func conversationLines(s Session, width int, st paneStyles) []string {
 	}
 	hint := firstKey(common.Hotkeys.PageUp) + "/" + firstKey(common.Hotkeys.PageDown)
 	lines := []string{section("Conversation", hint, width, st)}
+	now := st.now.Render(ansi.Truncate("✳ "+s.Now, width, "…"))
 	if len(turns) == 0 {
 		if s.AboutTitle != "" {
 			return nil // a new session: About says what happens
+		}
+		if s.Now != "" {
+			return append(lines, now)
 		}
 		return append(lines, st.dim.Render("Nothing said yet"))
 	}
@@ -323,6 +326,9 @@ func conversationLines(s Session, width int, st paneStyles) []string {
 			lines = append(lines, "")
 		}
 		lines = append(lines, turnBlock(t.Prompt, t.Tools, t.Reply, s.Mark, width, st)...)
+	}
+	if s.Now != "" {
+		lines = append(lines, "", now)
 	}
 	return lines
 }

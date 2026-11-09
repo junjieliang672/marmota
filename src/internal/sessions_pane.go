@@ -61,7 +61,7 @@ func (m *model) sessionsPaneView() askui.Session {
 	case sessionsui.NeedsYou:
 		m.questionPaneView(s, &v)
 	case sessionsui.Working:
-		v.Now = s.PendingTool
+		v.Now = firstNonEmpty(s.PendingTool, "working")
 	case sessionsui.Unread, sessionsui.Idle, sessionsui.Ended:
 	}
 	return v

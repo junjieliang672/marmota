@@ -3,6 +3,7 @@ package ask
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -279,12 +280,21 @@ func TestRenderSessionLaysOutTheSession(t *testing.T) {
 	assert.Len(t, lines, 30)
 	for _, want := range []string{
 		"✳ proj-1 · fix the login", "working · beside Marmota · ⏵⏵ bypass", "~/w/repo · main",
-		"Now", "✳ Bash(go test ./...)", "Conversation", "› why does login fail?", "  ⎿ Read(auth.go)",
+		"Conversation", "› why does login fail?", "  ⎿ Read(auth.go)",
 		"▌ The token expires.", "Tasks", "◐ fix it", "☐ test it", "Changed files", "auth.go",
 		"→ typed into its pane",
 	} {
 		assert.Contains(t, out, want)
 	}
+	reply := slices.IndexFunc(lines, func(l string) bool { return strings.Contains(l, "The token expires.") })
+	require.GreaterOrEqual(t, reply, 0)
+	assert.Equal(t, "✳ Bash(go test ./...)", strings.Trim(lines[reply+2], "│ "), "under the reply, a line apart")
+
+	// The conversation stays where it is whether a tool runs or not.
+	s.Now = "working"
+	between := strings.Split(ansi.Strip(RenderSession(s, c.Render(58, Sending{}), 60, 30, 0, false)), "\n")
+	assert.Equal(t, reply, slices.IndexFunc(between, func(l string) bool { return strings.Contains(l, "The token expires.") }))
+	assert.Equal(t, "✳ working", strings.Trim(between[reply+2], "│ "))
 
 	s.Question = []string{"☐ Color", "Do you prefer red or blue?", "❯ 1. Red", "  2. Blue"}
 	out = ansi.Strip(RenderSession(s, c.Render(58, Sending{}), 60, 30, 0, true))
