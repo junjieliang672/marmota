@@ -76,22 +76,8 @@ table.keys th { font-size: 13px; letter-spacing: 0.06em; text-transform: upperca
 table.keys td:first-child { width: 34%; }
 
 /* The screen sketch: drawn like the terminal it stands for, dark in both themes */
-.screen-wrap { overflow-x: auto; }
-.screen { min-width: 620px; background: var(--term-bg); color: var(--term-fg); border-radius: 14px; padding: 14px; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.45; display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: auto auto auto; gap: 8px; }
-.box { border: 1px solid var(--term-line); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; min-width: 0; position: relative; }
-.box.hi { border-color: var(--term-hi); }
-.box .t { color: var(--term-dim); }
-.box .dim { color: var(--term-dim); }
-.files { grid-column: 1 / 2; min-height: 150px; }
-.preview { grid-column: 2 / 4; min-height: 150px; }
-.sessions { grid-column: 1 / 2; }
-.details { grid-column: 2 / 3; }
-.ask { grid-column: 3 / 4; }
-.statusline { grid-column: 1 / 4; color: var(--term-dim); padding: 2px 4px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.screen .cc { color: var(--term-cc); font-weight: 600; }
-.screen .co { color: var(--term-co); font-weight: 600; }
-.screen .warn { color: var(--term-warn); }
-.pin { position: absolute; top: -9px; right: 10px; background: var(--term-hi); color: var(--term-bg); font-weight: 600; border-radius: 999px; font-size: 11px; padding: 0 7px; }
+.shot-pins { position: relative; }
+.shot-pins .pin { position: absolute; transform: translate(-50%, -50%); background: var(--co); color: #FFFFFF; font-family: var(--font-mono); font-weight: 600; font-size: 12px; border-radius: 999px; min-width: 20px; height: 20px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 0 0 2px #1A1B26; pointer-events: none; }
 .legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; }
 .legend div { display: flex; gap: 10px; min-width: 0; }
 .legend .chip { flex: none; font-family: var(--font-mono); font-size: 12px; font-weight: 600; background: var(--co); color: var(--surface); border-radius: 999px; height: 20px; min-width: 20px; display: inline-flex; align-items: center; justify-content: center; margin-top: 3px; }
@@ -107,31 +93,16 @@ a:focus-visible, kbd:focus-visible { outline: 2px solid var(--co); outline-offse
   .lede { font-size: 17px; }
 }
 
-/* Workflows: a card per way of working, each with a thumbnail of its panes */
+/* Workflows: a card per way of working, each with its screenshot */
 .flows { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
 .flow-card { display: flex; flex-direction: column; gap: 8px; text-decoration: none; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px; min-width: 0; }
 .flow-card:hover { border-color: var(--co); }
 .flow-card:focus-visible { outline: 2px solid var(--co); outline-offset: 2px; }
+.flow-card img { display: block; width: 100%; height: auto; border-radius: 6px; background: #1A1B26; }
 .flow-card strong { font-size: 15px; line-height: 1.3; }
 .flow-card span { font-size: 13px; color: var(--muted); line-height: 1.4; }
-.thumb { background: var(--term-bg); border-radius: 8px; height: 76px; padding: 6px; display: flex; gap: 4px; position: relative; font-family: var(--font-mono); font-size: 9px; color: var(--term-dim); }
-.thumb.big { height: 120px; max-width: 360px; font-size: 11px; }
-.pane { border: 1px solid var(--term-line); border-radius: 4px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; padding: 3px 5px; min-width: 0; overflow: hidden; }
-.pane.hi { border-color: var(--term-hi); color: var(--term-fg); }
-.pane .dock { border-top: 1px solid var(--term-line); padding-top: 2px; }
-.pane .row { white-space: nowrap; overflow: hidden; }
-.pane .add { color: #9ECE6A; }
-.pane .del { color: #F7768E; }
-.thumb .cc { color: var(--term-cc); }
-.thumb .co { color: var(--term-co); }
-.thumb .warn { color: var(--term-warn); }
-.stack { position: absolute; right: 8px; bottom: 6px; display: flex; gap: 2px; }
-.stack i { display: block; width: 14px; height: 10px; border: 1px solid var(--term-line); border-radius: 2px; background: var(--term-panel); }
-.toast { position: absolute; right: 8px; top: 8px; border: 1px solid var(--term-warn); color: var(--term-warn); border-radius: 4px; padding: 0 4px; background: var(--term-panel); }
 .flow { display: flex; flex-direction: column; gap: 22px; scroll-margin-top: 16px; }
-.flow-intro { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
-.flow-intro > div { flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
-.flow-intro .thumb.big { flex: 0 1 300px; }
+.flow-intro { display: flex; flex-direction: column; gap: 10px; }
 .eyebrow.small { font-size: 12px; }
 .case { display: flex; flex-direction: column; gap: 8px; }
 ol.steps { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 6px; max-width: 70ch; }
@@ -140,6 +111,18 @@ ol.steps li::marker { color: var(--accent); font-family: var(--font-mono); font-
 @media (max-width: 640px) {
   .cases { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Screenshots: real Marmota in WezTerm (docs/shots). Wider than the text
+   where the window allows; a click shows one full size. */
+.shot { margin: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.shot.wide { align-self: center; width: min(1180px, calc(100vw - 56px)); }
+.shot button { all: unset; display: block; cursor: zoom-in; border-radius: 12px; }
+.shot button:focus-visible { outline: 2px solid var(--co); outline-offset: 3px; }
+.shot img { display: block; width: 100%; height: auto; border-radius: 12px; background: #1A1B26; box-shadow: 0 1px 2px rgba(15, 20, 40, 0.12), 0 12px 32px rgba(15, 20, 40, 0.18); }
+.shot figcaption { font-size: 14px; color: var(--muted); max-width: 78ch; }
+dialog.zoom { padding: 0; border: 0; background: transparent; max-width: 98vw; max-height: 98vh; cursor: zoom-out; }
+dialog.zoom::backdrop { background: rgba(10, 12, 20, 0.88); }
+dialog.zoom img { display: block; max-width: 98vw; max-height: 96vh; width: auto; height: auto; border-radius: 10px; }
 </style>
 
 <div class="page">
@@ -192,43 +175,12 @@ y</pre>
 
 <section aria-labelledby="s2">
   <div class="step-head"><span class="step-num">2</span><h2 id="s2">What is on the screen</h2></div>
-  <div class="screen-wrap">
-    <div class="screen" role="img" aria-label="Sketch of the y screen: file panels and a preview on top; the Sessions, Details and Ask boxes at the foot; the status line below">
-      <div class="box files hi"><span class="pin">A</span>
-        <span class="t">╭ Marmota 3/9</span>
-        <span>▌ build.sh</span>
-        <span class="dim">  CLAUDE.md</span>
-        <span class="dim">  README.md <span class="cc">✳</span></span>
-        <span class="dim">  src/ <span class="cc">✳2</span></span>
-      </div>
-      <div class="box preview"><span class="pin">B</span>
-        <span class="t">╭ README.md</span>
-        <span># Marmota</span>
-        <span class="dim">A terminal file manager that works beside</span>
-        <span class="dim">your Claude Code and Codex sessions.</span>
-      </div>
-      <div class="box sessions"><span class="pin">C</span>
-        <span class="t">╭ ✳ Sessions</span>
-        <span>1 <span class="cc">✳</span> <span class="cc">cc</span> fix the login</span>
-        <span class="dim">    Edit(login.go)</span>
-        <span>2 <span class="warn">⚑</span> <span class="co">co</span> docs pass</span>
-        <span class="warn">    asks: run make docs</span>
-      </div>
-      <div class="box details"><span class="pin">D</span>
-        <span class="t">╭ Details</span>
-        <span class="dim">FILE  README.md · 4 KB</span>
-        <span class="dim">MAC   cpu ▮▮▯▯ mem ▮▮▮▯</span>
-        <span class="dim">OPS   nothing running</span>
-      </div>
-      <div class="box ask"><span class="pin">E</span>
-        <span class="t">╭ Ask</span>
-        <span>→ fix the login</span>
-        <span class="dim">K write</span>
-        <span class="dim">you: "tests too?"</span>
-      </div>
-      <div class="statusline"><span>K:ask  @:send  !:sessions  &gt;:agent  ?:help</span><span><span class="cc">✳ 1 working</span> · <span class="warn">⚑ 1 needs you</span></span></div>
+  <figure class="shot wide">
+    <div class="shot-pins">
+      <button type="button" aria-label="Show full size"><img src="shots/screen.webp" width="1368" height="839" alt="Marmota in a project called tidepool: the file panel on internal/api with server.go under the cursor, its code in the preview, and at the foot the Sessions box with four sessions, Details, and the Ask box; the status line says 1 needs you."></button>
+      <span class="pin" style="left:9.8%;top:2.6%">A</span><span class="pin" style="left:58.9%;top:2.6%">B</span><span class="pin" style="left:11.6%;top:73.1%">C</span><span class="pin" style="left:41.1%;top:73.1%">D</span><span class="pin" style="left:79.8%;top:73.1%">E</span><span class="pin" style="left:52.8%;top:97.4%">F</span>
     </div>
-  </div>
+  </figure>
   <div class="legend">
     <div><span class="chip">A</span><p><strong>File panels.</strong> Your folders. <kbd>tab</kbd> moves to the next panel, <kbd>n</kbd> opens another. A <span class="tag cc">✳</span> marks a file a running session changed.</p></div>
     <div><span class="chip">B</span><p><strong>Preview.</strong> The file under the cursor; while you are in the Sessions box, the selected session's conversation.</p></div>
@@ -244,23 +196,23 @@ y</pre>
   <p>Marmota works as a plain file manager, or with coding agents beside it. Start with the way you work today; each one builds on the one before.</p>
   <nav class="flows" aria-label="Workflows">
     <a class="flow-card" href="#browse">
-      <div class="thumb" aria-hidden="true"><div class="pane hi"><span class="row">▌ src/</span><span class="row">  README.md</span><span class="dock">!  ·  K</span></div></div>
+      <img src="shots/browse-panels.webp" width="1368" height="839" alt="" loading="lazy">
       <strong>Just browse files</strong><span>No agents: find, open, move and preview files.</span>
     </a>
     <a class="flow-card" href="#one-agent">
-      <div class="thumb" aria-hidden="true"><div class="pane"><span class="row">▌ src/</span><span class="row">  login.go <span class="cc">✳</span></span><span class="dock">K</span></div><div class="pane hi"><span class="row"><span class="cc">✳</span> claude</span><span class="row">&gt; fix the…</span><span class="row"> </span></div></div>
+      <img src="shots/agent-working.webp" width="1368" height="839" alt="" loading="lazy">
       <strong>One coding agent beside you</strong><span>Claude Code or Codex next to your files.</span>
     </a>
     <a class="flow-card" href="#many">
-      <div class="thumb" aria-hidden="true"><div class="pane"><span class="row">▌ src/</span><span class="row"><span class="cc">cc</span> <span class="co">co</span> <span class="cc">cc</span></span><span class="dock">! 3</span></div><div class="pane hi"><span class="row"><span class="cc">✳</span> claude</span><span class="row">&gt; …</span><span class="row"> </span></div><div class="stack"><i></i><i></i><i></i></div></div>
+      <img src="shots/many-hero.webp" width="1368" height="839" alt="" loading="lazy">
       <strong>Several sessions, one beside you</strong><span>Hand off tasks in the background and keep watch.</span>
     </a>
     <a class="flow-card" href="#review">
-      <div class="thumb" aria-hidden="true"><div class="pane"><span class="row">W login.go</span><span class="row">  auth.go</span><span class="dock">] [</span></div><div class="pane hi"><span class="row del">- old line</span><span class="row add">+ new line</span><span class="row add">+ new line</span></div></div>
+      <img src="shots/review.webp" width="1368" height="839" alt="" loading="lazy">
       <strong>Review what a session changed</strong><span>Its files and each one's diff.</span>
     </a>
     <a class="flow-card" href="#away">
-      <div class="thumb" aria-hidden="true"><div class="pane"><span class="row">▌ docs/</span><span class="row"> </span><span class="dock"><span class="warn">⚑ 1</span> · ● 2</span></div><span class="toast">⚑ asks</span></div>
+      <img src="shots/away.webp" width="1368" height="839" alt="" loading="lazy">
       <strong>Leave them running</strong><span>Come back when a session needs you.</span>
     </a>
   </nav>
@@ -268,13 +220,14 @@ y</pre>
 
 <section class="flow" id="browse" aria-labelledby="browse-h">
   <div class="flow-intro">
-    <div class="thumb big" aria-hidden="true"><div class="pane hi"><span class="row">╭ marmota 3/9</span><span class="row">▌ src/</span><span class="row">  README.md</span><span class="row">  build.sh</span><span class="dock">Sessions · Details · Ask</span></div><div class="pane"><span class="row">README.md</span><span class="row"># Marmota</span><span class="row"> </span><span class="row"> </span><span class="dock"> </span></div></div>
-    <div>
-      <span class="eyebrow small">Workflow 1</span>
-      <h2 id="browse-h">Just browse files</h2>
-      <p>No agents needed. Marmota is a file manager first: two or more panels, a preview of what is under the cursor, and the boxes at the foot, which <kbd>F</kbd> hides.</p>
-    </div>
+    <span class="eyebrow small">Workflow 1</span>
+    <h2 id="browse-h">Just browse files</h2>
+    <p>No agents needed. Marmota is a file manager first: two or more panels, a preview of what is under the cursor, and the boxes at the foot, which <kbd>F</kbd> hides.</p>
   </div>
+  <figure class="shot wide">
+    <button type="button" aria-label="Show full size"><img src="shots/browse-panels.webp" width="1368" height="839" alt="Two file panels, field-notes/2026-11 on the left and tidepool/internal/tides on the right, with the Go code of predict.go in the preview." loading="lazy"></button>
+    <figcaption>Two panels: trip notes on the left, the code of a tide-table tool on the right. The preview shows <code>predict.go</code>, the file under the cursor.</figcaption>
+  </figure>
   <div class="cases">
     <div class="case">
       <h3>Jump to a project and open a file</h3>
@@ -293,6 +246,12 @@ y</pre>
         <li><kbd>tab</kbd> to the other panel, <kbd>v</kbd> to paste.</li>
       </ol>
     </div>
+  </div>
+  <figure class="shot wide">
+    <button type="button" aria-label="Show full size"><img src="shots/browse-zoxide.webp" width="1368" height="839" alt="The z popup over the panels: the query ti, and the folders tidepool and tides with how often each was visited." loading="lazy"></button>
+    <figcaption><kbd>z</kbd>, then <code>ti</code>: the folders you visit most whose names match, with how often you went there. <kbd>enter</kbd> goes to the picked one.</figcaption>
+  </figure>
+  <div class="cases">
     <div class="case">
       <h3>Find a file deep in a folder</h3>
       <ol class="steps">
@@ -322,17 +281,22 @@ y</pre>
       </ol>
     </div>
   </div>
+  <figure class="shot wide">
+    <button type="button" aria-label="Show full size"><img src="shots/browse-sidebar.webp" width="1368" height="839" alt="The s popup: three pinned folders, two recent files, and the path enter goes to." loading="lazy"></button>
+    <figcaption><kbd>s</kbd>: your pinned folders and recent files. The line at the bottom shows the path <kbd>enter</kbd> goes to.</figcaption>
+  </figure>
 </section>
 
 <section class="flow" id="one-agent" aria-labelledby="one-h">
   <div class="flow-intro">
-    <div class="thumb big" aria-hidden="true"><div class="pane"><span class="row">▌ src/</span><span class="row">  login.go <span class="cc">✳</span></span><span class="row">  auth.go</span><span class="row"> </span><span class="dock">✳ 1 working</span></div><div class="pane hi"><span class="row"><span class="cc">✳</span> Claude Code</span><span class="row">&gt; fix the login</span><span class="row">  ⏺ Edit(login.go)</span><span class="row"> </span><span class="dock"> </span></div></div>
-    <div>
-      <span class="eyebrow small">Workflow 2</span>
-      <h2 id="one-h">One coding agent beside you</h2>
-      <p>Claude Code or Codex runs in a WezTerm pane next to Marmota, in the folder you are in. You browse on the left and talk to it on the right; <kbd>Cmd+Opt+←</kbd> <kbd>→</kbd> move between the two.</p>
-    </div>
+    <span class="eyebrow small">Workflow 2</span>
+    <h2 id="one-h">One coding agent beside you</h2>
+    <p>Claude Code or Codex runs in a WezTerm pane next to Marmota, in the folder you are in. You browse on the left and talk to it on the right; <kbd>Cmd+Opt+←</kbd> <kbd>→</kbd> move between the two.</p>
   </div>
+  <figure class="shot wide">
+    <button type="button" aria-label="Show full size"><img src="shots/agent-working.webp" width="1368" height="839" alt="Marmota on the left with server.go and server_test.go marked as changed; Claude Code on the right, writing tests and running them." loading="lazy"></button>
+    <figcaption>Claude Code adds a health check, on the right. On the left, <span class="tag cc">✳</span> marks the two files it has changed so far (<code>M</code> changed in git, <code>?</code> new), and the status line says <span class="tag cc">✳ 1 working</span>.</figcaption>
+  </figure>
   <div class="cases">
     <div class="case">
       <h3>Start it</h3>
@@ -349,6 +313,12 @@ y</pre>
         <li>Say what to do with them.</li>
       </ol>
     </div>
+  </div>
+  <figure class="shot wide">
+    <button type="button" aria-label="Show full size"><img src="shots/agent-mention.webp" width="1368" height="839" alt="Claude Code's prompt beside Marmota holds @internal/api/server.go followed by a request for a health check endpoint." loading="lazy"></button>
+    <figcaption><kbd>@</kbd> on <code>server.go</code> typed <code>@internal/api/server.go</code> into Claude Code's prompt and moved the keyboard there; the request follows it.</figcaption>
+  </figure>
+  <div class="cases">
     <div class="case">
       <h3>Keep browsing while it works</h3>
       <ol class="steps">
@@ -379,17 +349,22 @@ y</pre>
       </ol>
     </div>
   </div>
+  <figure class="shot wide">
+    <button type="button" aria-label="Show full size"><img src="shots/agent-answer.webp" width="1368" height="839" alt="The preview shows a hidden session's permission question: a shell command, then Do you want to proceed, with the options Yes, Yes and switch to auto mode, and No." loading="lazy"></button>
+    <figcaption>A session out of sight wants to run a shell command. After <kbd>!</kbd> and <kbd>K</kbd>, your keys go to its question: <kbd>1</kbd> answers Yes.</figcaption>
+  </figure>
 </section>
 
 <section class="flow" id="many" aria-labelledby="many-h">
   <div class="flow-intro">
-    <div class="thumb big" aria-hidden="true"><div class="pane"><span class="row">▌ src/</span><span class="row">1 <span class="cc">✳ cc</span> fix the login</span><span class="row">2 <span class="warn">⚑</span> <span class="co">co</span> docs pass</span><span class="row">3 ○ <span class="cc">cc</span> tests</span><span class="dock">✳ 1 · ⚑ 1</span></div><div class="pane hi"><span class="row"><span class="cc">✳</span> fix the login</span><span class="row">&gt; …</span><span class="row"> </span><span class="row"> </span><span class="dock"> </span></div><div class="stack"><i></i><i></i></div></div>
-    <div>
-      <span class="eyebrow small">Workflow 3</span>
-      <h2 id="many-h">Several sessions, one beside you</h2>
-      <p>Hand tasks to sessions that run in the background, each in its own folder, while one stays beside you. The Sessions box lists them all; the others wait in a hidden WezTerm workspace until you bring one in.</p>
-    </div>
+    <span class="eyebrow small">Workflow 3</span>
+    <h2 id="many-h">Several sessions, one beside you</h2>
+    <p>Hand tasks to sessions that run in the background, each in its own folder, while one stays beside you. The Sessions box lists them all; the others wait in a hidden WezTerm workspace until you bring one in.</p>
   </div>
+  <figure class="shot wide">
+    <button type="button" aria-label="Show full size"><img src="shots/many-hero.webp" width="1368" height="839" alt="The Sessions box with four sessions in different states, the second selected; the preview shows its permission question; Claude Code works beside Marmota." loading="lazy"></button>
+    <figcaption>Four sessions: two replied (<span class="tag co">●</span>), one asks permission (<span style="color: var(--accent)">⚑</span>), one works beside Marmota (<span class="tag cc">✳</span>). The preview shows the selected session's question.</figcaption>
+  </figure>
   <div class="cases">
     <div class="case">
       <h3>Start one in the background</h3>
@@ -412,6 +387,12 @@ y</pre>
         <div class="state"><span class="g" style="color: var(--muted)">○</span><strong>Waiting</strong><span>Ready for your next prompt.</span></div>
       </div>
     </div>
+  </div>
+  <figure class="shot wide">
+    <button type="button" aria-label="Show full size"><img src="shots/many-new-wide.webp" width="1368" height="839" alt="The Ask box at full width: a new Codex session in tidepool, auto permissions, model codex default, effort medium, with a task typed in." loading="lazy"></button>
+    <figcaption><kbd>!</kbd> <kbd>n</kbd>, then <kbd>tab</kbd> for Codex: the Ask box will start a Codex session in <code>tidepool</code>, in auto mode, at medium effort.</figcaption>
+  </figure>
+  <div class="cases">
     <div class="case">
       <h3>Swap which one is beside you</h3>
       <ol class="steps">
@@ -427,6 +408,12 @@ y</pre>
         <li>For a running Codex session, <kbd>ctrl+o</kbd> and <kbd>ctrl+t</kbd> change its model and effort from your next message.</li>
       </ol>
     </div>
+  </div>
+  <figure class="shot wide">
+    <button type="button" aria-label="Show full size"><img src="shots/many-write.webp" width="1368" height="839" alt="The Ask box writing to a hidden session: also document GET /healthz in the README usage section; below it, the earlier request and when it replied." loading="lazy"></button>
+    <figcaption><kbd>K</kbd> on a hidden session: the message goes into its prompt. Under the draft, what you sent it before and when it replied.</figcaption>
+  </figure>
+  <div class="cases">
     <div class="case">
       <h3>Keep one in view while you browse</h3>
       <ol class="steps">
@@ -446,13 +433,14 @@ y</pre>
 
 <section class="flow" id="review" aria-labelledby="review-h">
   <div class="flow-intro">
-    <div class="thumb big" aria-hidden="true"><div class="pane"><span class="row">fix the login: 2 files</span><span class="row">▌ login.go</span><span class="row">  auth.go</span><span class="row"> </span><span class="dock">] next · [ previous</span></div><div class="pane hi"><span class="row">login.go</span><span class="row del">- if user == nil {</span><span class="row add">+ if user == nil || !ok {</span><span class="row add">+   return errAuth</span><span class="dock"> </span></div></div>
-    <div>
-      <span class="eyebrow small">Workflow 4</span>
-      <h2 id="review-h">Review what a session changed</h2>
-      <p>Before you accept a session's work, read what it did, file by file, without opening each one.</p>
-    </div>
+    <span class="eyebrow small">Workflow 4</span>
+    <h2 id="review-h">Review what a session changed</h2>
+    <p>Before you accept a session's work, read what it did, file by file, without opening each one.</p>
   </div>
+  <figure class="shot wide">
+    <button type="button" aria-label="Show full size"><img src="shots/review.webp" width="1368" height="839" alt="A session's three changed files listed in the panel, and the diff of server.go in the preview: 22 lines added, 2 removed." loading="lazy"></button>
+    <figcaption><kbd>W</kbd> on the session that added the health check: its three files, and <code>server.go</code> compared with the file as it was before the session first changed it.</figcaption>
+  </figure>
   <div class="case">
     <ol class="steps">
       <li><kbd>!</kbd>, select the session, <kbd>W</kbd>: the panel lists the files it changed.</li>
@@ -465,13 +453,14 @@ y</pre>
 
 <section class="flow" id="away" aria-labelledby="away-h">
   <div class="flow-intro">
-    <div class="thumb big" aria-hidden="true"><div class="pane"><span class="row">▌ notes/</span><span class="row">  plan.md</span><span class="row"> </span><span class="row"> </span><span class="dock"><span class="warn">⚑ 1 needs you</span> · ● 2 unread</span></div><span class="toast">⚑ docs pass asks</span></div>
-    <div>
-      <span class="eyebrow small">Workflow 5</span>
-      <h2 id="away-h">Leave them running</h2>
-      <p>Get on with something else, in Marmota or another app. Marmota tells you when a session needs you, and never moves your focus on its own.</p>
-    </div>
+    <span class="eyebrow small">Workflow 5</span>
+    <h2 id="away-h">Leave them running</h2>
+    <p>Get on with something else, in Marmota or another app. Marmota tells you when a session needs you, and never moves your focus on its own.</p>
   </div>
+  <figure class="shot wide">
+    <button type="button" aria-label="Show full size"><img src="shots/away.webp" width="1368" height="839" alt="Marmota showing a trip report, with a note in the top right corner: Tides daylight saving duplicate events needs you, permission prompt." loading="lazy"></button>
+    <figcaption>A hidden session stopped to ask permission. The note in the top right says which one and why; <kbd>!</kbd> opens it, <kbd>esc</kbd> puts the note away.</figcaption>
+  </figure>
   <div class="case">
     <ol class="steps">
       <li>When a session you can't see asks something, fails, or replies, a note appears in Marmota's top right corner; while Marmota isn't in front, WezTerm also posts a macOS notification.</li>
@@ -500,5 +489,21 @@ y</pre>
 </div>
 
 
+<dialog class="zoom" aria-label="Screenshot, full size"><img alt=""></dialog>
+<script>
+(() => {
+  const dialog = document.querySelector('dialog.zoom');
+  const big = dialog.querySelector('img');
+  document.querySelectorAll('.shot button').forEach((button) => {
+    button.addEventListener('click', () => {
+      const img = button.querySelector('img');
+      big.src = img.src;
+      big.alt = img.alt;
+      dialog.showModal();
+    });
+  });
+  dialog.addEventListener('click', () => dialog.close());
+})();
+</script>
 </body>
 </html>
