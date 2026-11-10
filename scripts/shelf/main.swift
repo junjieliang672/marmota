@@ -7,10 +7,10 @@
 // While a shelf is open, running y-shelf again adds the files to it.
 //
 // The files that come in together (one Y, one drop) sit in one pile. Each
-// pile: drag it out whole (it leaves the shelf unless locked), double-click to
-// open it (a pile of several: show it in Finder), x to remove it, the eye or
-// space to Quick Look it, the lock to keep it after a drop. The shelf quits
-// when it empties, or on esc.
+// pile: drag it out whole (it stays, with a green tick once it has been
+// dropped somewhere), double-click to open it (a pile of several: show it in
+// Finder), x to remove it, the eye or space to Quick Look it. The shelf stays
+// open, empty too, until you close it: the close button, the menu, or esc.
 import AppKit
 import Quartz
 import QuickLookThumbnailing
@@ -25,7 +25,7 @@ let restingAlpha: CGFloat = 0.92
 // Item is one pile: the files that came in together.
 final class Item {
     let urls: [URL]
-    var locked = false
+    var dropped = false // dropped into another app at least once
     var thumbs: [NSImage]
     weak var view: NSView?
 
@@ -48,7 +48,6 @@ final class Shelf {
     var items: [Item] = []
     weak var hovered: Item?
     var onChange: () -> Void = {}
-    private var everFilled = false
 
     // add puts urls on the shelf as one pile, leaving out the ones already on it.
     func add(_ urls: [URL]) {
@@ -59,7 +58,6 @@ final class Shelf {
         if !fresh.isEmpty {
             let item = Item(urls: fresh)
             items.append(item)
-            everFilled = true
             // Only the top three show in the pile.
             for i in fresh.indices.prefix(3) { loadThumbnail(item, i) }
         }
@@ -76,10 +74,7 @@ final class Shelf {
         changed()
     }
 
-    private func changed() {
-        if items.isEmpty && everFilled { NSApp.terminate(nil) }
-        onChange()
-    }
+    private func changed() { onChange() }
 
     // Quick Look's picture of the file: a page of a PDF, a text file's first
     // lines. The Finder icon stands in until it arrives.
@@ -154,7 +149,6 @@ final class ItemView: NSView, NSDraggingSource {
     let item: Item
     var closeButton: NSButton!
     var eyeButton: NSButton!
-    var lockButton: NSButton!
     var hovering = false {
         didSet {
             updateButtons()
@@ -171,8 +165,7 @@ final class ItemView: NSView, NSDraggingSource {
         item.view = self
         closeButton = symbolButton("xmark", size: 12, target: self, action: #selector(removeItem))
         eyeButton = symbolButton("eye", size: 11, target: self, action: #selector(preview))
-        lockButton = symbolButton("lock.open", size: 12, target: self, action: #selector(toggleLock))
-        for (i, button) in [closeButton!, eyeButton!, lockButton!].enumerated() {
+        for (i, button) in [closeButton!, eyeButton!].enumerated() {
             button.frame = NSRect(x: width - buttonColumn, y: 8 + CGFloat(i) * 24, width: 22, height: 22)
             addSubview(button)
         }
@@ -186,12 +179,6 @@ final class ItemView: NSView, NSDraggingSource {
     func updateButtons() {
         closeButton.isHidden = !hovering
         eyeButton.isHidden = !hovering
-        lockButton.isHidden = !hovering && !item.locked
-        let name = item.locked ? "lock.fill" : "lock.open"
-        lockButton.image = NSImage(systemSymbolName: name, accessibilityDescription: name)!
-            .withSymbolConfiguration(.init(pointSize: 12, weight: .regular))
-        lockButton.contentTintColor = item.locked ? .systemYellow : NSColor(white: 1, alpha: 0.8)
-        lockButton.toolTip = item.locked ? "Locked: stays after a drop" : "Lock: keep it after a drop"
     }
 
     var thumbBox: NSRect {
@@ -233,6 +220,7 @@ final class ItemView: NSView, NSDraggingSource {
             NSGraphicsContext.restoreGraphicsState()
         }
         if item.urls.count > 1 { drawCount() }
+        if item.dropped { drawTick() }
 
         let style = NSMutableParagraphStyle()
         style.alignment = .center
@@ -245,6 +233,19 @@ final class ItemView: NSView, NSDraggingSource {
                 .foregroundColor: NSColor(white: 1, alpha: 0.9),
                 .paragraphStyle: style,
             ])
+    }
+
+    // A green tick on the bottom left corner: this pile has been dropped
+    // into another app.
+    func drawTick() {
+        let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .bold)
+            .applying(.init(paletteColors: [.white, .systemGreen]))
+        guard let tick = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: "dropped")?
+            .withSymbolConfiguration(config)
+        else { return }
+        let size = tick.size
+        tick.draw(in: NSRect(x: thumbBox.minX - 5, y: thumbBox.maxY - size.height + 3, width: size.width, height: size.height),
+                  from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
     }
 
     // How many files the pile holds, in a blue badge on its top right corner.
@@ -284,6 +285,9 @@ final class ItemView: NSView, NSDraggingSource {
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
+    // Pressing on a pile drags its files, never the shelf.
+    override var mouseDownCanMoveWindow: Bool { false }
+
     override func mouseDown(with event: NSEvent) {
         mouseDownAt = event.locationInWindow
         guard event.clickCount == 2 else { return }
@@ -316,7 +320,9 @@ final class ItemView: NSView, NSDraggingSource {
     }
 
     func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
-        if operation != [] && !item.locked { Shelf.shared.remove(item) }
+        guard operation != [] else { return }
+        item.dropped = true
+        needsDisplay = true
     }
 
     @objc func removeItem() {
@@ -325,11 +331,6 @@ final class ItemView: NSView, NSDraggingSource {
     }
 
     @objc func preview() { (window as? ShelfPanel)?.togglePreview(item.urls) }
-
-    @objc func toggleLock() {
-        item.locked.toggle()
-        updateButtons()
-    }
 }
 
 final class RootView: NSView {
@@ -338,6 +339,7 @@ final class RootView: NSView {
     let placeholder = NSTextField(labelWithString: "Drop files here")
     var menuButton: NSButton!
     var clearButton: NSButton!
+    var closeButton: NSButton!
     var dropHighlight = false {
         didSet {
             layer?.borderWidth = dropHighlight ? 2 : 0.5
@@ -424,6 +426,12 @@ final class RootView: NSView {
         clearButton.toolTip = "Clear the shelf"
         addSubview(menuButton)
         addSubview(clearButton)
+        // The only way the shelf goes, with esc and the menu's Close Shelf.
+        closeButton = symbolButton("xmark.circle", size: 14, target: NSApp, action: #selector(NSApplication.terminate(_:)))
+        closeButton.frame = NSRect(x: (bounds.width - 22) / 2, y: 6, width: 22, height: 22)
+        closeButton.autoresizingMask = [.minXMargin, .maxXMargin, .maxYMargin]
+        closeButton.toolTip = "Close the shelf"
+        addSubview(closeButton)
 
         registerForDraggedTypes([.fileURL])
     }
@@ -454,7 +462,7 @@ final class RootView: NSView {
         let urls = Shelf.shared.items.flatMap(\.urls)
         let add = { (title: String, action: @escaping () -> Void) in
             let entry = ClosureMenuItem(title: title, action: action)
-            entry.isEnabled = !urls.isEmpty || title.hasPrefix("Quit")
+            entry.isEnabled = !urls.isEmpty || title.hasPrefix("Close")
             menu.addItem(entry)
         }
         add("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting(urls) }
@@ -463,7 +471,7 @@ final class RootView: NSView {
             NSPasteboard.general.setString(urls.map(\.path).joined(separator: "\n"), forType: .string)
         }
         menu.addItem(.separator())
-        add("Quit Shelf") { NSApp.terminate(nil) }
+        add("Close Shelf") { NSApp.terminate(nil) }
         menu.autoenablesItems = false
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: menuButton.bounds.height + 4), in: menuButton)
     }
@@ -568,7 +576,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.backgroundColor = .clear
         panel.hasShadow = true
         panel.level = .floating
-        panel.isMovableByWindowBackground = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.appearance = NSAppearance(named: .darkAqua)
         panel.alphaValue = restingAlpha
