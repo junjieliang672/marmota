@@ -76,7 +76,34 @@ func (m *model) sendToShelf() tea.Cmd {
 		m.flashClaude("The shelf works on macOS only")
 		return nil
 	}
-	paths := m.getFocusedFilePanel().actionTargets()
+	return m.shelfCmd(m.getFocusedFilePanel().actionTargets())
+}
+
+// sendSessionFilesToShelf puts the files the selected session changed on
+// the shelf, as one pile.
+func (m *model) sendSessionFilesToShelf() tea.Cmd {
+	s, ok := m.selectedSession()
+	if !ok {
+		m.flashClaude("No session selected")
+		return nil
+	}
+	var paths []string
+	for _, e := range touchedElements(s) {
+		paths = append(paths, e.location)
+	}
+	if len(paths) == 0 {
+		m.flashClaude("This session hasn't changed any files")
+		return nil
+	}
+	if runtime.GOOS != utils.OsDarwin {
+		m.flashClaude("The shelf works on macOS only")
+		return nil
+	}
+	return m.shelfCmd(paths)
+}
+
+// shelfCmd hands paths to Marmota's shelf, or to the app shelf_app names.
+func (m *model) shelfCmd(paths []string) tea.Cmd {
 	if len(paths) == 0 {
 		return nil
 	}

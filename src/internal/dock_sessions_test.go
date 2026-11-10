@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -11,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/junjieliang672/marmota/src/internal/common"
+	"github.com/junjieliang672/marmota/src/internal/utils"
 	"github.com/junjieliang672/marmota/src/pkg/claudesession"
 )
 
@@ -305,4 +308,70 @@ func TestTheSessionsBoxMarksRemoteControl(t *testing.T) {
 	}
 	require.Len(t, marked, 1, "one row is marked:\n%s", box)
 	assert.Contains(t, marked[0], remote.DisplayTitle(), "the row of the session with Remote Control")
+}
+
+func TestQuestionMarkOpensTheHelpFromTheSessionsBox(t *testing.T) {
+	m := dockTestModel(t)
+	bang(m)
+	on := m.sessions.list.SelectedID()
+
+	pressKey(m, common.Hotkeys.OpenHelpMenu[0])
+	require.True(t, m.helpMenu.open)
+	pressKey(m, common.Hotkeys.ListDown[0])
+	assert.Equal(t, on, m.sessions.list.SelectedID(), "the help takes the keys while it is open")
+
+	pressKey(m, "esc")
+	pressKey(m, "esc")
+	assert.False(t, m.helpMenu.open)
+	assert.Equal(t, dockSessionsFocus, m.focusPanel, "closed, it gives the keys back to the Sessions box")
+	pressKey(m, common.Hotkeys.ListDown[0])
+	assert.NotEqual(t, on, m.sessions.list.SelectedID())
+}
+
+func TestThePromptOpensFromTheSessionsBox(t *testing.T) {
+	m := dockTestModel(t)
+	bang(m)
+
+	pressKey(m, common.Hotkeys.OpenAgentPrompt[0])
+
+	assert.True(t, m.promptModal.IsOpen())
+}
+
+func TestPCopiesTheSessionsFolder(t *testing.T) {
+	m := dockTestModel(t)
+	var copied string
+	setForTest(t, &writeClipboard, func(text string) error {
+		copied = text
+		return nil
+	})
+	bang(m)
+	s, ok := m.selectedSession()
+	require.True(t, ok)
+
+	pressKey(m, common.Hotkeys.CopyPath[0])
+
+	assert.Equal(t, s.Cwd, copied)
+}
+
+func TestYPutsTheFilesASessionChangedOnTheShelf(t *testing.T) {
+	if runtime.GOOS != utils.OsDarwin {
+		t.Skip("the shelf is macOS only")
+	}
+	m, dir := sessionFilesModel(t)
+	setForTest(t, &common.Config.ShelfApp, "")
+	setForTest(t, &shelfBinary, func() (string, error) { return "/bin/y-shelf", nil })
+	var got []string
+	setForTest(t, &startShelf, func(path string, args ...string) error {
+		got = append([]string{path}, args...)
+		return nil
+	})
+	require.Nil(t, m.focusDockSessionsOn(m.dockSessions()[0].ID))
+
+	cmd := m.dockSessionsKey(utils.TeaKeyMsg(common.Hotkeys.SendToShelf[0]))
+	require.NotNil(t, cmd)
+	m.applyShelfSent(cmd().(shelfSentMsg))
+
+	assert.Equal(t, []string{"/bin/y-shelf", filepath.Join(dir, "new.go"), filepath.Join(dir, "src", "edited.go")}, got,
+		"the files it changed that are still there, as one pile")
+	assert.Equal(t, "2 items → the shelf", m.claude.flash)
 }

@@ -771,7 +771,7 @@ func (m *model) handleKeyInput(msg tea.KeyMsg) tea.Cmd {
 
 	// The Sessions box in the dock takes the keys while it has them, and
 	// the Ask box all of them: you type there.
-	case m.focusPanel == dockSessionsFocus && !m.isDockQuitKey(msg.String()):
+	case m.focusPanel == dockSessionsFocus && !m.isDockQuitKey(msg.String()) && !m.helpMenu.open:
 		cmd = m.dockSessionsKey(msg)
 	case m.focusPanel == dockAskFocus:
 		cmd = m.dockAskKey(msg)

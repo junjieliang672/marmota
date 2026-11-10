@@ -212,6 +212,28 @@ func getHelpMenuData() []helpMenuModalData {
 			hotkeyWorkType: globalType,
 		},
 		{
+			hotkey:         []string{firstKey(common.Hotkeys.CopyPath), ""},
+			description:    "Copy the folder the session works in",
+			hotkeyWorkType: globalType,
+		},
+		{
+			hotkey:         []string{firstKey(common.Hotkeys.SendToShelf), ""},
+			description:    "Put the files the session changed on the shelf, as one pile, to drag into another app",
+			hotkeyWorkType: globalType,
+		},
+		{
+			hotkey: []string{
+				firstKey(common.Hotkeys.OpenAgentPrompt) + "/" + firstKey(common.Hotkeys.OpenCommandLine), "",
+			},
+			description:    "Start a session (>claude, >codex) or run a command, in the panel's folder",
+			hotkeyWorkType: globalType,
+		},
+		{
+			hotkey:         []string{firstKey(common.Hotkeys.OpenHelpMenu), ""},
+			description:    "This help, from the Sessions box too",
+			hotkeyWorkType: globalType,
+		},
+		{
 			hotkey: []string{
 				"[n]" + firstKey(common.Hotkeys.ListTop) + "/" + firstKey(common.Hotkeys.ListBottom), "",
 			},

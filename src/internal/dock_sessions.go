@@ -265,6 +265,16 @@ func (m *model) dockSessionsKey(msg tea.KeyMsg) tea.Cmd {
 		return m.toggleSessionFiles()
 	case slices.Contains(common.Hotkeys.PinViewer, key):
 		return m.togglePinViewer()
+	case slices.Contains(common.Hotkeys.OpenHelpMenu, key):
+		m.openHelpMenu()
+	case slices.Contains(common.Hotkeys.OpenAgentPrompt, key):
+		m.promptModal.Open(false)
+	case slices.Contains(common.Hotkeys.OpenCommandLine, key):
+		m.promptModal.Open(true)
+	case slices.Contains(common.Hotkeys.CopyPath, key):
+		m.withSelectedSession(m.copySessionFolder)
+	case slices.Contains(common.Hotkeys.SendToShelf, key):
+		return m.sendSessionFilesToShelf()
 	case slices.Contains(common.Hotkeys.FocusOnSidebar, key):
 		// The s and z popups go to folders: they act on the files. Closed
 		// with esc, they give the keyboard back here.
@@ -475,6 +485,7 @@ func (m *model) dockStatusLine() string {
 		{Key: firstKey(common.Hotkeys.SessionFork), Description: "fork"},
 		{Key: firstKey(common.Hotkeys.SessionStop), Description: "stop"},
 		{Key: firstKey(common.Hotkeys.FocusOnSidebar) + "/" + firstKey(common.Hotkeys.OpenZoxide), Description: "go"},
+		{Key: firstKey(common.Hotkeys.OpenHelpMenu), Description: "help"},
 	}
 	switch {
 	case m.sessions.focus == sessionsFocusAnswer:

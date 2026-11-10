@@ -340,6 +340,20 @@ func (m *model) mentionClaudeSession(s claudesession.Session) {
 	m.flashClaude("Added " + mention + " to your question, and copied it")
 }
 
+// copySessionFolder copies the folder the session works in.
+func (m *model) copySessionFolder(s claudesession.Session) {
+	if s.Cwd == "" {
+		m.flashClaude("Marmota doesn't know " + s.DisplayTitle() + "'s folder")
+		return
+	}
+	if err := writeClipboard(s.Cwd); err != nil {
+		slog.Error("Could not copy the session's folder", "error", err)
+		m.flashClaude("Couldn't copy the folder: " + err.Error())
+		return
+	}
+	m.flashClaude("Copied " + shortPath(s.Cwd))
+}
+
 // sessionMention is how Claude Code mentions a session by name: @name, or
 // @"name" when it has spaces.
 func sessionMention(name string) string {
