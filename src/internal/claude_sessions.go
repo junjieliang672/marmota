@@ -427,9 +427,10 @@ func (m *model) claudeSessionDir(s claudesession.Session) string {
 	return m.getFocusedFilePanel().location
 }
 
-// showWeztermPaneForSession brings a session's pane beside superfile, or
-// switches WezTerm to it when it isn't one of superfile's agent panes. With
-// focus, or when it is already beside superfile, the keyboard moves into it.
+// showWeztermPaneForSession brings a session's pane beside superfile, taking
+// it from wherever it is: the hidden workspace, or another tab, beside
+// another Marmota or on its own. With focus, or when it is already beside
+// superfile, the keyboard moves into it.
 func (m *model) showWeztermPaneForSession(pane weztermPane, title string, focus bool) (string, error) {
 	cwd := m.getFocusedFilePanel().location
 	superfilePaneID, err := currentWeztermPaneID()
@@ -445,11 +446,14 @@ func (m *model) showWeztermPaneForSession(pane weztermPane, title string, focus 
 	}
 
 	m.refreshManagedWeztermState()
-	if pane.Workspace == managedAgentHiddenWorkspace && !m.isManagedAgentPane(pane.PaneID) {
-		// Parked by an earlier superfile, or lost track of: take it over.
-		// Focusing it where it is would show nothing. Reconciling again
-		// records where the panes really are before the swap.
-		m.adoptParkedAgentPane(superfilePaneID, pane)
+	if !m.isManagedAgentPane(pane.PaneID) {
+		// Parked by an earlier superfile, lost track of, or in another tab:
+		// take it over. Focusing it where it is would show nothing, or
+		// switch WezTerm away to that tab. Another Marmota that had it lets
+		// go, or it would park it again. Reconciling again records where
+		// the panes really are before the swap.
+		releasePaneFromOtherMarmotas(superfilePaneID, pane.PaneID)
+		m.adoptAgentPane(superfilePaneID, pane)
 		m.refreshManagedWeztermState()
 	}
 	for _, managed := range m.managedWeztermState.Sessions {
@@ -494,14 +498,18 @@ func (m *model) isManagedAgentPane(paneID int) bool {
 	return false
 }
 
-// adoptParkedAgentPane adds a pane waiting in the hidden workspace to the
-// agent panes superfile manages, still parked.
-func (m *model) adoptParkedAgentPane(superfilePaneID int, pane weztermPane) {
+// adoptAgentPane adds a pane to the agent panes superfile manages, as a
+// hidden one: it is moved beside superfile when it is shown.
+func (m *model) adoptAgentPane(superfilePaneID int, pane weztermPane) {
 	state := m.managedWeztermState
 	cwd := weztermPaneCwdPath(pane.Cwd)
+	provider := inferManagedAgentProvider(cwd, pane, managedAgentProviderUnknown)
+	if provider == managedAgentProviderUnknown {
+		provider = managedAgentProviderClaude
+	}
 	state.Sessions = append(state.Sessions, managedAgentSession{
 		PaneID:      pane.PaneID,
-		Provider:    managedAgentProviderClaude,
+		Provider:    provider,
 		Cwd:         cwd,
 		DisplayName: managedAgentFolderName(cwd),
 		VisibleSlot: managedAgentHiddenSlot,

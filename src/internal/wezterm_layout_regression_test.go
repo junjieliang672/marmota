@@ -112,6 +112,56 @@ func TestShowingAPaneParkedByAnEarlierSuperfileTakesItOver(t *testing.T) {
 	assert.True(t, m.isManagedAgentPane(70))
 }
 
+// A session beside another Marmota, in another tab, comes in beside this
+// one; enter used to switch WezTerm to that tab. The other Marmota lets go
+// of it, so that it doesn't park it again, and its stale view of the panes
+// doesn't park it when it next shows a session.
+func TestShowingASessionBesideAnotherMarmotaTakesItOver(t *testing.T) {
+	m := newClaudeTestModel(t)
+	require.NoError(t, saveWeztermPaneLayoutState(10, weztermPaneLayoutState{
+		FixedSuperfileCols: 100,
+		Sessions:           []managedAgentSession{{PaneID: 8, Provider: managedAgentProviderClaude, VisibleSlot: 1}},
+	}))
+	otherState := weztermPaneLayoutState{
+		FixedSuperfileCols: 100,
+		Sessions: []managedAgentSession{
+			{PaneID: 4, Provider: managedAgentProviderClaude, VisibleSlot: 1},
+			{PaneID: 6, Provider: managedAgentProviderClaude},
+		},
+	}
+	require.NoError(t, saveWeztermPaneLayoutState(2, otherState))
+	wez := newFakeWezterm(t,
+		weztermPane{PaneID: 10, TabID: 1, WindowID: 1, Size: weztermPaneSize{Rows: 50, Cols: 100}},
+		weztermPane{PaneID: 8, TabID: 1, WindowID: 1, LeftCol: 101, TTYName: "/dev/ttys008", Title: "✳ doubao",
+			Size: weztermPaneSize{Rows: 50, Cols: 99}},
+		weztermPane{PaneID: 2, TabID: 2, WindowID: 1, Size: weztermPaneSize{Rows: 50, Cols: 100}},
+		weztermPane{PaneID: 4, TabID: 2, WindowID: 1, LeftCol: 101, TTYName: "/dev/ttys004", Title: "✳ m5-1",
+			Size: weztermPaneSize{Rows: 50, Cols: 99}},
+		weztermPane{PaneID: 6, TabID: 6, WindowID: 6, Workspace: managedAgentHiddenWorkspace,
+			TTYName: "/dev/ttys006", Size: weztermPaneSize{Rows: 24, Cols: 80}},
+	)
+	m.claude.panes = wez.paneList()
+
+	m.focusClaudeSession(claudesession.Session{ID: "s4", Title: "m5-1", Live: true, TTY: "/dev/ttys004"})
+
+	assert.Equal(t, 1, wez.tabOf(4), "it is brought in beside this Marmota: %v", wez.commands)
+	assert.Equal(t, 4, wez.active)
+	assert.Equal(t, managedAgentHiddenWorkspace, wez.panes[8].Workspace, "the one that was there is parked")
+	assert.True(t, m.isManagedAgentPane(4))
+
+	other, err := loadWeztermPaneLayoutState(2)
+	require.NoError(t, err)
+	require.Len(t, other.Sessions, 1, "the other Marmota lets go of it, and keeps the rest")
+	assert.Equal(t, 6, other.Sessions[0].PaneID)
+
+	// The other Marmota, with its view from before, shows its parked one.
+	stale := defaultTestModel(t.TempDir())
+	_, err = stale.foregroundManagedAgentSessionByPaneID(2, otherState, 6)
+	require.NoError(t, err)
+	assert.Equal(t, 1, wez.tabOf(4), "it isn't taken back: %v", wez.commands)
+	assert.Equal(t, 2, wez.tabOf(6))
+}
+
 // Starting Claude from the prompt while another session is beside Marmota
 // shows the new one there, with the keyboard, and parks the other.
 func TestClaudeFromThePromptComesInBesideSuperfile(t *testing.T) {

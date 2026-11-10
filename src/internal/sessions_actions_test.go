@@ -71,17 +71,24 @@ func TestTheSessionsBoxListsLiveSessionsAndThePreviewTheSelectedOne(t *testing.T
 	assert.Less(t, strings.Index(plain, "src/b.go"), strings.Index(plain, " a.go"), "newest changed file first")
 }
 
-func TestEnterInTheSessionsBoxSwitchesToTheSession(t *testing.T) {
+// enter on a session in another tab brings it in beside Marmota, in place
+// of the one there, instead of switching WezTerm to that tab.
+func TestEnterInTheSessionsBoxBringsTheSessionBesideSuperfile(t *testing.T) {
 	m := dockTestModel(t)
+	require.NoError(t, saveWeztermPaneLayoutState(10, weztermPaneLayoutState{
+		FixedSuperfileCols: 74,
+		Sessions:           []managedAgentSession{{PaneID: 20, Provider: managedAgentProviderClaude, VisibleSlot: 1}},
+	}))
+	wez := newFakeWezterm(t, tabPanes()...)
 	bang(m)
 	require.True(t, m.sessions.list.Select("s50"))
 	require.Equal(t, "s50", m.sessions.list.SelectedID())
-	calls := installFakeExec(t, paneListResult(), fakeExecResult{retCode: 0, output: ""})
 
 	pressKey(m, "enter")
 
-	require.Len(t, *calls, 2)
-	assert.Equal(t, "wezterm cli activate-pane --pane-id 50", (*calls)[1].cmd)
+	assert.Equal(t, 1, wez.tabOf(50), "it is beside Marmota: %v", wez.commands)
+	assert.Equal(t, 50, wez.active, "with the keyboard")
+	assert.Equal(t, managedAgentHiddenWorkspace, wez.panes[20].Workspace, "the one that was there is parked")
 	assert.Equal(t, "Switched to ime hold tests", m.claude.flash)
 }
 

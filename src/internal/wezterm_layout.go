@@ -757,9 +757,11 @@ func (m *model) foregroundManagedAgentSessionByPaneID(
 		return state, fmt.Errorf("failed to inspect wezterm panes: %w", err)
 	}
 	// superfile's pane and its tab must be there before anything moves.
-	if _, err = findWeztermPaneByID(allPanes, superfilePaneID); err != nil {
+	superfilePane, err := findWeztermPaneByID(allPanes, superfilePaneID)
+	if err != nil {
 		return state, err
 	}
+	superfileTabID := superfilePane.TabID
 	if _, err = filterWeztermTabPanes(allPanes, superfilePaneID); err != nil {
 		return state, fmt.Errorf("failed to inspect wezterm panes: %w", err)
 	}
@@ -771,8 +773,10 @@ func (m *model) foregroundManagedAgentSessionByPaneID(
 	}
 
 	if currentForegroundIdx >= 0 {
-		// A session that has exited has no pane left to park.
-		if _, findErr := findWeztermPaneByID(allPanes, state.Sessions[currentForegroundIdx].PaneID); findErr == nil {
+		// A session that has exited has no pane left to park, and one
+		// another Marmota took beside it is no longer ours to park.
+		if foreground, findErr := findWeztermPaneByID(allPanes,
+			state.Sessions[currentForegroundIdx].PaneID); findErr == nil && foreground.TabID == superfileTabID {
 			if err = parkWeztermPane(focusPanelDir, state.Sessions[currentForegroundIdx].PaneID); err != nil {
 				return state, err
 			}
@@ -810,6 +814,37 @@ func (m *model) foregroundManagedAgentSessionByPaneID(
 	state.Sessions[targetIdx].VisibleSlot = managedAgentSlotOne
 	state.ForegroundPaneID = targetPaneID
 	return normalizeWeztermPaneLayoutState(state), nil
+}
+
+// releasePaneFromOtherMarmotas takes a pane out of the agent panes every
+// other Marmota manages, so that none of them parks it again or swaps it
+// out of the tab it was moved to.
+func releasePaneFromOtherMarmotas(superfilePaneID, paneID int) {
+	paths, err := filepath.Glob(filepath.Join(variable.SuperFileStateDir, "wezterm-pane-state-*.json"))
+	if err != nil {
+		return
+	}
+	for _, path := range paths {
+		var otherPaneID int
+		if _, err := fmt.Sscanf(filepath.Base(path), "wezterm-pane-state-%d.json", &otherPaneID); err != nil ||
+			otherPaneID == superfilePaneID {
+			continue
+		}
+		state, err := loadWeztermPaneLayoutState(otherPaneID)
+		if err != nil {
+			continue
+		}
+		before := len(state.Sessions)
+		state.Sessions = slices.DeleteFunc(state.Sessions, func(s managedAgentSession) bool { return s.PaneID == paneID })
+		state.ManagedPaneIDs = slices.DeleteFunc(state.ManagedPaneIDs, func(id int) bool { return id == paneID })
+		if state.ForegroundPaneID == paneID {
+			state.ForegroundPaneID = 0
+		}
+		if len(state.Sessions) == before {
+			continue
+		}
+		persistWeztermPaneLayoutState(otherPaneID, state)
+	}
 }
 
 func loadWeztermPaneLayoutState(superfilePaneID int) (weztermPaneLayoutState, error) {

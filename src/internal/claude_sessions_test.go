@@ -140,24 +140,6 @@ func TestOpenClaudeSession_FocusesSessionAlreadyBesideSuperfile(t *testing.T) {
 	assert.Equal(t, "Focused shown", m.claude.flash)
 }
 
-func TestOpenClaudeSession_SwitchesToPaneOutsideSuperfile(t *testing.T) {
-	m := newClaudeTestModel(t)
-	m.claude.panes = tabPanes()
-	m.claude.snapshot = claudesession.Snapshot{Live: []claudesession.Session{
-		{ID: "s50", Title: "elsewhere", Live: true, TTY: "/dev/ttys050"},
-	}}
-	calls := installFakeExec(t,
-		fakeExecResult{retCode: 0, output: marshalWeztermPanesForTest(tabPanes()...)},
-		fakeExecResult{retCode: 0, output: ""},
-	)
-
-	m.openClaudeSession("s50")
-
-	require.Len(t, *calls, 2)
-	assert.Equal(t, "wezterm cli activate-pane --pane-id 50", (*calls)[1].cmd)
-	assert.Equal(t, "Switched to elsewhere", m.claude.flash)
-}
-
 func TestOpenClaudeSession_AttachesBackgroundSession(t *testing.T) {
 	m := newClaudeTestModel(t)
 	m.claude.snapshot = claudesession.Snapshot{Live: []claudesession.Session{
