@@ -20,7 +20,7 @@ let rowHeight: CGFloat = 104
 let buttonColumn: CGFloat = 28
 let footHeight: CGFloat = 32
 // See-through until the pointer is on it, or files are dragged over it.
-let restingAlpha: CGFloat = 0.8
+let restingAlpha: CGFloat = 0.92
 
 // Item is one pile: the files that came in together.
 final class Item {
@@ -379,6 +379,14 @@ final class RootView: NSView {
         blur.state = .active
         blur.autoresizingMask = [.width, .height]
         addSubview(blur)
+
+        // A dark layer over the blur, so white names stay readable over a
+        // white page behind the shelf.
+        let shade = NSView(frame: bounds)
+        shade.wantsLayer = true
+        shade.layer?.backgroundColor = NSColor(white: 0.08, alpha: 0.45).cgColor
+        shade.autoresizingMask = [.width, .height]
+        addSubview(shade)
 
         // A blue glow along the left edge, brightest at the bottom.
         let glow = CAGradientLayer()
