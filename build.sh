@@ -242,6 +242,21 @@ if ! go build -o "$TARGET"; then
 fi
 echo "Built: $TARGET"
 
+# The shelf Y puts files on (bin/y-shelf), built when Xcode's command line
+# tools are here (without them /usr/bin/swiftc only offers to install them)
+build_shelf() {
+    local src="$REPO/scripts/shelf/main.swift" out="$REPO/bin/y-shelf"
+    [[ $(uname -s) == "Darwin" ]] || return 0
+    if ! xcode-select -p &>/dev/null; then
+        echo "Skipped the shelf (Y): it needs Xcode's command line tools (xcode-select --install)"
+        return 0
+    fi
+    [[ -x $out && $out -nt $src ]] && return 0
+    echo "Building the shelf (y-shelf)..."
+    swiftc -O "$src" -o "$out" || echo "Warning: the shelf didn't build, so Y can't open it"
+}
+build_shelf
+
 remove_old_binaries
 setup_shell
 

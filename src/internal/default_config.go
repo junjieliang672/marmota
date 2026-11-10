@@ -580,7 +580,7 @@ func getHelpMenuData() []helpMenuModalData {
 		},
 		{
 			hotkey:         common.Hotkeys.SendToShelf,
-			description:    "Send selected items to the shelf app (Yoink) to drag elsewhere",
+			description:    "Put selected items on the shelf, to drag them into another app",
 			hotkeyWorkType: normalType,
 		},
 		{

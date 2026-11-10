@@ -30,9 +30,11 @@ second_editor = "neovide"
 dir_editor = ""
 
 #-- Shelf App
-# The macOS app the send_to_shelf key (Y) hands the selected files to, so you
-# can drag them from its shelf into another app. Any app name `open -a` takes.
-shelf_app = "Yoink"
+# Where the send_to_shelf key (Y) puts the selected files, so you can drag
+# them from there into another app. Blank: Marmota's own shelf (y-shelf), at
+# the right edge of the screen. Or a shelf app's name, as `open -a` takes it,
+# such as "Yoink".
+shelf_app = ""
 
 #-- Codex
 # The codex program Codex sessions start with. Leave blank for the newest

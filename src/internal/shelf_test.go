@@ -92,6 +92,35 @@ func TestSendToShelf(t *testing.T) {
 		assert.Equal(t, "2 items → Yoink", m.claude.flash)
 	})
 
+	t.Run("blank shelf_app starts Marmota's shelf", func(t *testing.T) {
+		setForTest(t, &common.Config.ShelfApp, "")
+		var got []string
+		setForTest(t, &shelfBinary, func() (string, error) { return "/bin/y-shelf", nil })
+		setForTest(t, &startShelf, func(path string, args ...string) error {
+			got = append([]string{path}, args...)
+			return nil
+		})
+		m := defaultTestModel(root)
+		panel := m.getFocusedFilePanel()
+		panel.selected[a] = struct{}{}
+		panel.selected[b] = struct{}{}
+
+		m.applyShelfSent(m.mainKey(common.Hotkeys.SendToShelf[0])().(shelfSentMsg))
+
+		assert.Equal(t, []string{"/bin/y-shelf", a, b}, got)
+		assert.Equal(t, "2 items → the shelf", m.claude.flash)
+	})
+
+	t.Run("says when Marmota's shelf isn't built", func(t *testing.T) {
+		setForTest(t, &common.Config.ShelfApp, "")
+		setForTest(t, &shelfBinary, func() (string, error) { return "", errors.New("y-shelf isn't built") })
+		m := defaultTestModel(root)
+
+		m.applyShelfSent(m.mainKey(common.Hotkeys.SendToShelf[0])().(shelfSentMsg))
+
+		assert.Contains(t, m.claude.flash, "y-shelf isn't built")
+	})
+
 	t.Run("says when the app can't be opened", func(t *testing.T) {
 		fakeShelfCommand(t, errors.New("exit status 1"))
 		m := defaultTestModel(root)

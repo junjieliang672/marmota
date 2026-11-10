@@ -1,9 +1,12 @@
 package internal
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -16,6 +19,40 @@ import (
 // runShelfCommand runs open; tests swap it out.
 var runShelfCommand = func(name string, args ...string) ([]byte, error) { //nolint:gochecknoglobals // test seam
 	return exec.Command(name, args...).CombinedOutput()
+}
+
+// builtInShelf names Marmota's own shelf (bin/y-shelf) in messages.
+const builtInShelf = "the shelf"
+
+// startShelf starts Marmota's shelf, apart from the terminal so it outlives
+// Marmota; tests swap it out.
+var startShelf = func(path string, args ...string) error { //nolint:gochecknoglobals // test seam
+	cmd := exec.Command(path, args...)
+	utils.DetachFromTerminal(cmd)
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	go cmd.Wait() //nolint:errcheck // only reaps it
+	return nil
+}
+
+// shelfBinary finds Marmota's shelf; tests swap it out.
+var shelfBinary = findShelfBinary //nolint:gochecknoglobals // test seam
+
+// findShelfBinary is Marmota's shelf, y-shelf, which build.sh builds beside y.
+func findShelfBinary() (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = resolved
+	}
+	path := filepath.Join(filepath.Dir(exe), "y-shelf")
+	if _, err := os.Stat(path); err != nil {
+		return "", errors.New("y-shelf isn't built: ./build.sh builds it (it needs Xcode's command line tools)")
+	}
+	return path, nil
 }
 
 // shelfSentMsg reports files handed to the shelf app.
@@ -31,21 +68,27 @@ func shelfCommand(app string, paths []string) (string, []string) {
 	return "open", append([]string{"-g", "-a", app}, paths...)
 }
 
-// sendToShelf hands the selected items, else the one under the cursor, to the
-// shelf app (Yoink by default), to drag from there into another app.
+// sendToShelf hands the selected items, else the one under the cursor, to a
+// shelf to drag from there into another app: Marmota's own (y-shelf), or the
+// app shelf_app names, such as Yoink.
 func (m *model) sendToShelf() tea.Cmd {
 	if runtime.GOOS != utils.OsDarwin {
-		m.flashClaude("Sending to a shelf app works on macOS only")
-		return nil
-	}
-	app := strings.TrimSpace(common.Config.ShelfApp)
-	if app == "" {
-		m.flashClaude("Set shelf_app in config.toml to send files to a shelf app")
+		m.flashClaude("The shelf works on macOS only")
 		return nil
 	}
 	paths := m.getFocusedFilePanel().actionTargets()
 	if len(paths) == 0 {
 		return nil
+	}
+	app := strings.TrimSpace(common.Config.ShelfApp)
+	if app == "" {
+		return func() tea.Msg {
+			path, err := shelfBinary()
+			if err == nil {
+				err = startShelf(path, paths...)
+			}
+			return shelfSentMsg{app: builtInShelf, count: len(paths), err: err}
+		}
 	}
 	name, args := shelfCommand(app, paths)
 	return func() tea.Msg {
