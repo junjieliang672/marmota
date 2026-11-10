@@ -9,28 +9,6 @@ import (
 	"github.com/junjieliang672/marmota/src/internal/ui/rendering"
 )
 
-// PopupRenderer draws the s popup's frame, in the focused panel's frame
-// color, titled with the popup's key and its name: "s go to".
-func PopupRenderer(totalHeight int, totalWidth int, key, name string) *rendering.Renderer {
-	cfg := rendering.DefaultRendererConfig(totalHeight, totalWidth)
-	st := common.PopupStyles(false)
-	cfg.TitleFGColor = st.Title.GetForeground()
-	cfg.ContentFGColor = common.SidebarFGColor
-	cfg.ContentBGColor = common.SidebarBGColor
-	cfg.BorderRequired = true
-	cfg.BorderBGColor = common.SidebarBGColor
-	cfg.BorderFGColor = common.PopupBorderColor()
-	cfg.Border = DefaultLipglossBorder()
-	r, err := rendering.NewRenderer(cfg)
-	if err != nil {
-		slog.Error("Error in creating renderer. Falling back to default renderer", "error", err)
-		r = &rendering.Renderer{}
-	}
-	r.SetBorderTitle(name)
-	r.SetBorderTitleGlyph(key, st.Key.GetForeground())
-	return r
-}
-
 func FilePanelRenderer(totalHeight int, totalWidth int, filePanelFocussed bool) *rendering.Renderer {
 	cfg := rendering.DefaultRendererConfig(totalHeight, totalWidth)
 

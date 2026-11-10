@@ -15,7 +15,7 @@ import (
 )
 
 // The Ask box resumes a session that has ended instead of starting one
-// (ask_resume, ctrl+r, while it writes to a new session): the s popup opens
+// (ask_resume, ctrl+r, while it writes to a new session): the s list opens
 // on its Resume section alone, the five ended sessions last used of Claude
 // Code and of Codex, and the one picked is where enter goes. With a draft,
 // it is resumed in the background with the draft as its first message, as
@@ -28,19 +28,19 @@ type resumeTarget struct {
 	codex     bool
 }
 
-// resumeShown is how many ended sessions of each agent the s popup lists:
+// resumeShown is how many ended sessions of each agent the s list lists:
 // the ones last used. It reads that many of the panel's folder and of each
 // of that many folders sessions were last active in, which holds them.
 const resumeShown = 5
 
-// resumeEndedMsg is the ended sessions read for the s popup, older ones
+// resumeEndedMsg is the ended sessions read for the s list, older ones
 // than the day's the sessions list keeps.
 type resumeEndedMsg struct {
 	sessions []claudesession.Session
 }
 
 // readEndedCmd reads the ended sessions of Claude Code and Codex, of any
-// day, for the s popup.
+// day, for the s list.
 func (m *model) readEndedCmd() tea.Cmd {
 	if m.claude.tracker == nil {
 		m.claude.tracker = claudesession.NewTracker()
@@ -75,7 +75,7 @@ func (m *model) readEndedCmd() tea.Cmd {
 	}
 }
 
-// applyResumeEnded keeps what was read, and lists it in the s popup.
+// applyResumeEnded keeps what was read, and lists it in the s list.
 func (m *model) applyResumeEnded(msg resumeEndedMsg) {
 	m.resume.ended = msg.sessions
 	m.refreshJump()
@@ -83,7 +83,7 @@ func (m *model) applyResumeEnded(msg resumeEndedMsg) {
 
 // endedSessions are the five ended sessions of Codex, or of Claude Code,
 // last used, newest first: of the day's the sessions list keeps, and the
-// older ones read for the s popup.
+// older ones read for the s list.
 func (m *model) endedSessions(codex bool) []claudesession.Session {
 	var sessions []claudesession.Session
 	listed := map[string]bool{}
@@ -116,7 +116,7 @@ func (m *model) isRunning(id string) bool {
 	return false
 }
 
-// findResumable is a session the s popup listed: in the snapshot, or read
+// findResumable is a session the s list listed: in the snapshot, or read
 // for it.
 func (m *model) findResumable(id string) (claudesession.Session, bool) {
 	if s, ok := m.claude.snapshot.Find(id); ok {

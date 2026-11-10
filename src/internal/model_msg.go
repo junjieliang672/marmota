@@ -331,12 +331,12 @@ func (msg FilePreviewUpdateMsg) ApplyToModel(m *model) tea.Cmd {
 		queuedCmd = m.requestFilePreviewRender(forcePreviewRender)
 	}
 
-	selectedItem := m.getFocusedFilePanel().getSelectedItemPtr()
-	if selectedItem == nil {
+	location, ok := m.previewPath()
+	if !ok {
 		slog.Debug("Panel empty or cursor invalid. Ignoring FilePreviewUpdateMsg")
 		return queuedCmd
 	}
-	if selectedItem.location != msg.location {
+	if location != msg.location {
 		slog.Debug("FilePreviewUpdateMsg for older files. Ignoring")
 		return queuedCmd
 	}

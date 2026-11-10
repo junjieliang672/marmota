@@ -7,7 +7,7 @@ import "time"
 const ClaudeAgentColor = "#f0a07a"
 
 // CodexAgentColor marks a Codex session, as ClaudeAgentColor marks Claude
-// Code's: its cc or co tag, and its name in the s popup.
+// Code's: its cc or co tag, and its name in the s list.
 const CodexAgentColor = "#7aa2f7"
 
 // ClaudeNeedsYouColor marks a session that needs you (the ⚑ glyph); git's

@@ -13,6 +13,7 @@ import (
 	zoxidelib "github.com/lazysegtree/go-zoxide"
 
 	"github.com/junjieliang672/marmota/src/internal/common"
+	askui "github.com/junjieliang672/marmota/src/internal/ui/ask"
 	"github.com/junjieliang672/marmota/src/internal/ui/jump"
 	sessionsui "github.com/junjieliang672/marmota/src/internal/ui/sessions"
 	"github.com/junjieliang672/marmota/src/internal/ui/zoxide"
@@ -20,13 +21,15 @@ import (
 	"github.com/junjieliang672/marmota/src/pkg/codexsession"
 )
 
-// The s popup (src/internal/ui/jump) goes to a pinned folder or file, a
+// The s list (src/internal/ui/jump) goes to a pinned folder or file, a
 // session (running, or ended to resume), a folder zoxide knows or a file
-// edited lately. This file gives it its items, and acts on them: enter, and
-// the keys an item takes elsewhere (t pins, r renames, a session's keys are
-// the Sessions box's).
+// edited lately. It is drawn in the focused file panel's place, and the
+// preview beside it shows the item enter goes to: a folder's contents, a
+// file, a session's conversation. This file gives it its items, acts on
+// them (enter, and the keys an item takes elsewhere: t pins, r renames, a
+// session's keys are the Sessions box's) and keeps the preview on them.
 
-// jumpState is the s popup's side of the model.
+// jumpState is the s list's side of the model.
 type jumpState struct {
 	// zoxide is zoxide's answer for zoxideFor, what was typed when it was
 	// asked.
@@ -35,6 +38,9 @@ type jumpState struct {
 	// forResume is set when the Ask box opened it (ask_resume): enter on a
 	// session makes it the one the box resumes.
 	forResume bool
+	// convo is the conversation of the session the list is on, for the
+	// preview.
+	convo sessionsConversation
 }
 
 // jumpZoxideMsg is zoxide's answer for query.
@@ -43,21 +49,24 @@ type jumpZoxideMsg struct {
 	results []zoxidelib.Result
 }
 
-// jumpShare is the part of the Marmota window the popup takes, across and
-// down: its size whatever it lists.
-const jumpShare = 0.85
-
+// setJumpSize sizes the list as the focused file panel it is drawn in. Its
+// keys go to the status line when there is one: it is wider.
 func (m *model) setJumpSize() {
-	m.jumpUI.SetSize(max(30, int(float64(m.fullWidth)*jumpShare)), max(12, int(float64(m.fullHeight)*jumpShare))) //nolint:mnd // the least it can be drawn in
+	m.jumpUI.KeysElsewhere = common.Config.ShowStatusLine && m.statusLineModel.IsEnabled()
+	if len(m.fileModel.filePanels) == 0 {
+		return
+	}
+	m.jumpUI.SetSize(m.filePanelWidthAt(m.filePanelFocusIndex)+common.BorderPadding,
+		m.mainPanelHeight+common.BorderPadding)
 }
 
-// openJump opens the s popup on every section, nothing typed.
+// openJump opens the s list on every section, nothing typed.
 func (m *model) openJump() tea.Cmd {
 	m.jump.forResume = false
 	return m.startJump()
 }
 
-// openJumpForResume opens the s popup on the Resume section alone, for the
+// openJumpForResume opens the s list on the Resume section alone, for the
 // Ask box to pick the session it resumes.
 func (m *model) openJumpForResume() tea.Cmd {
 	m.jump.forResume = true
@@ -70,14 +79,92 @@ func (m *model) startJump(only ...jump.Kind) tea.Cmd {
 	m.jump.zoxide, m.jump.zoxideFor = nil, ""
 	m.setJumpSize()
 	focus := m.jumpUI.Open(m.jumpSections(), only...)
-	return tea.Batch(focus, m.jumpZoxideCmd(""), m.readEndedCmd())
+	return tea.Batch(focus, m.jumpZoxideCmd(""), m.readEndedCmd(), m.jumpPreviewCmd())
 }
 
-// refreshJump gives the open popup its items again.
+// refreshJump gives the open list its items again, and reads the
+// conversation of the session it is on when it changed.
 func (m *model) refreshJump() {
-	if m.jumpUI.IsOpen() {
-		m.jumpUI.SetSections(m.jumpSections())
+	if !m.jumpUI.IsOpen() {
+		return
 	}
+	m.jumpUI.SetSections(m.jumpSections())
+	if s, ok := m.jumpPreviewSession(); ok {
+		m.jump.convo = readConversation(m.jump.convo, s)
+	}
+}
+
+// jumpTarget is what the preview shows while the list is open: the item
+// enter goes to, or home when enter goes home.
+func (m *model) jumpTarget() (jump.Item, bool) {
+	if it, ok := m.jumpUI.Picked(); ok {
+		return it, true
+	}
+	if m.jumpUI.GoesHome() {
+		return jump.Item{Kind: jump.Folder, Key: xdg.Home, Dir: true}, true
+	}
+	return jump.Item{}, false
+}
+
+// jumpPreviewSession is the session the list is on, while the preview
+// shows it.
+func (m *model) jumpPreviewSession() (claudesession.Session, bool) {
+	if !m.jumpUI.IsOpen() || !m.fileModel.filePreview.IsOpen() {
+		return claudesession.Session{}, false
+	}
+	it, ok := m.jumpTarget()
+	switch {
+	case !ok:
+	case it.Kind == jump.Session:
+		if s, found := m.findSession(it.Key); found {
+			return s, true
+		}
+		return m.findResumable(it.Key)
+	case it.Kind == jump.Ended:
+		return m.findResumable(it.Key)
+	}
+	return claudesession.Session{}, false
+}
+
+// jumpSessionPreview draws session s in the preview, as the Sessions box
+// would: its question if it asks one, its conversation.
+func (m *model) jumpSessionPreview(s claudesession.Session, width, height int) string {
+	if st := m.unlistedStart(s.ID); st != nil {
+		return askui.RenderSession(m.startingSessionPaneView(st), "", width, height, 0, false)
+	}
+	convo := m.jump.convo
+	if convo.id != s.ID {
+		convo = sessionsConversation{id: s.ID}
+	}
+	return askui.RenderSession(m.sessionPaneViewOf(s, convo), "", width, height, 0, false)
+}
+
+// jumpPreviewPath is the file or folder the preview shows while the list
+// is open; none while it is on a session or on nothing.
+func (m *model) jumpPreviewPath() (string, bool) {
+	it, ok := m.jumpTarget()
+	if !ok || it.Kind == jump.Session || it.Kind == jump.Ended {
+		return "", false
+	}
+	return it.Key, true
+}
+
+// jumpPreviewCmd keeps the preview on what the list is on, after a key or
+// an answer moved it: a session's conversation is read at once, a file or
+// folder is drawn after the debounce the cursor's moves have. Closed, the
+// list gives the preview back to the panel's cursor.
+func (m *model) jumpPreviewCmd() tea.Cmd {
+	if !m.fileModel.filePreview.IsOpen() {
+		return nil
+	}
+	if !m.jumpUI.IsOpen() {
+		return m.requestFilePreviewRender(false)
+	}
+	if s, ok := m.jumpPreviewSession(); ok {
+		m.jump.convo = readConversation(m.jump.convo, s)
+		return nil
+	}
+	return schedulePreviewRefresh(m)
 }
 
 // jumpZoxideCmd asks zoxide for the folders matching query.
@@ -91,15 +178,16 @@ func (m *model) jumpZoxideCmd(query string) tea.Cmd {
 	}
 }
 
-func (m *model) applyJumpZoxide(msg jumpZoxideMsg) {
+func (m *model) applyJumpZoxide(msg jumpZoxideMsg) tea.Cmd {
 	if !m.jumpUI.IsOpen() || msg.query != m.jumpUI.Query() {
-		return // typed on since
+		return nil // typed on since
 	}
 	m.jump.zoxide, m.jump.zoxideFor = msg.results, msg.query
 	m.refreshJump()
+	return m.jumpPreviewCmd() // the first match may be a folder it found
 }
 
-// jumpSections are the popup's items, section by section.
+// jumpSections are the list's items, section by section.
 func (m *model) jumpSections() []jump.Section {
 	now := time.Now()
 	pinned := m.sidebarModel.PinnedEntries()
@@ -176,9 +264,16 @@ func isDir(path string) bool {
 	return err == nil && info.IsDir()
 }
 
-// jumpKey takes a key while the popup is open.
+// jumpKey takes a key while the list is open, and keeps the preview on
+// what it is on.
 func (m *model) jumpKey(msg tea.KeyMsg) tea.Cmd {
-	act := m.jumpUI.HandleKey(msg)
+	m.setJumpSize() // a panel may have been opened or closed since
+	cmd := m.jumpAct(m.jumpUI.HandleKey(msg))
+	return tea.Batch(cmd, m.jumpPreviewCmd())
+}
+
+// jumpAct does what a key in the list asked.
+func (m *model) jumpAct(act jump.Action) tea.Cmd {
 	switch act.Kind {
 	case jump.Closed:
 		if m.jump.forResume {
@@ -461,7 +556,7 @@ func renameOnDisk(path, name string) (string, error) {
 	return to, os.Rename(path, to)
 }
 
-// jumpKeys are the keys the picked item takes, for the popup's foot.
+// jumpKeys are the keys the picked item takes, for the list's foot.
 func (m *model) jumpKeys(it jump.Item) []string {
 	k := firstKey
 	if m.jump.forResume {

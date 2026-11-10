@@ -86,7 +86,7 @@ type model struct {
 	typingModal typingModal
 	helpMenu    helpMenuModal
 	promptModal prompt.Model
-	// jumpUI is the s popup; jump its side of the model.
+	// jumpUI is the s list; jump its side of the model.
 	jumpUI jumpui.Model
 	jump   jumpState
 	resume resumeState

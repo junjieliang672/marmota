@@ -28,7 +28,7 @@ func (m *model) isTextInputActive() bool {
 
 	if m.typingModal.open || // create a new file or directory
 		m.promptModal.IsOpen() || // SPF or shell prompt
-		m.jumpUI.IsOpen() && (!m.jumpUI.Picking() || m.jumpUI.Renaming()) || // the s popup's search or rename
+		m.jumpUI.IsOpen() && (!m.jumpUI.Picking() || m.jumpUI.Renaming()) || // the s list's search or rename
 		m.fileModel.renaming || // file panel rename
 		m.sessionsShown() && m.sessions.list.IsRenaming() || // session rename
 		m.sessionsShown() && m.sessions.focus == sessionsFocusAnswer || // typing an answer
@@ -55,7 +55,7 @@ func (m *model) isBlockingModalOpen() bool {
 	if m.firstUse ||
 		m.notifyModel.IsOpen() ||
 		m.helpMenu.open ||
-		m.jumpUI.IsOpen() && m.jumpUI.Picking() && !m.jumpUI.Renaming() { // the s popup's item keys
+		m.jumpUI.IsOpen() && m.jumpUI.Picking() && !m.jumpUI.Renaming() { // the s list's item keys
 		return true
 	}
 

@@ -8,7 +8,7 @@ type directory struct {
 }
 
 // Model keeps the pinned folders and files, the files edited lately, and
-// the git status of the focused panel's folder. The s popup
+// the git status of the focused panel's folder. The s list
 // (src/internal/ui/jump) lists the first two; the file rows and Details
 // show the third.
 type Model struct {

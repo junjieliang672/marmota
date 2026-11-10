@@ -194,7 +194,7 @@ func TestEscFromTheAskBoxGoesBackToTheFiles(t *testing.T) {
 	assert.Equal(t, nonePanelFocus, m.focusPanel, "opened from the files, esc goes back to them")
 }
 
-// s opens its popup from the Sessions box too; it goes to folders, so the
+// s opens its list from the Sessions box too; it goes to folders, so the
 // files have the keyboard behind it. Closed without going anywhere, it gives
 // the keyboard back to the Sessions box, on the same session.
 func TestSOpensItsPopupFromTheSessionsBox(t *testing.T) {

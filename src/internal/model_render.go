@@ -10,6 +10,7 @@ import (
 	variable "github.com/junjieliang672/marmota/src/config"
 	"github.com/junjieliang672/marmota/src/internal/ui"
 	"github.com/junjieliang672/marmota/src/internal/ui/rendering"
+	"github.com/junjieliang672/marmota/src/internal/ui/statusline"
 	filepreview "github.com/junjieliang672/marmota/src/pkg/file_preview"
 	"github.com/junjieliang672/marmota/src/pkg/icloud"
 
@@ -37,25 +38,28 @@ func (m *model) filePanelRender() string {
 		}
 		m.fileModel.filePanels[i] = filePanel
 
-		// Calculate remainder for file panel space (excluding preview)
-		var filePanelWidth int
-		filePanelSpace := m.fullWidth -
-			(common.BorderPadding + (len(m.fileModel.filePanels)-1)*common.BorderPadding)
-
-		if m.fileModel.filePreview.IsOpen() {
-			filePanelSpace -= m.fileModel.filePreview.GetWidth()
+		// The s list takes the focused panel's place while it is open.
+		if m.jumpUI.IsOpen() && i == m.filePanelFocusIndex {
+			f[i] = m.jumpUI.Render(true)
+			continue
 		}
-
-		// Last panel ALWAYS gets the remainder to ensure exact width match
-		if i == len(m.fileModel.filePanels)-1 && filePanelSpace%len(m.fileModel.filePanels) != 0 {
-			filePanelWidth = m.fileModel.width + (filePanelSpace % len(m.fileModel.filePanels))
-		} else {
-			filePanelWidth = m.fileModel.width
-		}
-
-		f[i] = filePanel.renderWithBadges(m.mainPanelHeight, filePanelWidth, filePanel.isFocused, badges)
+		f[i] = filePanel.renderWithBadges(m.mainPanelHeight, m.filePanelWidthAt(i), filePanel.isFocused, badges)
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Top, f...)
+}
+
+// filePanelWidthAt is panel i's width inside its frame: the last panel
+// takes what doesn't divide evenly, so the panels fill the window exactly.
+func (m *model) filePanelWidthAt(i int) int {
+	n := len(m.fileModel.filePanels)
+	space := m.fullWidth - (common.BorderPadding + (n-1)*common.BorderPadding)
+	if m.fileModel.filePreview.IsOpen() {
+		space -= m.fileModel.filePreview.GetWidth()
+	}
+	if i == n-1 && space%n != 0 {
+		return m.fileModel.width + space%n
+	}
+	return m.fileModel.width
 }
 
 func (panel *filePanel) Render(mainPanelHeight int, filePanelWidth int, focussed bool) string {
@@ -317,6 +321,14 @@ func (m *model) statusLineRender() string {
 		right = ops + sep + right
 	}
 	m.statusLineModel.SetRight(right)
+	if m.jumpUI.IsOpen() {
+		keys := m.jumpUI.FootKeys()
+		hotkeys := make([]statusline.Hotkey, 0, len(keys)/2) //nolint:mnd // key, then what it does
+		for i := 0; i+1 < len(keys); i += 2 {
+			hotkeys = append(hotkeys, statusline.Hotkey{Key: keys[i], Description: keys[i+1]})
+		}
+		return m.statusLineModel.RenderHotkeys(hotkeys)
+	}
 	if m.focusPanel == dockSessionsFocus {
 		return m.dockStatusLine()
 	}

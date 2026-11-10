@@ -213,26 +213,33 @@ func (m *model) sessionsSelectionChanged() tea.Cmd {
 // its transcript changed since it was last read.
 func (m *model) loadSessionsConversation() {
 	s, ok := m.selectedSession()
-	if !ok || s.TranscriptPath == "" {
+	if !ok {
 		m.sessions.convo = sessionsConversation{id: m.sessions.list.SelectedID(), branch: gitBranch(s.Cwd)}
 		return
 	}
+	m.sessions.convo = readConversation(m.sessions.convo, s)
+}
+
+// readConversation is s's conversation: c, what was last read, when s is
+// c's session and its transcript hasn't changed since, else read again.
+func readConversation(c sessionsConversation, s claudesession.Session) sessionsConversation {
 	branch := gitBranch(s.Cwd)
+	if s.TranscriptPath == "" {
+		return sessionsConversation{id: s.ID, branch: branch}
+	}
 	info, err := os.Stat(s.TranscriptPath)
 	if err != nil {
-		m.sessions.convo = sessionsConversation{id: s.ID, branch: branch}
-		return
+		return sessionsConversation{id: s.ID, branch: branch}
 	}
-	c := m.sessions.convo
 	if c.id == s.ID && c.path == s.TranscriptPath && c.size == info.Size() && c.modTime.Equal(info.ModTime()) {
-		m.sessions.convo.branch = branch
-		return
+		c.branch = branch
+		return c
 	}
 	turns, err := sessionConversation(s, sessionsConversationTurns)
 	if err != nil {
 		slog.Debug("Could not read the session's conversation", "session", s.ID, "error", err)
 	}
-	m.sessions.convo = sessionsConversation{id: s.ID, path: s.TranscriptPath, size: info.Size(),
+	return sessionsConversation{id: s.ID, path: s.TranscriptPath, size: info.Size(),
 		modTime: info.ModTime(), turns: turns, branch: branch}
 }
 

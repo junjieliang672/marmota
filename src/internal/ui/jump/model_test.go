@@ -2,6 +2,7 @@ package jump
 
 import (
 	"strconv"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -76,15 +77,39 @@ func TestTypedWordsMustAppearWhole(t *testing.T) {
 	assert.Equal(t, "site", it.Title, "enter: a folder zoxide found, before the sessions")
 }
 
-func TestANarrowPopupStacksTheSections(t *testing.T) {
+func TestTheSectionsSitOneUnderTheOtherInThePanel(t *testing.T) {
 	m := New()
-	m.SetSize(80, 40)
+	m.SetSize(60, 40)
 	m.Open(testSections())
 
-	view := ansi.Strip(m.Render())
-	assert.NotContains(t, view, " │ ", "one column")
+	view := ansi.Strip(m.Render(true))
+	assert.Contains(t, view, "go to", "the panel's title")
 	assert.Equal(t, []string{"marmota", "notes", "group the logos", "logo sizes", "site", "archive",
-		"file0", "file1", "file2", "file3", "file4"}, titles(&m), "the same order")
+		"file0", "file1", "file2", "file3", "file4"}, titles(&m), "Pinned, Sessions, Resume, Folders, Files")
+	lines := strings.Split(view, "\n")
+	var order []string
+	for _, l := range lines {
+		for _, k := range Kinds {
+			if strings.Contains(l, k.Title()) {
+				order = append(order, k.Title())
+			}
+		}
+	}
+	assert.Equal(t, []string{"Pinned", "Sessions", "Resume", "Folders", "Files"}, order)
+	for _, l := range lines {
+		assert.LessOrEqual(t, ansi.StringWidth(l), 60, "fits the panel")
+	}
+	assert.Len(t, lines, 40, "as tall as the panel")
+}
+
+func TestPickingShowsWhereTheCursorIsInTheTitle(t *testing.T) {
+	m := New()
+	m.SetSize(60, 40)
+	m.Open(testSections())
+	m.HandleKey(tea.KeyMsg{Type: tea.KeyDown})
+	m.HandleKey(tea.KeyMsg{Type: tea.KeyDown})
+
+	assert.Contains(t, ansi.Strip(m.Render(true)), "go to 2/11")
 }
 
 func TestRowsAreNumbered(t *testing.T) {
@@ -92,7 +117,7 @@ func TestRowsAreNumbered(t *testing.T) {
 	m.SetSize(140, 40)
 	m.Open(testSections())
 
-	view := ansi.Strip(m.Render())
+	view := ansi.Strip(m.Render(true))
 	assert.Contains(t, view, " 1 · marmota")
 	assert.Contains(t, view, "11 · file4")
 }
@@ -138,10 +163,29 @@ func TestEnterGoesToAFolderBeforeASession(t *testing.T) {
 	it, ok := m.Picked()
 	require.True(t, ok)
 	assert.Equal(t, Folder, it.Kind, "listed after the session, still where enter goes")
-	assert.Contains(t, ansi.Strip(m.Render()), "↵ 2 ▸ marmota")
+	assert.Contains(t, ansi.Strip(m.Render(true)), "↵ 2 ▸ marmota")
 
 	m.Open([]Section{{Kind: Session, Items: items(Session, "marmota docs")}, {Kind: Folder}})
 	typeText(&m, "marmota")
 	it, _ = m.Picked()
 	assert.Equal(t, Session, it.Kind, "no place matches: the session")
+}
+
+func TestAShortPanelDropsBlankLinesThenEmptySections(t *testing.T) {
+	sections := testSections()
+	sections[0].Items = nil // nothing pinned
+	m := New()
+	m.SetSize(60, 15)
+	m.Open(sections)
+
+	view := ansi.Strip(m.Render(true))
+	assert.NotContains(t, view, "Pinned", "empty, and rows are short")
+	for _, title := range []string{"group the logos", "logo sizes", "site", "file0"} {
+		assert.Contains(t, view, title, "each section with items shows one at least")
+	}
+
+	m.SetSize(60, 40)
+	view = ansi.Strip(m.Render(true))
+	assert.Contains(t, view, "Pinned", "room enough: every section")
+	assert.Contains(t, view, "none")
 }

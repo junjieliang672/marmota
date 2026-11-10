@@ -154,7 +154,7 @@ type HotkeysType struct {
 	OpenSortOptionsMenu    []string `toml:"open_sort_options_menu"`
 	ToggleReverseSort      []string `toml:"toggle_reverse_sort"`
 
-	// GoTo opens the s popup: pinned folders, sessions, folders zoxide
+	// GoTo opens the s list: pinned folders, sessions, folders zoxide
 	// knows, files edited lately.
 	GoTo                []string `toml:"go_to"`
 	FocusOnMetaData     []string `toml:"focus_on_metadata"`

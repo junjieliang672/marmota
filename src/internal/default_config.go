@@ -391,7 +391,7 @@ func getHelpMenuData() []helpMenuModalData {
 		},
 		{
 			hotkey:         []string{"[count]g/G", ""},
-			description:    "File panel, or picking in the s popup: jump to item number (not while typing search)",
+			description:    "File panel, or picking in the s list: jump to item number (not while typing search)",
 			hotkeyWorkType: globalType,
 		},
 		{
@@ -484,7 +484,7 @@ func getHelpMenuData() []helpMenuModalData {
 		},
 		{
 			hotkey:         common.Hotkeys.PinnedDirectory,
-			description:    "Pin the item, or unpin a pinned one (in the s popup too)",
+			description:    "Pin the item, or unpin a pinned one (in the s list too)",
 			hotkeyWorkType: globalType,
 		},
 		{
@@ -527,7 +527,7 @@ func getHelpMenuData() []helpMenuModalData {
 		},
 		{
 			hotkey:         common.Hotkeys.CopyPath,
-			description:    "Copy the highlighted file or folder's path (in the s popup too)",
+			description:    "Copy the highlighted file or folder's path (in the s list too)",
 			hotkeyWorkType: globalType,
 		},
 		{

@@ -276,7 +276,7 @@ func (m *model) dockSessionsKey(msg tea.KeyMsg) tea.Cmd {
 	case slices.Contains(common.Hotkeys.SendToShelf, key):
 		return m.sendSessionFilesToShelf()
 	case slices.Contains(common.Hotkeys.GoTo, key):
-		// The s popup goes to folders, which acts on the files. Closed with
+		// The s list goes to folders, which acts on the files. Closed with
 		// esc, it gives the keyboard back here.
 		m.leaveDockSessions()
 		m.dock.popupFrom = true

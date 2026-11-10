@@ -28,6 +28,12 @@ func (m *model) sessionsPaneView() askui.Session {
 	if st := m.unlistedStart(s.ID); st != nil {
 		return m.startingSessionPaneView(st)
 	}
+	return m.sessionPaneViewOf(s, m.sessions.convo)
+}
+
+// sessionPaneViewOf is session s as the preview shows it, with convo, its
+// conversation as last read.
+func (m *model) sessionPaneViewOf(s claudesession.Session, convo sessionsConversation) askui.Session {
 	state := m.sessionState(s)
 	title := s.DisplayTitle()
 	if s.Name != "" && s.Name != title {
@@ -39,8 +45,8 @@ func (m *model) sessionsPaneView() askui.Session {
 		Title:      title,
 		State:      m.sessionStateWords(s, state),
 		Folder:     tildePath(s.Cwd),
-		Branch:     m.sessions.convo.branch,
-		Turns:      m.sessions.convo.turns,
+		Branch:     convo.branch,
+		Turns:      convo.turns,
 		Tasks:      s.Todos,
 		Files:      newestFirstFiles(s.EditedFiles, s.Cwd),
 	}

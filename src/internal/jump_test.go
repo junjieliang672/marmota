@@ -2,7 +2,11 @@ package internal
 
 import (
 	"encoding/json"
+	"github.com/adrg/xdg"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,7 +16,6 @@ import (
 
 	variable "github.com/junjieliang672/marmota/src/config"
 	"github.com/junjieliang672/marmota/src/internal/common"
-	"github.com/junjieliang672/marmota/src/internal/ui/jump"
 	"github.com/junjieliang672/marmota/src/internal/ui/sidebar"
 	"github.com/junjieliang672/marmota/src/internal/utils"
 	"github.com/junjieliang672/marmota/src/pkg/claudesession"
@@ -52,7 +55,7 @@ func configureSidebarPinnedAndRecentForTest(t *testing.T, tempDir string, pinned
 	setForTest(t, &variable.RecentEditsFile, recentFile)
 }
 
-// jumpTestModel is a model whose s popup lists a pinned folder and a pinned
+// jumpTestModel is a model whose s list lists a pinned folder and a pinned
 // file, two recently edited files, the two running sessions of
 // dockTestModel and an ended one.
 type jumpFixture struct {
@@ -94,7 +97,7 @@ func jumpTitles(m *model) []string {
 	return titles
 }
 
-func TestSOpensThePopupWithEverySection(t *testing.T) {
+func TestSOpensTheListWithEverySection(t *testing.T) {
 	f := jumpTestModel(t)
 	m := f.m
 
@@ -103,12 +106,12 @@ func TestSOpensThePopupWithEverySection(t *testing.T) {
 	require.True(t, m.jumpUI.IsOpen())
 	assert.Equal(t, []string{"logos", "plan.md", "provider registry", "ime hold tests", "logo sizes for the deck",
 		"logo-notes.md", "todo.txt"}, jumpTitles(m),
-		"numbered down the left column (Pinned, Sessions, Resume), then the right (Folders, Files)")
+		"numbered down the sections: Pinned, Sessions, Resume, Folders, Files")
 	view := viewText(m)
 	for _, s := range []string{"Pinned", "Sessions", "Resume", "Folders", "Files", "go to"} {
 		assert.Contains(t, view, s)
 	}
-	assert.Contains(t, view, "enter go · ↓ pick · tab section · esc close")
+	assert.Contains(t, view, "enter:go   ↓:pick   tab:section   esc:close", "its keys, in the status line")
 }
 
 func TestEnterWithNothingTypedGoesHome(t *testing.T) {
@@ -170,16 +173,13 @@ func TestPickingMovesAndJumpsByNumber(t *testing.T) {
 	typeInto(m, "6")
 	pressKey(m, "g")
 	it, _ = m.jumpUI.Picked()
-	assert.Equal(t, "logo-notes.md", it.Title, "6g: row 6, the right column's first")
+	assert.Equal(t, "logo-notes.md", it.Title, "6g: row 6")
 	pressKey(m, "g")
 	it, _ = m.jumpUI.Picked()
 	assert.Equal(t, "logos", it.Title, "g: the first")
 	pressKey(m, "G")
 	it, _ = m.jumpUI.Picked()
 	assert.Equal(t, "todo.txt", it.Title, "G: the last")
-	pressKey(m, "left")
-	it, _ = m.jumpUI.Picked()
-	assert.Equal(t, jump.Session, it.Kind, "← the nearest row of the left column")
 	pressKey(m, "g")
 	pressKey(m, "up")
 	assert.False(t, m.jumpUI.Picking(), "↑ on the first row: back to the search")
@@ -326,7 +326,7 @@ func TestTabShowsOneSectionAlone(t *testing.T) {
 	assert.Len(t, jumpTitles(m), 7, "back to every section")
 }
 
-func TestThePopupOpensFreshEachTime(t *testing.T) {
+func TestTheListOpensFreshEachTime(t *testing.T) {
 	f := jumpTestModel(t)
 	m := f.m
 	pressKey(m, common.Hotkeys.GoTo[0])
@@ -351,4 +351,73 @@ func TestAPinnedFolderIsntListedTwice(t *testing.T) {
 
 	assert.Equal(t, []string{"logos", "plan.md", "provider registry", "ime hold tests", "logo sizes for the deck",
 		"notes", "logo-notes.md", "todo.txt"}, jumpTitles(m), "zoxide's logos is the pinned one")
+}
+
+func TestTheListTakesTheFocusedPanelsPlace(t *testing.T) {
+	f := jumpTestModel(t)
+	m := f.m
+	m.fileModel.filePreview.SetOpen(true)
+	TeaUpdate(m, tea.WindowSizeMsg{Width: DefaultTestModelWidth, Height: DefaultTestModelHeight})
+	before := strings.Split(viewText(m), "\n")
+
+	pressKey(m, common.Hotkeys.GoTo[0])
+
+	after := strings.Split(viewText(m), "\n")
+	require.Len(t, after, len(before), "nothing over the screen: the same rows")
+	assert.True(t, strings.HasPrefix(after[0], "╭─ go to "), "the panel's frame, named go to: %q", after[0])
+	width := m.filePanelWidthAt(m.filePanelFocusIndex) + common.BorderPadding
+	assert.Equal(t, before[0][strings.Index(before[0], "╮")+len("╮"):], after[0][strings.Index(after[0], "╮")+len("╮"):],
+		"the preview's frame where it was")
+	assert.Equal(t, width, ansi.StringWidth(after[0][:strings.Index(after[0], "╮")+len("╮")]), "the panel's width")
+	assert.Contains(t, viewText(m), "Sessions", "the dock stays below")
+}
+
+func TestThePreviewShowsWhatTheListIsOn(t *testing.T) {
+	f := jumpTestModel(t)
+	m := f.m
+	m.fileModel.filePreview.SetOpen(true)
+	pressKey(m, common.Hotkeys.GoTo[0])
+
+	path, ok := m.previewPath()
+	require.True(t, ok)
+	assert.Equal(t, xdg.Home, path, "nothing typed: home, where enter goes")
+
+	typeInto(m, "todo")
+	path, _ = m.previewPath()
+	assert.Equal(t, f.recentB, path, "the first match: a file")
+	m.getFilePreviewCmd(true)
+	assert.Equal(t, f.recentB, m.fileModel.filePreview.GetLocation())
+
+	pressKey(m, "esc")
+	typeInto(m, "provider")
+	s, ok := m.jumpPreviewSession()
+	require.True(t, ok, "a session")
+	assert.Equal(t, "provider registry", s.DisplayTitle())
+	preview := viewText(m)
+	assert.Contains(t, preview, "✳ provider registry", "the preview draws it, as the Sessions box does")
+
+	pressKey(m, "esc")
+	pressKey(m, "esc")
+	require.False(t, m.jumpUI.IsOpen())
+	_, ok = m.jumpPreviewSession()
+	assert.False(t, ok)
+	path, ok = m.previewPath()
+	if sel := m.getFocusedFilePanel().getSelectedItemPtr(); sel != nil {
+		require.True(t, ok)
+		assert.Equal(t, sel.location, path, "closed: the cursor's item again")
+	}
+}
+
+func TestAnEndedSessionIsPreviewedFromItsTranscript(t *testing.T) {
+	f := jumpTestModel(t)
+	m := f.m
+	m.fileModel.filePreview.SetOpen(true)
+	pressKey(m, common.Hotkeys.GoTo[0])
+
+	typeInto(m, "deck")
+	s, ok := m.jumpPreviewSession()
+	require.True(t, ok)
+	assert.Equal(t, "ended-1", s.ID)
+	top := strings.Split(viewText(m), "\n")[0]
+	assert.Contains(t, top[strings.Index(top, "╮"):], "logo sizes for the deck", "the preview's title")
 }

@@ -17,7 +17,7 @@ func utilsKey(key string) tea.KeyMsg { return utils.TeaKeyMsg(key) }
 // is missing, the IME ascii-hold stays in force while that field has focus and
 // the user simply cannot type Chinese into it — so this table is the guard
 // against a new input being added and forgotten.
-// modelWithOnePinnedFolder gives the s popup's cases an item to act on.
+// modelWithOnePinnedFolder gives the s list's cases an item to act on.
 func modelWithOnePinnedFolder(t *testing.T) *model {
 	t.Helper()
 	dir := t.TempDir()
@@ -26,7 +26,7 @@ func modelWithOnePinnedFolder(t *testing.T) *model {
 	return defaultTestModel(dir)
 }
 
-// pickInJump opens the s popup and picks its first item.
+// pickInJump opens the s list and picks its first item.
 func pickInJump(m *model) {
 	m.openJump()
 	m.jumpKey(utilsKey("down"))
@@ -39,9 +39,9 @@ func TestIsTextInputActive(t *testing.T) {
 	}{
 		{"create file or directory", func(m *model) { m.typingModal.open = true }},
 		{"SPF or shell prompt", func(m *model) { m.promptModal.Open(false) }},
-		{"s popup search", func(m *model) { m.openJump() }},
+		{"s list search", func(m *model) { m.openJump() }},
 		{"file panel rename", func(m *model) { m.fileModel.renaming = true }},
-		{"s popup rename", func(m *model) {
+		{"s list rename", func(m *model) {
 			pickInJump(m)
 			m.jumpKey(utilsKey(common.Hotkeys.FilePanelItemRename[0]))
 		}},
@@ -83,7 +83,7 @@ func TestIsBlockingModalOpen(t *testing.T) {
 		{"help menu", func(m *model) { m.openHelpMenu() }},
 		{"sort options", func(m *model) { m.getFocusedFilePanel().sortOptions.open = true }},
 		{"iCloud filter", func(m *model) { m.getFocusedFilePanel().iCloudFilter.open = true }},
-		{"s popup picking", pickInJump},
+		{"s list picking", pickInJump},
 		{"first use", func(m *model) { m.firstUse = true }},
 	}
 

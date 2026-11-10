@@ -1,6 +1,7 @@
 package jump
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
@@ -10,14 +11,7 @@ import (
 	"github.com/junjieliang672/marmota/src/internal/ui"
 )
 
-// columnGap is what separates the two columns: " │ ".
-const columnGap = 3
-
-// narrowWidth is the inner width under which the sections stack in one
-// column.
-const narrowWidth = 100
-
-// slot is one row of a column: a section's title, an item, or a note
+// slot is one row of the list: a section's title, an item, or a note
 // such as "none".
 type slot struct {
 	header bool
@@ -28,34 +22,32 @@ type slot struct {
 	total  int
 }
 
-// grid is the two columns, and the items in them in the order the arrows
-// go: the left column's top to bottom, then the right's.
+// grid is the list's rows, and the items in them in the order the arrows
+// go.
 type grid struct {
-	cols  [2][]slot
+	rows  []slot
 	items []Item
-	at    []struct{ col, row int }
 }
 
-func (m *Model) innerWidth() int  { return max(20, m.width-common.BorderPadding) } //nolint:mnd // narrowest
-func (m *Model) twoColumns() bool { return m.innerWidth() >= narrowWidth }
+func (m *Model) innerWidth() int { return max(20, m.width-common.BorderPadding) } //nolint:mnd // narrowest
 
-func (m *Model) columnWidth() int {
-	if !m.twoColumns() {
-		return m.innerWidth()
+// chromeRows is the panel's rows that aren't the list: its frame, the
+// input and its rule, and the rule and path line at the foot, then the
+// keys unless the status line shows them.
+const chromeRows = 6
+
+func (m *Model) bodyRows() int {
+	rows := m.height - chromeRows
+	if !m.KeysElsewhere {
+		rows--
 	}
-	return max(10, (m.innerWidth()-columnGap)/2) //nolint:mnd // two columns
+	return max(3, rows) //nolint:mnd // a row or two of items
 }
-
-// chromeRows is the popup's rows that aren't the columns: its frame, the
-// input and its rule, and the rule, path line and keys at the foot.
-const chromeRows = 7
-
-func (m *Model) bodyRows() int { return max(3, m.height-chromeRows) } //nolint:mnd // a row or two of items
 
 func (m *Model) visible() []Item { return m.layout().items }
 
-// layout places the sections shown in the two columns, each section as
-// many of its items as fit, the rows shared out evenly among them.
+// layout places the sections shown one under the other, in Kinds' order,
+// each as many of its items as fit, the rows shared out evenly among them.
 func (m *Model) layout() grid {
 	var g grid
 	rows := m.bodyRows()
@@ -64,72 +56,87 @@ func (m *Model) layout() grid {
 		m.layoutOne(&g, rows)
 		return g
 	}
-	for col := range 2 {
-		var secs []Section
-		for _, s := range m.shown {
-			inCol := !m.twoColumns() && col == 0 || m.twoColumns() && s.Kind.leftColumn() == (col == 0)
-			if inCol && (len(s.Items) > 0 || !typed) {
-				secs = append(secs, s)
-			}
+	var secs []Section
+	for _, s := range m.shown {
+		if len(s.Items) > 0 || !typed {
+			secs = append(secs, s)
 		}
-		if len(secs) == 0 {
-			continue
+	}
+	// Each section's title, a blank line between sections, "none" for an
+	// empty one: what is left goes to the items. A short panel drops the
+	// blank lines first, then the empty sections, so each section with
+	// items shows one at least.
+	gap := 1
+	free := freeRows(secs, rows, gap)
+	if free < nonEmpty(secs) {
+		gap = 0
+		free = freeRows(secs, rows, gap)
+	}
+	if free < nonEmpty(secs) {
+		secs = slices.DeleteFunc(secs, func(s Section) bool { return len(s.Items) == 0 })
+		free = freeRows(secs, rows, gap)
+	}
+	counts := make([]int, len(secs))
+	for i, s := range secs {
+		counts[i] = len(s.Items)
+	}
+	shares := share(counts, free)
+	for i, s := range secs {
+		if i > 0 && gap > 0 {
+			g.rows = append(g.rows, slot{note: " "})
 		}
-		// Each section's title, a blank line between sections, "none" for
-		// an empty one: what is left goes to the items.
-		free := rows - 2*len(secs) + 1
-		counts := make([]int, len(secs))
-		for i, s := range secs {
-			counts[i] = len(s.Items)
-			if counts[i] == 0 {
-				free--
-			}
+		g.rows = append(g.rows, slot{header: true, kind: s.Kind, more: len(s.Items) - shares[i], total: len(s.Items)})
+		if len(s.Items) == 0 {
+			g.rows = append(g.rows, slot{note: "none"})
 		}
-		shares := share(counts, free)
-		for i, s := range secs {
-			if i > 0 {
-				g.cols[col] = append(g.cols[col], slot{note: " "})
-			}
-			g.cols[col] = append(g.cols[col], slot{header: true, kind: s.Kind, more: len(s.Items) - shares[i],
-				total: len(s.Items)})
-			if len(s.Items) == 0 {
-				g.cols[col] = append(g.cols[col], slot{note: "none"})
-			}
-			for _, it := range s.Items[:shares[i]] {
-				g.add(col, it)
-			}
+		for _, it := range s.Items[:shares[i]] {
+			g.add(it)
 		}
 	}
 	return g
 }
 
-// layoutOne fills both columns with the one section shown: its title over
-// the left column, its items down the left, then down the right.
+// freeRows is what rows leave for items once secs have their titles, gap
+// blank lines between them, and "none" when empty.
+func freeRows(secs []Section, rows, gap int) int {
+	free := rows - len(secs) - gap*max(0, len(secs)-1)
+	for _, s := range secs {
+		if len(s.Items) == 0 {
+			free--
+		}
+	}
+	return free
+}
+
+func nonEmpty(secs []Section) int {
+	n := 0
+	for _, s := range secs {
+		if len(s.Items) > 0 {
+			n++
+		}
+	}
+	return n
+}
+
+// layoutOne fills the list with the one section shown.
 func (m *Model) layoutOne(g *grid, rows int) {
 	var s Section
 	for _, sec := range m.shown {
 		s = sec
 	}
 	s.Kind = Kinds[m.scope]
-	per := rows - 1
-	cols := 1
-	if m.twoColumns() {
-		cols = 2
-		g.cols[1] = append(g.cols[1], slot{note: " "})
-	}
-	fit := min(len(s.Items), cols*per)
-	g.cols[0] = append(g.cols[0], slot{header: true, kind: s.Kind, more: len(s.Items) - fit, total: len(s.Items)})
+	fit := min(len(s.Items), rows-1)
+	g.rows = append(g.rows, slot{header: true, kind: s.Kind, more: len(s.Items) - fit, total: len(s.Items)})
 	if len(s.Items) == 0 {
-		g.cols[0] = append(g.cols[0], slot{note: "none"})
+		g.rows = append(g.rows, slot{note: "none"})
 	}
-	for i, it := range s.Items[:fit] {
-		g.add(i/per, it)
+	for _, it := range s.Items[:fit] {
+		g.add(it)
 	}
 }
 
-func (g *grid) add(col int, it Item) {
-	g.at = append(g.at, struct{ col, row int }{col, len(g.cols[col])})
-	g.cols[col] = append(g.cols[col], slot{item: len(g.items)})
+func (g *grid) add(it Item) {
+	g.rows = append(g.rows, slot{item: len(g.items)})
 	g.items = append(g.items, it)
 }
 
@@ -153,82 +160,44 @@ func share(counts []int, rows int) []int {
 	return out
 }
 
-// otherColumn is the item across from item i, on the nearest row; i when
-// the other column has none.
-func (m *Model) otherColumn(i int) int {
-	g := m.layout()
-	if i >= len(g.at) {
-		return i
-	}
-	from := g.at[i]
-	best, bestDist := i, -1
-	for j, at := range g.at {
-		if at.col == from.col {
-			continue
-		}
-		dist := at.row - from.row
-		if dist < 0 {
-			dist = -dist
-		}
-		if bestDist < 0 || dist < bestDist {
-			best, bestDist = j, dist
-		}
-	}
-	return best
-}
-
-// Render draws the popup.
-func (m *Model) Render() string {
+// Render draws the list in a file panel's frame, focused or not, as the
+// panel it takes the place of would be.
+func (m *Model) Render(focused bool) string {
 	width := m.innerWidth()
 	st := common.PopupStyles(false)
 	g := m.layout()
 	lines := []string{m.topLine(width, st), st.Rule.Render(strings.Repeat("─", width))}
 
 	target, hasTarget := m.Picked()
-	colW := m.columnWidth()
 	m.numWidth = len(strconv.Itoa(max(1, len(g.items))))
 	for r := range m.bodyRows() {
-		line := m.slotLine(g, 0, r, colW, target, hasTarget)
-		if m.twoColumns() {
-			line += st.Faint.Render(" │ ") + m.slotLine(g, 1, r, colW, target, hasTarget)
-		}
-		lines = append(lines, line)
+		lines = append(lines, m.slotLine(g, r, width, target, hasTarget))
 	}
 	if len(g.items) == 0 && strings.TrimSpace(m.input.Value()) != "" {
 		lines[2] = padTo(st.Muted.Render("  Nothing matches"), width)
 	}
-	lines = append(lines, st.Rule.Render(strings.Repeat("─", width)), m.pathLine(width, st, target, hasTarget),
-		m.keysLine(width, st, target, hasTarget))
-
-	key := ""
-	if len(common.Hotkeys.GoTo) > 0 {
-		key = common.Hotkeys.GoTo[0]
+	lines = append(lines, st.Rule.Render(strings.Repeat("─", width)), m.pathLine(width, st, target, hasTarget))
+	if !m.KeysElsewhere {
+		lines = append(lines, m.keysLine(width, st))
 	}
-	r := ui.PopupRenderer(len(lines)+common.BorderPadding, m.width, key, "go to")
+
+	r := ui.FilePanelRenderer(m.height, m.width, focused)
+	r.SetBorderTitle("go to")
+	if m.picking && len(g.items) > 0 {
+		r.SetBorderTitleSuffix(strconv.Itoa(m.cursor+1) + "/" + strconv.Itoa(len(g.items)))
+	}
 	r.AddLines(lines...)
 	return r.Render()
 }
 
-// topLine is what you type, and the sections tab goes through on the
-// right.
+// topLine is what you type, and on the right the section shown (tab goes
+// through them): All, or the one shown alone.
 func (m *Model) topLine(width int, st common.PopupStyleSet) string {
-	var chips []string
-	if m.only {
-		chips = []string{st.Key.Render(Kinds[m.scope].Title())}
-	} else {
-		for i := -1; i < len(Kinds); i++ {
-			name := "All"
-			if i >= 0 {
-				name = Kinds[i].Title()
-			}
-			if i == m.scope {
-				chips = append(chips, st.Key.Render(name))
-			} else {
-				chips = append(chips, st.Faint.Render(name))
-			}
-		}
+	name := "All"
+	if m.scope >= 0 {
+		name = Kinds[m.scope].Title()
 	}
-	right := strings.Join(chips, st.Faint.Render(" · "))
+	right := st.Key.Render(name)
 	m.input.Width = max(1, width-ansi.StringWidth(right)-5) //nolint:mnd // "› ", the cursor, a gap
 	input := st.Key.Render("› ") + m.input.View()
 	if m.picking {
@@ -241,12 +210,12 @@ func (m *Model) topLine(width int, st common.PopupStyleSet) string {
 	return input + strings.Repeat(" ", gap) + right
 }
 
-func (m *Model) slotLine(g grid, col, row, width int, target Item, hasTarget bool) string {
+func (m *Model) slotLine(g grid, row, width int, target Item, hasTarget bool) string {
 	st := common.PopupStyles(false)
-	if row >= len(g.cols[col]) {
+	if row >= len(g.rows) {
 		return strings.Repeat(" ", width)
 	}
-	s := g.cols[col][row]
+	s := g.rows[row]
 	switch {
 	case s.header:
 		title := st.Section.Render(s.kind.Title())
@@ -336,7 +305,10 @@ func (m *Model) short(path string) string {
 	return path
 }
 
-func (m *Model) keysLine(width int, st common.PopupStyleSet, target Item, ok bool) string {
+// FootKeys are the keys the list takes now, each key then what it does:
+// the picked item's, or the search's.
+func (m *Model) FootKeys() []string {
+	target, ok := m.Picked()
 	var keys []string
 	switch {
 	case m.renaming:
@@ -359,6 +331,12 @@ func (m *Model) keysLine(width int, st common.PopupStyleSet, target Item, ok boo
 	if m.picking && m.count != "" {
 		keys = append([]string{m.count + "g", "row " + m.count}, keys...)
 	}
+	return keys
+}
+
+// keysLine is FootKeys at the list's foot, as many as fit.
+func (m *Model) keysLine(width int, st common.PopupStyleSet) string {
+	keys := m.FootKeys()
 	var parts []string
 	for i := 0; i+1 < len(keys); i += 2 {
 		part := st.Key.Render(keys[i])

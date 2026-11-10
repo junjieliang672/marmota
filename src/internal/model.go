@@ -140,7 +140,7 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		updateCmd = m.applyEditorFinished(msg)
 
 	case jumpZoxideMsg:
-		m.applyJumpZoxide(msg)
+		updateCmd = m.applyJumpZoxide(msg)
 	case ModelUpdateMessage:
 		// TODO: Some of these updates messages should trigger filePanel state update
 		// For example a success message for delete operation
@@ -424,32 +424,46 @@ func (m *model) getFilePreviewCmd(forcePreviewRender bool) tea.Cmd {
 	if !m.fileModel.filePreview.IsOpen() {
 		return nil
 	}
-	if len(m.getFocusedFilePanel().element) == 0 {
+	location, ok := m.previewPath()
+	if !ok {
 		// Sync call because this will be fast
+		m.fileModel.filePreview.SetLocation("")
 		m.fileModel.filePreview.SetContentWithRenderText("")
 		return nil
 	}
-	selectedItem := m.getFocusedFilePanel().getSelectedItem()
-	if m.fileModel.filePreview.GetLocation() == selectedItem.location && !forcePreviewRender {
+	if m.fileModel.filePreview.GetLocation() == location && !forcePreviewRender {
 		return nil
 	}
-	if layer := m.touchedLayer(); layer != nil && !selectedItem.directory {
-		return m.diffPreviewCmd(layer, selectedItem.location) // what the session changed in it
+	if layer := m.touchedLayer(); layer != nil && !m.jumpUI.IsOpen() &&
+		!m.getFocusedFilePanel().getSelectedItem().directory {
+		return m.diffPreviewCmd(layer, location) // what the session changed in it
 	}
 
-	m.fileModel.filePreview.SetLocation(selectedItem.location)
+	m.fileModel.filePreview.SetLocation(location)
 	m.fileModel.filePreview.SetContentWithRenderText("Loading...")
 	reqCnt := m.ioReqCnt
 	m.ioReqCnt++
-	slog.Debug("Submitting file preview render request", "id", reqCnt, "path", selectedItem.location)
+	slog.Debug("Submitting file preview render request", "id", reqCnt, "path", location)
 
 	// Copy to a local variable to be used in below closure.
 	fullModalWidth := m.fullWidth
 
 	return func() tea.Msg {
-		return NewFilePreviewUpdateMsg(selectedItem.location,
-			m.fileModel.filePreview.RenderWithPath(selectedItem.location, fullModalWidth), reqCnt)
+		return NewFilePreviewUpdateMsg(location,
+			m.fileModel.filePreview.RenderWithPath(location, fullModalWidth), reqCnt)
 	}
+}
+
+// previewPath is the file or folder the preview shows: the s list's item
+// while it is open, else the item under the panel's cursor.
+func (m *model) previewPath() (string, bool) {
+	if m.jumpUI.IsOpen() {
+		return m.jumpPreviewPath()
+	}
+	if item := m.getFocusedFilePanel().getSelectedItemPtr(); item != nil {
+		return item.location, true
+	}
+	return "", false
 }
 
 func (m *model) requestFilePreviewRender(forcePreviewRender bool) tea.Cmd {
@@ -1014,13 +1028,17 @@ func (m *model) View() string {
 		slog.Error("Invalid layout", "error", err)
 	}
 
-	// No sidebar column: s draws it as a popup over the panels.
+	// No sidebar column: s lists its places in the focused panel.
 	sidebar := ""
 
 	filePanel := m.filePanelRender()
 
 	filePreview := m.filePreviewPanelRender()
-	if m.previewShowsASession() {
+	if s, ok := m.jumpPreviewSession(); ok {
+		// The s list is on a session: the preview shows it.
+		filePreview = m.jumpSessionPreview(s, m.fileModel.filePreview.GetWidth(),
+			m.fileModel.filePreview.GetHeight()) + filepreview.ClearKittyImages()
+	} else if m.previewShowsASession() {
 		// The preview shows the session the Sessions box is on. An image
 		// the file preview drew, such as a PDF's page, stays on the screen
 		// over it until cleared; back in the files, it is drawn again.
@@ -1079,13 +1097,6 @@ func (m *model) updateRenderForOverlay(finalRender string) string {
 		overlayX := m.fullWidth/common.CenterDivisor - m.promptModal.GetWidth()/common.CenterDivisor
 		overlayY := m.fullHeight/common.CenterDivisor - m.promptModal.GetMaxHeight()/common.CenterDivisor
 		return stringfunction.PlaceOverlay(overlayX, overlayY, promptModal, finalRender)
-	}
-
-	if m.jumpUI.IsOpen() {
-		popup := m.jumpUI.Render()
-		x := max(0, (m.fullWidth-lipgloss.Width(popup))/common.CenterDivisor)
-		y := max(0, (m.fullHeight-lipgloss.Height(popup))/common.CenterDivisor)
-		return stringfunction.PlaceOverlay(x, y, popup, finalRender)
 	}
 
 	panel := m.fileModel.filePanels[m.filePanelFocusIndex]

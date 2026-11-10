@@ -1,4 +1,5 @@
-// Package jump is the s popup: one place to go to a pinned folder or file,
+// Package jump is the s list, drawn in the focused file panel's place: one
+// place to go to a pinned folder or file,
 // a session (running, or ended to resume), a folder zoxide knows, or a file
 // edited lately. It has two modes. Searching, what you type filters every
 // section and enter goes to the first item (with nothing typed, home).
@@ -6,8 +7,9 @@
 // [n]g and G jump, and the keys that act on an item elsewhere act on the
 // picked one: t pins, r renames, a session's keys are the Sessions box's.
 // esc steps back: from picking to the search, then clears what is typed,
-// then closes. The sections sit in two columns: Pinned, Sessions and Resume
-// on the left, Folders and Files on the right; a narrow popup stacks them.
+// then closes. The sections sit one under the other: Pinned, Sessions,
+// Resume, Folders, Files. The preview beside it shows the item enter goes
+// to (Picked).
 package jump
 
 import (
@@ -33,15 +35,12 @@ const (
 	File                // a file edited lately
 )
 
-// Kinds are the sections in order: the left column's, then the right's.
+// Kinds are the sections in order.
 var Kinds = []Kind{Pinned, Session, Ended, Folder, File}
 
 func (k Kind) Title() string {
 	return [...]string{"Pinned", "Sessions", "Resume", "Folders", "Files"}[k]
 }
-
-// leftColumn reports whether k's section sits in the left column.
-func (k Kind) leftColumn() bool { return k == Pinned || k == Session || k == Ended }
 
 // capped is how many folders and files show while nothing is typed; the
 // pinned ones, the sessions, and the five ended of each agent all show.
@@ -64,7 +63,7 @@ type Item struct {
 }
 
 // Section is a kind's items. Matched is set when they already match what
-// was typed (zoxide's, which zoxide searched), so the popup keeps them all.
+// was typed (zoxide's, which zoxide searched), so the list keeps them all.
 type Section struct {
 	Kind    Kind
 	Items   []Item
@@ -93,7 +92,7 @@ type Action struct {
 	Text string
 }
 
-// Model is the popup.
+// Model is the list.
 type Model struct {
 	open    bool
 	input   textinput.Model
@@ -101,7 +100,7 @@ type Model struct {
 	// scope is -1 for every section, else the index in Kinds of the one
 	// shown alone.
 	scope int
-	// only is set when the popup shows one section and tab can't leave it,
+	// only is set when the list shows one section and tab can't leave it,
 	// as when the Ask box lists the sessions it can resume.
 	only     bool
 	sections []Section
@@ -110,18 +109,22 @@ type Model struct {
 	count    string    // digits typed while picking, for g
 	renaming bool
 	rename   textinput.Model
-	// width and height are the window's share, whatever is listed: what
-	// arrives late (zoxide's answer, older sessions) or tab doesn't resize it.
+	// width and height are the file panel's it is drawn in, its frame
+	// included: what arrives late (zoxide's answer, older sessions) or tab
+	// doesn't resize it.
 	width    int
 	height   int
 	numWidth int // the digits of the last row's number, as last drawn
 	// ShortPath writes a folder as the rest of Marmota does (~ for home).
 	ShortPath func(string) string
 	// Keys are the keys the picked item takes, each key then what it does,
-	// for the foot of the popup.
+	// for the foot of the list.
 	Keys func(Item) []string
 	// HomeText is where enter goes with nothing typed.
 	HomeText string
+	// KeysElsewhere is set while the status line lists FootKeys, so the
+	// list doesn't.
+	KeysElsewhere bool
 }
 
 func New() Model {
@@ -154,12 +157,12 @@ func (m *Model) Picking() bool  { return m.picking }
 func (m *Model) Renaming() bool { return m.renaming }
 func (m *Model) Query() string  { return m.input.Value() }
 
-// SetSize is the popup's size, its frame included.
+// SetSize is the list's size: the file panel's, its frame included.
 func (m *Model) SetSize(width, height int) {
 	m.width, m.height = width, height
 }
 
-// SetSections gives the popup its items again: after zoxide answered, a
+// SetSections gives the list its items again: after zoxide answered, a
 // pin changed, or the ended sessions were read. The picked item stays
 // picked when it is still there.
 func (m *Model) SetSections(sections []Section) {
@@ -228,6 +231,12 @@ func (m *Model) Picked() (Item, bool) {
 		}
 	}
 	return Item{}, false
+}
+
+// GoesHome reports whether enter goes home: nothing typed or picked, and
+// not a list of one section.
+func (m *Model) GoesHome() bool {
+	return !m.picking && !m.only && strings.TrimSpace(m.input.Value()) == ""
 }
 
 // enterOrder is where enter looks for its match while searching: places
@@ -311,9 +320,6 @@ func (m *Model) pickKey(msg tea.KeyMsg) Action {
 		return Action{}
 	case "down", "j":
 		m.cursor = min(m.cursor+1, len(items)-1)
-		return Action{}
-	case "left", "h", "right", "l":
-		m.cursor = m.otherColumn(m.cursor)
 		return Action{}
 	case "g":
 		m.cursor = min(max(n, 1), len(items)) - 1

@@ -38,7 +38,7 @@ func jumpIDs(m *model) []string {
 	return ids
 }
 
-// pickJumpRow picks row n of the open s popup, as [n]g does.
+// pickJumpRow picks row n of the open s list, as [n]g does.
 func pickJumpRow(m *model, n int) {
 	if !m.jumpUI.Picking() {
 		press(m, "down")
