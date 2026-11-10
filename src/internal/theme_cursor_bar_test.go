@@ -108,3 +108,20 @@ func TestThemesWithoutTheNewKeysLookAsBefore(t *testing.T) {
 		assert.NotContains(t, line, folderFG)
 	}
 }
+
+func TestTheGoToListIsOnTheFilePanelsBackground(t *testing.T) {
+	withTheme(t, func(th *common.ThemeType) {
+		th.FilePanelBG, th.SidebarBG, th.ModalBG = "#101820", "#402030", "#305040"
+	})
+	f := jumpTestModel(t)
+	m := f.m
+	pressKey(m, common.Hotkeys.GoTo[0])
+	typeInto(m, "lo")
+
+	view := m.jumpUI.Render(true)
+	panel := sgr(lipgloss.NewStyle().Background(common.FilePanelBGColor))
+	assert.Contains(t, view, panel, "the file panel's background")
+	for name, bg := range map[string]lipgloss.Color{"sidebar": "#402030", "dialog": "#305040"} {
+		assert.NotContains(t, view, sgr(lipgloss.NewStyle().Background(bg)), "not the %s's", name)
+	}
+}

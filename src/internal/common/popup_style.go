@@ -8,11 +8,11 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// PopupStyleSet is how the s and z popups color their text, each kind its
-// own color from the theme: the frame as the focused panel's, the title as
-// the help menu's, keys as its keys, section labels as a panel's path,
-// sessions in Claude's orange, names in the sidebar's text, the picked name
-// brighter, where things are dimmer, numbers and scores dimmer still.
+// PopupStyleSet is how the s list colors its text, on the file panel's
+// background it is drawn in, each kind its own color from the theme: the
+// title as the help menu's, keys as its keys, section labels as a panel's
+// path, sessions in Claude's orange, names in a panel's text, the picked
+// name brighter, where things are dimmer, numbers and scores dimmer still.
 type PopupStyleSet struct {
 	Accent, Title, Section, Session, Rule, Text, Picked, Value, Muted, Faint, Key lipgloss.Style
 }
@@ -20,10 +20,10 @@ type PopupStyleSet struct {
 // PopupBorderColor is the popups' frame.
 func PopupBorderColor() lipgloss.TerminalColor { return FilePanelBorderActiveColor }
 
-// PopupStyles are the popup's styles on its background, or on the picked
-// row's bar when picked.
+// PopupStyles are the s list's styles on a file panel's background, the
+// panel it is drawn in, or on the picked row's bar when picked.
 func PopupStyles(picked bool) PopupStyleSet {
-	var bg lipgloss.TerminalColor = SidebarBGColor
+	var bg lipgloss.TerminalColor = FilePanelBGColor
 	if picked {
 		bg = PopupPickedBG()
 	}
@@ -36,11 +36,11 @@ func PopupStyles(picked bool) PopupStyleSet {
 		Section: on(filePanelTopPathColor).Bold(true),
 		Session: on(lipgloss.Color(ClaudeAgentColor)),
 		Rule:    on(FilePanelBorderColor),
-		Text:    on(SidebarFGColor),
+		Text:    on(FilePanelFGColor),
 		Picked:  on(sidebarItemSelectedFGColor).Bold(true),
-		Value:   on(SidebarFGColor).Bold(true),
-		Muted:   on(blendOr(SidebarFGColor, SidebarBGColor, 0.35, FilePanelBorderColor)), //nolint:mnd // a third toward the background
-		Faint:   on(blendOr(SidebarFGColor, SidebarBGColor, 0.55, FilePanelBorderColor)), //nolint:mnd // half way, and more
+		Value:   on(FilePanelFGColor).Bold(true),
+		Muted:   on(blendOr(FilePanelFGColor, FilePanelBGColor, 0.35, FilePanelBorderColor)), //nolint:mnd // a third toward the background
+		Faint:   on(blendOr(FilePanelFGColor, FilePanelBGColor, 0.55, FilePanelBorderColor)), //nolint:mnd // half way, and more
 		Key:     on(helpMenuHotkeyColor),
 	}
 }
@@ -51,13 +51,13 @@ func PopupPickedBG() lipgloss.TerminalColor {
 	if FilePanelCursorRowBGColor != "" {
 		return FilePanelCursorRowBGColor
 	}
-	return blendOr(SidebarBGColor, SidebarFGColor, 0.12, SidebarBGColor) //nolint:mnd // a faint bar
+	return blendOr(FilePanelBGColor, FilePanelFGColor, 0.12, FilePanelBGColor) //nolint:mnd // a faint bar
 }
 
 // PopupHasBar reports whether the picked row's bar shows: a transparent
 // theme has none, and marks the row with the cursor instead.
 func PopupHasBar() bool {
-	return PopupPickedBG() != lipgloss.TerminalColor(SidebarBGColor)
+	return PopupPickedBG() != lipgloss.TerminalColor(FilePanelBGColor)
 }
 
 // blendOr is a t of the way from a to b, or or when either isn't a

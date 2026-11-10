@@ -130,6 +130,7 @@ type Model struct {
 func New() Model {
 	in := common.GeneratePromptTextInput()
 	in.Prompt = ""
+	onPanel(&in)
 	in.Placeholder = "pinned, sessions, folders, files"
 	return Model{input: in, scope: -1, width: 100, height: 30, HomeText: "~"} //nolint:mnd // until sized
 }
@@ -352,7 +353,17 @@ func (m *Model) pickKey(msg tea.KeyMsg) Action {
 func (m *Model) StartRename(name string) tea.Cmd {
 	m.renaming = true
 	m.rename = common.GeneratePinnedRenameTextInput(len([]rune(name)), name)
+	onPanel(&m.rename)
 	return m.rename.Focus()
+}
+
+// onPanel draws in on the file panel's background, the list's, not on a
+// dialog's.
+func onPanel(in *textinput.Model) {
+	in.TextStyle = common.FilePanelStyle
+	in.PlaceholderStyle = common.PopupStyles(false).Faint
+	in.Cursor.TextStyle = common.FilePanelStyle
+	in.Cursor.Style = in.Cursor.Style.Background(common.FilePanelBGColor)
 }
 
 func (m *Model) renameKey(msg tea.KeyMsg) Action {
