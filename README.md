@@ -51,7 +51,7 @@ Every run of `build.sh`:
 - keeps a block in your shell config (zsh, bash or fish) that adds `bin` to your PATH and defines a
   `y` function, which runs it and, with `cd_on_quit` on, moves your shell to the folder it quit in;
 - keeps Marmota's look in `~/.wezterm.lua`: the pane you type in stays bright, the lines between panes
-  are blue, and a blue edge marks the active pane. It is one marked block; the rest of your WezTerm
+  are blue. It is one marked block; the rest of your WezTerm
   settings stay as they are;
 - adds any setting a new version introduced to `~/.config/marmota`.
 

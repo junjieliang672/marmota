@@ -63,8 +63,8 @@ Options:
   --cmd-k           Only make Cmd+K leave Marmota alone, in your existing
                     ~/.wezterm.lua (everything else in it stays)
   --wezterm-look    Only add or update Marmota's block in ~/.wezterm.lua: the
-                    active pane bright, blue lines between panes, a blue edge
-                    beside the active pane (./build.sh runs this)
+                    active pane bright, blue lines between panes (./build.sh
+                    runs this)
   --all             Configure everything (default)
   --no-color        Disable colored output
   -h, --help        Show this help message
@@ -830,9 +830,11 @@ print_summary() {
 # =============================================================================
 
 # wezterm_look_block prints the block Marmota keeps in ~/.wezterm.lua: the
-# pane you type in is the bright one, the line between panes is blue on your
-# color scheme, and the window's edge beside the active pane turns blue
-# (WezTerm can't draw a border around one pane). Your key bindings are left alone.
+# pane you type in is the bright one, and the line between panes is blue on
+# your color scheme. Your key bindings are left alone. There is no edge that
+# follows the focus: WezTerm can only move one with set_config_overrides,
+# which reloads the fonts, and every icon and CJK character in the panes was
+# drawn garbled until they came back.
 wezterm_look_block() {
     cat << 'LOOK_EOF'
 -- >>> marmota >>>
@@ -840,7 +842,7 @@ wezterm_look_block() {
 -- it up to date; your settings above it are left as they are)
 do
   local wezterm = require 'wezterm'
-  local edge_on, edge_off = '#7aa2f7', '#1a1b26'
+  local split_blue = '#7aa2f7'
 
   -- The line between panes in blue, on your color scheme
   local name = config.color_scheme
@@ -850,83 +852,17 @@ do
     for k, v in pairs(scheme) do
       blue[k] = v
     end
-    blue.split = edge_on
-    edge_off = blue.background or edge_off
+    blue.split = split_blue
     config.color_schemes = config.color_schemes or {}
     config.color_schemes[name .. ' (blue splits)'] = blue
     config.color_scheme = name .. ' (blue splits)'
   else
     config.colors = config.colors or {}
-    config.colors.split = edge_on
+    config.colors.split = split_blue
   end
 
   -- The pane you type in is the bright one
   config.inactive_pane_hsb = { saturation = 1.0, brightness = 0.7 }
-
-  -- The window's edge beside the active pane: left or right when panes sit
-  -- side by side, top or bottom when stacked, none with one pane
-  local base_frame = config.window_frame or {}
-  local function frame(edges)
-    local f = {}
-    for k, v in pairs(base_frame) do
-      f[k] = v
-    end
-    local function color(on)
-      if on then
-        return edge_on
-      end
-      return edge_off
-    end
-    f.border_left_width, f.border_right_width = '0.4cell', '0.4cell'
-    f.border_top_height, f.border_bottom_height = '0.2cell', '0.2cell'
-    f.border_left_color, f.border_right_color = color(edges.left), color(edges.right)
-    f.border_top_color, f.border_bottom_color = color(edges.top), color(edges.bottom)
-    return f
-  end
-  config.window_frame = frame({})
-  -- The edge follows the focus within 50 ms, whatever moved it: your pane keys,
-  -- a click, Marmota. Your key bindings are left as they are.
-  config.status_update_interval = 50
-
-  local shown = {}
-  local function update(window)
-    local tab = window:active_tab()
-    if not tab then
-      return
-    end
-    local panes = tab:panes_with_info()
-    local right, bottom, active = 0, 0, nil
-    for _, p in ipairs(panes) do
-      right = math.max(right, p.left + p.width)
-      bottom = math.max(bottom, p.top + p.height)
-      if p.is_active then
-        active = p
-      end
-    end
-    local edges = {}
-    if active and #panes > 1 then
-      if active.width < right then
-        edges.left = active.left == 0
-        edges.right = active.left + active.width >= right
-      end
-      if active.height < bottom then
-        edges.top = active.top == 0
-        edges.bottom = active.top + active.height >= bottom
-      end
-    end
-    local key = tostring(edges.left) .. tostring(edges.right) .. tostring(edges.top) .. tostring(edges.bottom)
-    local id = window:window_id()
-    if shown[id] == key then
-      return
-    end
-    shown[id] = key
-    local overrides = window:get_config_overrides() or {}
-    overrides.window_frame = frame(edges)
-    window:set_config_overrides(overrides)
-  end
-  wezterm.on('update-status', function(window, _)
-    update(window)
-  end)
 end
 -- <<< marmota <<<
 LOOK_EOF
