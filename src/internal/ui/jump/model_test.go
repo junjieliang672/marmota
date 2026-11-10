@@ -208,3 +208,15 @@ func TestTheSectionsAreNamedUnderTheInput(t *testing.T) {
 	lines = strings.Split(ansi.Strip(m.Render(true)), "\n")
 	assert.Equal(t, "Resume", strings.Trim(lines[2], "│ "), "one section: its name alone")
 }
+
+func TestTheEmptySearchSaysHowToSearchAndWhereEnterGoes(t *testing.T) {
+	m := New()
+	m.SetSize(70, 30)
+	m.Open(testSections())
+	lines := strings.Split(ansi.Strip(m.Render(true)), "\n")
+	assert.Contains(t, lines[1], "type a name or folder · enter: ~")
+
+	m.Open(testSections(), Ended)
+	lines = strings.Split(ansi.Strip(m.Render(true)), "\n")
+	assert.Contains(t, lines[1], "type a session's name or folder", "enter waits there: not said")
+}

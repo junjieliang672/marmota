@@ -131,7 +131,6 @@ func New() Model {
 	in := common.GeneratePromptTextInput()
 	in.Prompt = ""
 	onPanel(&in)
-	in.Placeholder = "pinned, sessions, folders, files"
 	return Model{input: in, scope: -1, width: 100, height: 30, HomeText: "~"} //nolint:mnd // until sized
 }
 
@@ -144,6 +143,7 @@ func (m *Model) Open(sections []Section, only ...Kind) tea.Cmd {
 		m.scope = indexOf(only[0])
 	}
 	m.input.SetValue("")
+	m.input.Placeholder = m.placeholder()
 	m.SetSections(sections)
 	return m.input.Focus()
 }
@@ -232,6 +232,15 @@ func (m *Model) Picked() (Item, bool) {
 		}
 	}
 	return Item{}, false
+}
+
+// placeholder is what the search box says while nothing is typed: how to
+// search, and where enter goes now. The sections are named just below.
+func (m *Model) placeholder() string {
+	if m.only {
+		return "type a session's name or folder"
+	}
+	return "type a name or folder · enter: " + m.HomeText
 }
 
 // GoesHome reports whether enter goes home: nothing typed or picked, and
