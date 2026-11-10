@@ -1,6 +1,7 @@
 package jump
 
 import (
+	"github.com/junjieliang672/marmota/src/config/icon"
 	"strconv"
 	"strings"
 	"testing"
@@ -163,7 +164,7 @@ func TestEnterGoesToAFolderBeforeASession(t *testing.T) {
 	it, ok := m.Picked()
 	require.True(t, ok)
 	assert.Equal(t, Folder, it.Kind, "listed after the session, still where enter goes")
-	assert.Contains(t, ansi.Strip(m.Render(true)), "↵ 2 ▸ marmota")
+	assert.Contains(t, ansi.Strip(m.Render(true)), icon.Cursor+" 2 ▸ marmota", "the cursor on where enter goes")
 
 	m.Open([]Section{{Kind: Session, Items: items(Session, "marmota docs")}, {Kind: Folder}})
 	typeText(&m, "marmota")

@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/junjieliang672/marmota/src/config/icon"
 	"github.com/junjieliang672/marmota/src/internal/common"
 	"github.com/junjieliang672/marmota/src/internal/ui"
 )
@@ -252,21 +253,22 @@ func (m *Model) slotLine(g grid, row, width int, target Item, hasTarget bool) st
 		return padTo(st.Faint.Render("  "+strings.TrimSpace(s.note)), width)
 	}
 	it := g.items[s.item]
-	picked := m.picking && s.item == m.cursor
-	first := !m.picking && hasTarget && it.Kind == target.Kind && it.Key == target.Key
-	return m.itemLine(it, s.item+1, picked, first, width)
+	// The row enter goes to wears the file panel's cursor: the picked one,
+	// or while searching the first match.
+	onIt := m.picking && s.item == m.cursor ||
+		!m.picking && hasTarget && it.Kind == target.Kind && it.Key == target.Key
+	return m.itemLine(it, s.item+1, onIt, width)
 }
 
 // itemLine is one item: what it is (cc or co for a session, ▸ a folder,
 // · a file), its name, where it is, and on the right its age or state.
-func (m *Model) itemLine(it Item, n int, picked, first bool, width int) string {
+// The row enter goes to (picked) is drawn as a file panel's cursor row: the
+// cursor, and the theme's cursor bar under the row when it has one.
+func (m *Model) itemLine(it Item, n int, picked bool, width int) string {
 	st := common.PopupStyles(picked)
-	lead := "  "
-	switch {
-	case first:
-		lead = "↵ " // where enter goes
-	case picked && !common.PopupHasBar():
-		lead = "› "
+	lead := st.Text.Render("  ")
+	if picked {
+		lead = common.FilePanelCursorStyle.Background(common.PopupPickedBG()).Render(icon.Cursor + " ")
 	}
 	mark := st.Faint.Render("· ")
 	switch {
@@ -275,7 +277,7 @@ func (m *Model) itemLine(it Item, n int, picked, first bool, width int) string {
 	case it.Dir:
 		mark = st.Accent.Render("▸ ")
 	}
-	head := st.Key.Render(lead) + st.Faint.Render(fmtNum(n, m.numWidth)+" ") + mark
+	head := lead + st.Faint.Render(fmtNum(n, m.numWidth)+" ") + mark
 	where := it.Where
 	if m.ShortPath != nil && where != "" {
 		where = m.ShortPath(where)

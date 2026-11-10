@@ -5,6 +5,7 @@ import (
 	"github.com/adrg/xdg"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/junjieliang672/marmota/src/config/icon"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -132,7 +133,7 @@ func TestEnterGoesToTheFirstMatch(t *testing.T) {
 
 	typeInto(m, "todo")
 	require.Equal(t, []string{"todo.txt"}, jumpTitles(m))
-	assert.Contains(t, viewText(m), "↵", "where enter goes is marked")
+	assert.Contains(t, viewText(m), icon.Cursor+" 1 · todo.txt", "the cursor on where enter goes")
 	pressKey(m, "enter")
 
 	panel := m.getFocusedFilePanel()
