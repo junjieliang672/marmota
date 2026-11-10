@@ -166,7 +166,7 @@ func (m *Model) Render(focused bool) string {
 	width := m.innerWidth()
 	st := common.PopupStyles(false)
 	g := m.layout()
-	lines := []string{m.topLine(width, st), st.Rule.Render(strings.Repeat("─", width))}
+	lines := []string{m.topLine(width, st), m.scopeLine(width, st)}
 
 	target, hasTarget := m.Picked()
 	m.numWidth = len(strconv.Itoa(max(1, len(g.items))))
@@ -190,24 +190,45 @@ func (m *Model) Render(focused bool) string {
 	return r.Render()
 }
 
-// topLine is what you type, and on the right the section shown (tab goes
-// through them): All, or the one shown alone.
+// topLine is what you type.
 func (m *Model) topLine(width int, st common.PopupStyleSet) string {
-	name := "All"
-	if m.scope >= 0 {
-		name = Kinds[m.scope].Title()
-	}
-	right := st.Key.Render(name)
-	m.input.Width = max(1, width-ansi.StringWidth(right)-5) //nolint:mnd // "› ", the cursor, a gap
-	input := st.Key.Render("› ") + m.input.View()
+	m.input.Width = max(1, width-4) //nolint:mnd // "› ", the cursor, a gap
 	if m.picking {
-		input = st.Muted.Render("› " + m.input.Value())
+		return ansi.Truncate(st.Muted.Render("› "+m.input.Value()), width, "…")
 	}
-	gap := width - ansi.StringWidth(input) - ansi.StringWidth(right)
-	if gap < 1 {
-		return ansi.Truncate(input, width, "…")
+	return st.Key.Render("› ") + m.input.View()
+}
+
+// scopeLine names the sections tab goes through, under what you type, the
+// one shown lit: "All · Pinned · Sessions · Resume · Folders · Files". In a
+// narrow panel they are only spaced apart; a list of one section names it
+// alone.
+func (m *Model) scopeLine(width int, st common.PopupStyleSet) string {
+	names := []string{"All"}
+	for _, k := range Kinds {
+		names = append(names, k.Title())
 	}
-	return input + strings.Repeat(" ", gap) + right
+	lit := m.scope + 1
+	if m.only {
+		names, lit = []string{Kinds[m.scope].Title()}, 0
+	}
+	plain := 0
+	for _, n := range names {
+		plain += ansi.StringWidth(n)
+	}
+	sep := " · "
+	if plain+len(sep)*(len(names)-1) > width {
+		sep = " "
+	}
+	parts := make([]string, len(names))
+	for i, n := range names {
+		if i == lit {
+			parts[i] = st.Key.Render(n)
+		} else {
+			parts[i] = st.Faint.Render(n)
+		}
+	}
+	return padTo(ansi.Truncate(strings.Join(parts, st.Faint.Render(sep)), width, "…"), width)
 }
 
 func (m *Model) slotLine(g grid, row, width int, target Item, hasTarget bool) string {

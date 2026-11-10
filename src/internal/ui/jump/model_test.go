@@ -88,7 +88,7 @@ func TestTheSectionsSitOneUnderTheOtherInThePanel(t *testing.T) {
 		"file0", "file1", "file2", "file3", "file4"}, titles(&m), "Pinned, Sessions, Resume, Folders, Files")
 	lines := strings.Split(view, "\n")
 	var order []string
-	for _, l := range lines {
+	for _, l := range lines[3:] { // under the sections' names
 		for _, k := range Kinds {
 			if strings.Contains(l, k.Title()) {
 				order = append(order, k.Title())
@@ -179,13 +179,32 @@ func TestAShortPanelDropsBlankLinesThenEmptySections(t *testing.T) {
 	m.Open(sections)
 
 	view := ansi.Strip(m.Render(true))
-	assert.NotContains(t, view, "Pinned", "empty, and rows are short")
+	list := strings.Join(strings.Split(view, "\n")[3:], "\n") // under the sections' names
+	assert.NotContains(t, list, "Pinned", "empty, and rows are short")
 	for _, title := range []string{"group the logos", "logo sizes", "site", "file0"} {
 		assert.Contains(t, view, title, "each section with items shows one at least")
 	}
 
 	m.SetSize(60, 40)
 	view = ansi.Strip(m.Render(true))
-	assert.Contains(t, view, "Pinned", "room enough: every section")
+	list = strings.Join(strings.Split(view, "\n")[3:], "\n")
+	assert.Contains(t, list, "Pinned", "room enough: every section")
 	assert.Contains(t, view, "none")
+}
+
+func TestTheSectionsAreNamedUnderTheInput(t *testing.T) {
+	m := New()
+	m.SetSize(70, 30)
+	m.Open(testSections())
+
+	lines := strings.Split(ansi.Strip(m.Render(true)), "\n")
+	assert.Contains(t, lines[2], "All · Pinned · Sessions · Resume · Folders · Files", "under what you type")
+
+	m.SetSize(42, 30)
+	lines = strings.Split(ansi.Strip(m.Render(true)), "\n")
+	assert.Contains(t, lines[2], "All Pinned Sessions Resume Folders Files", "narrow: only spaced")
+
+	m.Open(testSections(), Ended)
+	lines = strings.Split(ansi.Strip(m.Render(true)), "\n")
+	assert.Equal(t, "Resume", strings.Trim(lines[2], "│ "), "one section: its name alone")
 }
