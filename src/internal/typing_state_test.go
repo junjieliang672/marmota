@@ -3,24 +3,33 @@ package internal
 import (
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/junjieliang672/marmota/src/internal/common"
+	"github.com/junjieliang672/marmota/src/internal/utils"
 )
+
+func utilsKey(key string) tea.KeyMsg { return utils.TeaKeyMsg(key) }
 
 // Every text input in the model has to be listed in isTextInputActive. When one
 // is missing, the IME ascii-hold stays in force while that field has focus and
 // the user simply cannot type Chinese into it — so this table is the guard
 // against a new input being added and forgotten.
-// modelWithOnePinnedFolder gives the pinned rename and move cases an item to
-// act on.
+// modelWithOnePinnedFolder gives the s popup's cases an item to act on.
 func modelWithOnePinnedFolder(t *testing.T) *model {
 	t.Helper()
 	dir := t.TempDir()
 	pinned := []sidebarTestEntry{{Location: dir, Name: "pinned", Timestamp: 1}}
 	configureSidebarPinnedAndRecentForTest(t, dir, pinned, nil)
-	m := defaultTestModel(dir)
-	m.sidebarModel.UpdateDirectories()
-	return m
+	return defaultTestModel(dir)
+}
+
+// pickInJump opens the s popup and picks its first item.
+func pickInJump(m *model) {
+	m.openJump()
+	m.jumpKey(utilsKey("down"))
 }
 
 func TestIsTextInputActive(t *testing.T) {
@@ -30,11 +39,13 @@ func TestIsTextInputActive(t *testing.T) {
 	}{
 		{"create file or directory", func(m *model) { m.typingModal.open = true }},
 		{"SPF or shell prompt", func(m *model) { m.promptModal.Open(false) }},
-		{"zoxide query", func(m *model) { m.zoxideModal.Open() }},
+		{"s popup search", func(m *model) { m.openJump() }},
 		{"file panel rename", func(m *model) { m.fileModel.renaming = true }},
-		{"pinned directory rename", func(m *model) { m.sidebarModel.PinnedItemRename() }},
+		{"s popup rename", func(m *model) {
+			pickInJump(m)
+			m.jumpKey(utilsKey(common.Hotkeys.FilePanelItemRename[0]))
+		}},
 		{"file panel search", func(m *model) { m.getFocusedFilePanel().searchBar.Focus() }},
-		{"sidebar search", func(m *model) { m.sidebarModel.SearchBarFocus() }},
 		{"Ask box", func(m *model) { m.openDockAsk("") }},
 	}
 
@@ -72,7 +83,7 @@ func TestIsBlockingModalOpen(t *testing.T) {
 		{"help menu", func(m *model) { m.openHelpMenu() }},
 		{"sort options", func(m *model) { m.getFocusedFilePanel().sortOptions.open = true }},
 		{"iCloud filter", func(m *model) { m.getFocusedFilePanel().iCloudFilter.open = true }},
-		{"pinned move", func(m *model) { m.sidebarModel.BeginPinnedMove(0) }},
+		{"s popup picking", pickInJump},
 		{"first use", func(m *model) { m.firstUse = true }},
 	}
 

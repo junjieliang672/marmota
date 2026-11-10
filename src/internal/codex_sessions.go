@@ -379,7 +379,7 @@ func (m *model) findCodexStart(st *askStart) (claudesession.Session, bool) {
 // session: another one there would be told apart from it only by luck.
 func (m *model) codexStartWaiting(folder string) bool {
 	for _, st := range m.ask.starts {
-		if st.codex && sameDir(st.folder, folder) {
+		if st.codex && !st.resumed && sameDir(st.folder, folder) {
 			return true
 		}
 	}

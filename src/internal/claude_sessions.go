@@ -212,7 +212,7 @@ func (m *model) applyClaudeSessionsSnapshot(msg claudeSessionsSnapshotMsg) tea.C
 	}
 	m.recomputeClaudeUnread()
 	m.refreshSessionsList()
-	m.syncSidebarSessions()
+	m.refreshJump()
 	m.keepAskBarTarget(askBarTarget)
 	m.keepViewerPin()
 	cmds := []tea.Cmd{m.scheduleClaudeSessionsRefresh(), m.updateClaudeInbox(), started}
@@ -409,11 +409,7 @@ func (m *model) jumpToClaudeSession(s claudesession.Session, focus bool) (string
 		return "", fmt.Errorf("%s isn't running in WezTerm (pid %d)", title, s.PID)
 	}
 
-	command := "claude --resume " + shellQuote(s.ID) + " --dangerously-skip-permissions"
-	if s.RemoteControl {
-		command += " --remote-control"
-	}
-	return m.launchVisibleSession(m.claudeSessionDir(s), command, "Resumed "+title, focus)
+	return m.launchVisibleSession(m.claudeSessionDir(s), resumeCommand(s), "Resumed "+title, focus)
 }
 
 // claudeSessionDir is where to start a session's pane: its own folder when it

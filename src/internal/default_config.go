@@ -13,9 +13,9 @@ import (
 	"github.com/junjieliang672/marmota/src/internal/ui/statusline"
 
 	"github.com/junjieliang672/marmota/src/internal/common"
+	jumpui "github.com/junjieliang672/marmota/src/internal/ui/jump"
 	"github.com/junjieliang672/marmota/src/internal/ui/preview"
 	"github.com/junjieliang672/marmota/src/internal/ui/prompt"
-	zoxideui "github.com/junjieliang672/marmota/src/internal/ui/zoxide"
 	"github.com/junjieliang672/marmota/src/pkg/ime"
 	"github.com/junjieliang672/marmota/src/pkg/sysstat"
 )
@@ -42,7 +42,7 @@ func defaultModelConfig(toggleDotFile, toggleFooter, firstUse bool,
 		},
 		helpMenu:          newHelpMenuModal(),
 		promptModal:       prompt.DefaultModel(prompt.PromptMinHeight, prompt.PromptMinWidth),
-		zoxideModal:       zoxideui.DefaultModel(zoxideui.ZoxideMinHeight, zoxideui.ZoxideMinWidth, zClient),
+		jumpUI:            jumpui.New(),
 		sessions:          newSessionsState(),
 		zClient:           zClient,
 		modelQuitState:    notQuitting,
@@ -123,11 +123,6 @@ func getHelpMenuData() []helpMenuModalData {
 		{
 			hotkey:         common.Hotkeys.OpenCommandLine,
 			description:    "Run a shell command in the current folder",
-			hotkeyWorkType: globalType,
-		},
-		{
-			hotkey:         common.Hotkeys.OpenZoxide,
-			description:    "Jump to a folder with zoxide",
 			hotkeyWorkType: globalType,
 		},
 		{
@@ -299,6 +294,11 @@ func getHelpMenuData() []helpMenuModalData {
 			hotkeyWorkType: globalType,
 		},
 		{
+			hotkey:         common.Hotkeys.AskResume,
+			description:    "Writing to a new session: resume an ended one instead, picked from a list of Claude Code's or Codex's",
+			hotkeyWorkType: globalType,
+		},
+		{
 			hotkey:         []string{"esc/" + firstKey(common.Hotkeys.OpenAskBar), ""},
 			description:    "Back to the list; your question stays",
 			hotkeyWorkType: globalType,
@@ -347,28 +347,13 @@ func getHelpMenuData() []helpMenuModalData {
 			hotkeyWorkType: globalType,
 		},
 		{
-			hotkey:         common.Hotkeys.FocusOnSidebar,
-			description:    "The sidebar as a popup: pinned, recent, disks (enter goes there; s or esc closes it)",
+			hotkey:         common.Hotkeys.GoTo,
+			description:    "Go to a pinned folder, a session (running, or ended to resume), a folder zoxide knows, a file edited lately",
 			hotkeyWorkType: globalType,
 		},
 		{
 			hotkey:         common.Hotkeys.FocusOnMetaData,
 			description:    "Focus Details (file, operations, this Mac); ↑↓ or the wheel scroll it",
-			hotkeyWorkType: globalType,
-		},
-		{
-			hotkey:         common.Hotkeys.MovePinnedItem,
-			description:    "Sidebar pinned: move highlighted pinned item (arrows preview, Enter confirms, digits+Enter jumps)",
-			hotkeyWorkType: globalType,
-		},
-		{
-			hotkey:         common.Hotkeys.NextSidebarSection,
-			description:    "Sidebar: jump to the next section",
-			hotkeyWorkType: globalType,
-		},
-		{
-			hotkey:         common.Hotkeys.PrevSidebarSection,
-			description:    "Sidebar: jump to the previous section",
 			hotkeyWorkType: globalType,
 		},
 		{
@@ -406,7 +391,7 @@ func getHelpMenuData() []helpMenuModalData {
 		},
 		{
 			hotkey:         []string{"[count]g/G", ""},
-			description:    "File panel or sidebar: jump to item number (not while typing search)",
+			description:    "File panel, or picking in the s popup: jump to item number (not while typing search)",
 			hotkeyWorkType: globalType,
 		},
 		{
@@ -499,7 +484,7 @@ func getHelpMenuData() []helpMenuModalData {
 		},
 		{
 			hotkey:         common.Hotkeys.PinnedDirectory,
-			description:    "Pin item, unpin pinned item, or remove recent file from sidebar",
+			description:    "Pin the item, or unpin a pinned one (in the s popup too)",
 			hotkeyWorkType: globalType,
 		},
 		{
@@ -542,12 +527,12 @@ func getHelpMenuData() []helpMenuModalData {
 		},
 		{
 			hotkey:         common.Hotkeys.CopyPath,
-			description:    "Copy highlighted file, folder, or sidebar item path",
+			description:    "Copy the highlighted file or folder's path (in the s popup too)",
 			hotkeyWorkType: globalType,
 		},
 		{
 			hotkey:         common.Hotkeys.CopyParentPath,
-			description:    "Copy parent path of the highlighted file, folder, or sidebar item",
+			description:    "Copy the path of the folder the file panel shows",
 			hotkeyWorkType: globalType,
 		},
 		{
@@ -624,11 +609,41 @@ func getHelpMenuData() []helpMenuModalData {
 			hotkeyWorkType: globalType,
 		},
 		{
-			subTitle: "Zoxide Navigation",
+			subTitle: "Go to (s)",
+		},
+		{
+			hotkey:         []string{"enter", ""},
+			description:    "Searching: the first match (↵: pinned, folders and files before sessions), or home with nothing typed; picking: the picked item",
+			hotkeyWorkType: globalType,
+		},
+		{
+			hotkey:         []string{"↓", ""},
+			description:    "Pick an item: its keys are the ones it takes elsewhere (t, r, p, e, m, Y; a session's are the Sessions box's)",
+			hotkeyWorkType: globalType,
+		},
+		{
+			hotkey:         []string{"←/→", ""},
+			description:    "Picking: the other column, on the nearest row",
+			hotkeyWorkType: globalType,
+		},
+		{
+			hotkey:         []string{"tab", ""},
+			description:    "One section alone, the next each time; then every section again",
+			hotkeyWorkType: globalType,
+		},
+		{
+			hotkey:         []string{"shift+↑/↓", ""},
+			description:    "Picking a pin: move it up or down the pinned list",
+			hotkeyWorkType: globalType,
 		},
 		{
 			hotkey:         []string{"ctrl+n", ""},
-			description:    "Open selected directory in new file panel (in zoxide menu)",
+			description:    "The item's folder in a new file panel",
+			hotkeyWorkType: globalType,
+		},
+		{
+			hotkey:         []string{"esc", ""},
+			description:    "Back one step: picking to searching, then clear the search, then close",
 			hotkeyWorkType: globalType,
 		},
 		{

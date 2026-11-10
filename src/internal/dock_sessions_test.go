@@ -194,37 +194,28 @@ func TestEscFromTheAskBoxGoesBackToTheFiles(t *testing.T) {
 	assert.Equal(t, nonePanelFocus, m.focusPanel, "opened from the files, esc goes back to them")
 }
 
-// s and z open their popups from the Sessions box too; the popups go to
-// folders, so the files have the keyboard behind them. Closed without going
-// anywhere, they give it back to the Sessions box, on the same session.
-func TestSAndZOpenTheirPopupsFromTheSessionsBox(t *testing.T) {
+// s opens its popup from the Sessions box too; it goes to folders, so the
+// files have the keyboard behind it. Closed without going anywhere, it gives
+// the keyboard back to the Sessions box, on the same session.
+func TestSOpensItsPopupFromTheSessionsBox(t *testing.T) {
 	m := dockTestModel(t)
 	bang(m)
 	require.Equal(t, dockSessionsFocus, m.focusPanel)
 	on := m.sessions.list.SelectedID()
 
-	pressKey(m, common.Hotkeys.FocusOnSidebar[0])
-	assert.Equal(t, sidebarFocus, m.focusPanel, "s: the sidebar popup")
+	pressKey(m, common.Hotkeys.GoTo[0])
+	assert.True(t, m.jumpUI.IsOpen(), "s: the go to popup")
 	pressKey(m, "esc")
+	assert.False(t, m.jumpUI.IsOpen())
 	assert.Equal(t, dockSessionsFocus, m.focusPanel, "esc: back to the Sessions box")
 	assert.Equal(t, on, m.sessions.list.SelectedID())
 
-	pressKey(m, common.Hotkeys.FocusOnSidebar[0])
-	pressKey(m, common.Hotkeys.FocusOnSidebar[0])
-	assert.Equal(t, dockSessionsFocus, m.focusPanel, "s again closes it the same way")
-
-	pressKey(m, common.Hotkeys.OpenZoxide[0])
-	assert.True(t, m.zoxideModal.IsOpen(), "z: the zoxide popup")
-	assert.Equal(t, nonePanelFocus, m.focusPanel)
-	pressKey(m, "esc")
-	assert.False(t, m.zoxideModal.IsOpen())
-	assert.Equal(t, dockSessionsFocus, m.focusPanel, "esc: back to the Sessions box")
-
 	pressKey(m, "esc")
 	require.Equal(t, nonePanelFocus, m.focusPanel)
-	pressKey(m, common.Hotkeys.FocusOnSidebar[0])
+	pressKey(m, common.Hotkeys.GoTo[0])
 	pressKey(m, "esc")
 	assert.Equal(t, nonePanelFocus, m.focusPanel, "opened from the files, it goes back to them")
+	assert.True(t, m.getFocusedFilePanel().isFocused)
 }
 
 // A PDF's page, a picture or a video's frame is an image the terminal keeps

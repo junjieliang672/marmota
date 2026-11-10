@@ -54,6 +54,15 @@ type askState struct {
 	change sessionChange
 	// starts are the sessions the bar started that it still watches, by id.
 	starts map[string]*askStart
+	// resume is the ended session the bar resumes in place of starting one
+	// (ask_resume), nil when it starts one.
+	resume *resumeTarget
+}
+
+// resumeState is what the list of sessions to resume read: the ended
+// sessions of any day.
+type resumeState struct {
+	ended []claudesession.Session
 }
 
 // sessionChange is a model and effort chosen for a running session; ""
@@ -90,6 +99,9 @@ type askStart struct {
 	began time.Time
 	codex bool
 	turn  codexsession.TurnOptions
+	// resumed is set for an ended session resumed: its id is known from
+	// the start, a Codex one's too.
+	resumed bool
 }
 
 // askQueued is a request waiting for the session the bar started.
@@ -151,6 +163,10 @@ func (m *model) askSending() askui.Sending {
 	if !ok || m.sessions.list.NewSelected() {
 		sending := askui.Sending{Text: "starts in the background, " + mode, New: true,
 			DefaultModel: m.ask.defaultModel, DefaultEffort: m.ask.defaultEffort}
+		if r, ok := m.resumeTargetFor(); ok {
+			sending.Text = "resumes " + r.title + " in the background, " + mode + " (enter alone: beside Marmota)"
+			sending.Resume = r.title
+		}
 		if m.askStartsCodex() {
 			sending.DefaultModel, sending.DefaultEffort = m.ask.codexModel, m.sessions.composer.CodexStartEffort()
 			if sending.DefaultModel == "" {
@@ -179,6 +195,9 @@ func (m *model) sendAsk() tea.Cmd {
 	c := &m.sessions.composer
 	question := strings.TrimSpace(c.Value())
 	if question == "" {
+		if r, ok := m.resumeTargetFor(); ok && m.askSending().New {
+			return m.resumeFromAsk(r)
+		}
 		return nil
 	}
 	here := m.sessionsHere()
@@ -193,6 +212,18 @@ func (m *model) sendAsk() tea.Cmd {
 	case ok && !m.sessions.list.NewSelected():
 		target = s.ID
 		cmd, err = m.sendAskTo(s, m.questionFor(question, s.Cwd))
+	case m.ask.resume != nil:
+		r, ok := m.resumeTargetFor()
+		if !ok {
+			m.ask.resume = nil
+			err = errors.New("that session is no longer listed: ctrl+r picks another")
+			break
+		}
+		target = r.id
+		if cmd, err = m.resumeInBackground(r, m.questionFor(question, here)); err == nil {
+			m.sessions.pendingSelect = target
+			c.ResetChoices()
+		}
 	default:
 		target = newAskSessionID()
 		if m.askStartsCodex() {
@@ -376,7 +407,7 @@ func (m *model) applyAskStartTick(msg askStartTickMsg) tea.Cmd {
 	if st == nil {
 		return nil
 	}
-	if st.codex {
+	if st.codex && !st.resumed {
 		if s, ok := m.findCodexStart(st); ok {
 			return m.codexStartFound(st, s)
 		}

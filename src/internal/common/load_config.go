@@ -187,11 +187,9 @@ func fillMissingHotkeysFromDefaults() {
 	}
 
 	// Compatibility migration: older user hotkey files commonly have
-	// focus_on_metadata = ['m', '']. Since move_pinned_item also defaults to
-	// 'm', preserving both would make the new sidebar move action unreachable.
-	// Only rewrite metadata when the collision matches the historical default.
-	if len(Hotkeys.FocusOnMetaData) > 0 && len(Hotkeys.MovePinnedItem) > 0 &&
-		Hotkeys.FocusOnMetaData[0] == "m" && Hotkeys.MovePinnedItem[0] == "m" {
+	// focus_on_metadata = ['m', ''], the historical default. m mentions the
+	// item in the Ask draft now, so that default gives way to the new one.
+	if len(Hotkeys.FocusOnMetaData) > 0 && Hotkeys.FocusOnMetaData[0] == "m" {
 		Hotkeys.FocusOnMetaData = defaultHotkeys.FocusOnMetaData
 	}
 

@@ -101,6 +101,24 @@ func Collect(ctx context.Context, o Options) Snapshot {
 	return snap
 }
 
+// Ended lists the finished sessions of o.Folders, and of the o.RecentFolders
+// folders sessions were last active in, newest first, as Collect does but
+// without asking which run: the ids in running are left out.
+func Ended(o Options, running map[string]bool) []Session {
+	folders := append([]string(nil), o.Folders...)
+	if o.RecentFolders > 0 {
+		for _, f := range RecentFolders(o.ProjectsDir, o.Tracker, o.RecentFolders) {
+			if !slices.Contains(folders, f) {
+				folders = append(folders, f)
+			}
+		}
+	}
+	if running == nil {
+		running = map[string]bool{}
+	}
+	return pastSessions(o, folders, running)
+}
+
 // pastSessions lists the finished sessions of folders and o.Include, newest
 // first, leaving out the running ones.
 func pastSessions(o Options, folders []string, liveIDs map[string]bool) []Session {

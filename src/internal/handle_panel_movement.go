@@ -96,67 +96,6 @@ func (m *model) executeOpenCommand() {
 	}
 }
 
-// Switch to the directory where the sidebar cursor is located
-func (m *model) sidebarSelectDirectory() {
-	// NEW: Handle search mode - navigate to parent directory and select item
-	if m.sidebarModel.IsInSearchMode() {
-		searchResults := m.sidebarModel.GetSearchResults()
-		cursor := m.sidebarModel.GetCursor()
-
-		if len(searchResults) > 0 && cursor >= 0 && cursor < len(searchResults) {
-			selectedItem := searchResults[cursor]
-
-			// Navigate file panel to parent directory
-			parentDir := filepath.Dir(selectedItem.Location)
-
-			panel := &m.fileModel.filePanels[m.filePanelFocusIndex]
-
-			// Update file panel to parent directory
-			err := m.updateCurrentFilePanelDir(parentDir)
-			if err != nil {
-				slog.Error("Error navigating to parent directory from sidebar search", "error", err)
-				return
-			}
-
-			// Mark file to select after directory loads
-			panel.targetFile = filepath.Base(selectedItem.Location)
-
-			// Clear sidebar search and exit search mode
-			m.sidebarModel.ExitSearchMode()
-
-			// Focus on file panel
-			m.focusPanel = nonePanelFocus
-			panel.isFocused = true
-		}
-		return
-	}
-
-	// ORIGINAL: Normal directory selection
-	// We can't do this when we have only divider directories
-	// m.sidebarModel.directories[m.sidebarModel.cursor].location would point to a divider dir.
-	if m.sidebarModel.NoActualDir() {
-		return
-	}
-	// TODO(Refactor): Move this to a function m.ResetFocus()
-	m.focusPanel = nonePanelFocus
-	panel := m.getFocusedFilePanel()
-
-	selectedLocation := m.sidebarModel.GetCurrentDirectoryLocation()
-	var err error
-	if info, statErr := os.Stat(selectedLocation); statErr == nil && !info.IsDir() {
-		err = m.updateCurrentFilePanelDir(filepath.Dir(selectedLocation))
-		if err == nil {
-			panel.targetFile = filepath.Base(selectedLocation)
-		}
-	} else {
-		err = m.updateCurrentFilePanelDir(selectedLocation)
-	}
-	if err != nil {
-		slog.Error("Error switching to sidebar directory", "error", err)
-	}
-	panel.isFocused = true
-}
-
 // Select all item in the file panel (only work on select mode)
 func (m *model) selectAllItem() {
 	panel := &m.fileModel.filePanels[m.filePanelFocusIndex]
@@ -245,17 +184,4 @@ func (m *model) searchBarFocus() {
 
 	// config search bar width
 	panel.searchBar.Width = m.fileModel.width - common.InnerPadding
-}
-
-func (m *model) sidebarSearchBarFocus() {
-	m.clearSidebarJumpCount()
-	if m.sidebarModel.SearchBarFocused() {
-		// Ideally Code should never reach here. Once sidebar is focussed, we should
-		// not cause sidebarSearchBarFocus() event by pressing search key
-		slog.Error("sidebarSearchBarFocus() called on Focussed sidebar")
-		m.sidebarModel.SearchBarBlur()
-		return
-	}
-	m.sidebarModel.SearchBarFocus()
-	m.firstTextInput = true
 }

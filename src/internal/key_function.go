@@ -2,14 +2,11 @@ package internal
 
 import (
 	"log/slog"
-	"os"
 	"path/filepath"
 	"slices"
-	"unicode"
 
 	"github.com/junjieliang672/marmota/src/internal/common"
 	"github.com/junjieliang672/marmota/src/internal/ui/notify"
-	"github.com/junjieliang672/marmota/src/internal/ui/sidebar"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -53,7 +50,7 @@ func (m *model) mainKey(msg string) tea.Cmd { //nolint:gocyclo,cyclop,funlen,mai
 		m.toggleSelectionYaziStyle()
 
 	case slices.Contains(common.Hotkeys.NextFilePanel, msg):
-		m.nextFilePanelKey()
+		m.nextFilePanel()
 
 	case slices.Contains(common.Hotkeys.PreviousFilePanel, msg):
 		m.previousFilePanel()
@@ -68,12 +65,9 @@ func (m *model) mainKey(msg string) tea.Cmd { //nolint:gocyclo,cyclop,funlen,mai
 	case slices.Contains(common.Hotkeys.ToggleFilePreviewPanel, msg):
 		m.toggleFilePreviewPanel()
 
-	case slices.Contains(common.Hotkeys.FocusOnSidebar, msg):
-		closing := m.focusPanel == sidebarFocus
-		m.focusOnSideBar()
-		if closing {
-			return m.popupClosed()
-		}
+	case slices.Contains(common.Hotkeys.GoTo, msg):
+		m.dock.popupFrom = false // opened from the files
+		return m.openJump()
 
 	case slices.Contains(common.Hotkeys.CopyPath, msg):
 		if m.pathsCopyable() {
@@ -100,25 +94,9 @@ func (m *model) mainKey(msg string) tea.Cmd { //nolint:gocyclo,cyclop,funlen,mai
 	case slices.Contains(common.Hotkeys.MoveSessionHere, msg):
 		return m.moveClaudeSessionHere()
 
-	// m in a file panel mentions the item in the Ask draft; in the sidebar
-	// it moves a pinned folder.
+	// m in a file panel mentions the item in the Ask draft.
 	case m.focusPanel == nonePanelFocus && slices.Contains(common.Hotkeys.SessionMention, msg):
 		m.mentionInAskDraft()
-
-	case slices.Contains(common.Hotkeys.MovePinnedItem, msg):
-		if m.focusPanel == sidebarFocus {
-			m.sidebarModel.BeginPinnedMove(m.sidebarListHeight())
-		}
-
-	case slices.Contains(common.Hotkeys.NextSidebarSection, msg):
-		if m.focusPanel == sidebarFocus {
-			m.sidebarModel.JumpToNextSection(m.sidebarListHeight())
-		}
-
-	case slices.Contains(common.Hotkeys.PrevSidebarSection, msg):
-		if m.focusPanel == sidebarFocus {
-			m.sidebarModel.JumpToPreviousSection(m.sidebarListHeight())
-		}
 
 	case slices.Contains(common.Hotkeys.PasteItems, msg):
 		return m.getPasteItemCmd()
@@ -126,7 +104,7 @@ func (m *model) mainKey(msg string) tea.Cmd { //nolint:gocyclo,cyclop,funlen,mai
 	case slices.Contains(common.Hotkeys.FilePanelItemCreate, msg):
 		m.panelCreateNewFile()
 	case slices.Contains(common.Hotkeys.PinnedDirectory, msg):
-		m.pinnedDirectoryKey()
+		m.pinnedDirectory()
 
 	case slices.Contains(common.Hotkeys.ToggleDotFile, msg):
 		m.toggleDotFileController()
@@ -144,9 +122,6 @@ func (m *model) mainKey(msg string) tea.Cmd { //nolint:gocyclo,cyclop,funlen,mai
 		m.promptModal.Open(true)
 	case slices.Contains(common.Hotkeys.OpenAgentPrompt, msg):
 		m.promptModal.Open(false)
-	case slices.Contains(common.Hotkeys.OpenZoxide, msg):
-		m.dock.popupFrom = false // opened from the files
-		return m.zoxideModal.Open()
 
 	case slices.Contains(common.Hotkeys.OpenHelpMenu, msg):
 		m.openHelpMenu()
@@ -158,9 +133,6 @@ func (m *model) mainKey(msg string) tea.Cmd { //nolint:gocyclo,cyclop,funlen,mai
 		m.toggleReverseSort()
 
 	case slices.Contains(common.Hotkeys.OpenFileWithEditor, msg):
-		if m.focusPanel == sidebarFocus {
-			return m.openSidebarRecentFileWithEditor()
-		}
 		return m.openFileWithEditor()
 
 	case slices.Contains(common.Hotkeys.OpenFileWithSecondEditor, msg):
@@ -244,8 +216,6 @@ func (m *model) selectModeHotkey(msg string) (tea.Cmd, bool) {
 // listUpKey moves the cursor of what has the keyboard up.
 func (m *model) listUpKey() {
 	switch m.focusPanel {
-	case sidebarFocus:
-		m.sidebarModel.ListUp(m.sidebarListHeight())
 	case metadataFocus:
 		m.details.ScrollBy(-1)
 	case nonePanelFocus:
@@ -256,8 +226,6 @@ func (m *model) listUpKey() {
 // listDownKey moves the cursor of what has the keyboard down.
 func (m *model) listDownKey() {
 	switch m.focusPanel {
-	case sidebarFocus:
-		m.sidebarModel.ListDown(m.sidebarListHeight())
 	case metadataFocus:
 		m.details.ScrollBy(1)
 	case nonePanelFocus:
@@ -269,12 +237,6 @@ func (m *model) listDownKey() {
 // the row of a count typed before it.
 func (m *model) listTopKey() {
 	switch m.focusPanel {
-	case sidebarFocus:
-		if count, ok := m.consumeSidebarJumpCount(); ok && m.isSidebarCountJumpEligible() {
-			m.sidebarModel.JumpToIndexedItem(count, m.sidebarListHeight())
-		} else {
-			m.sidebarModel.ListTop()
-		}
 	case metadataFocus:
 		m.details.ScrollTop()
 	case nonePanelFocus:
@@ -290,12 +252,6 @@ func (m *model) listTopKey() {
 // to the row of a count typed before it.
 func (m *model) listBottomKey() {
 	switch m.focusPanel {
-	case sidebarFocus:
-		if count, ok := m.consumeSidebarJumpCount(); ok && m.isSidebarCountJumpEligible() {
-			m.sidebarModel.JumpToIndexedItem(count, m.sidebarListHeight())
-		} else {
-			m.sidebarModel.ListBottom(m.sidebarListHeight())
-		}
 	case metadataFocus:
 		m.details.ScrollBottom()
 	case nonePanelFocus:
@@ -307,20 +263,10 @@ func (m *model) listBottomKey() {
 	}
 }
 
-// newFilePanelLocation is where a new file panel opens: the sidebar's
-// folder (a file's own folder), the folder under the file panel's cursor
-// (or the folder of the file there), else home.
+// newFilePanelLocation is where a new file panel opens: the folder under
+// the file panel's cursor (or the folder of the file there), else home.
 func (m *model) newFilePanelLocation() string {
 	switch m.focusPanel {
-	case sidebarFocus:
-		sidebarLocation := m.sidebarModel.GetCurrentDirectoryLocation()
-		if sidebarLocation == "" {
-			break
-		}
-		if info, err := os.Stat(sidebarLocation); err == nil && !info.IsDir() {
-			return filepath.Dir(sidebarLocation)
-		}
-		return sidebarLocation
 	case nonePanelFocus:
 		panel := m.getFocusedFilePanel()
 		if len(panel.element) == 0 || panel.cursor < 0 || panel.cursor >= len(panel.element) {
@@ -337,32 +283,10 @@ func (m *model) newFilePanelLocation() string {
 	return variable.HomeDir
 }
 
-// nextFilePanelKey focuses the next file panel; from the sidebar, the
-// leftmost one.
-func (m *model) nextFilePanelKey() {
-	if m.focusPanel != sidebarFocus {
-		m.nextFilePanel()
-		return
-	}
-	m.focusPanel = nonePanelFocus
-	m.filePanelFocusIndex = 0
-	m.fileModel.filePanels[0].isFocused = true
-}
-
-// pinnedDirectoryKey pins or unpins the sidebar's item, or the file
-// panel's folder.
-func (m *model) pinnedDirectoryKey() {
-	if m.focusPanel == sidebarFocus {
-		m.sidebarPinnedDirectory()
-		return
-	}
-	m.pinnedDirectory()
-}
-
 // pathsCopyable reports whether what has the keyboard has a path to copy:
-// the sidebar or a file panel.
+// a file panel.
 func (m *model) pathsCopyable() bool {
-	return m.focusPanel == sidebarFocus || m.focusPanel == nonePanelFocus
+	return m.focusPanel == nonePanelFocus
 }
 
 // clearJumpCounts forgets counts typed before a key that takes none.
@@ -370,53 +294,18 @@ func (m *model) clearJumpCounts() {
 	if m.hasPendingFilePanelJumpCount() {
 		m.clearFilePanelJumpCount()
 	}
-	if m.hasPendingSidebarJumpCount() {
-		m.clearSidebarJumpCount()
-	}
 }
 
 func (m *model) normalAndBrowserModeKey(msg string) tea.Cmd {
 	// if not focus on the filepanel return
 	if !m.getFocusedFilePanel().isFocused {
-		return m.sidebarKey(msg)
+		return nil
 	}
 	// Check if in the select mode and focusOn filepanel
 	if m.getFocusedFilePanel().panelMode == selectMode {
 		return m.selectModeFilePanelKey(msg)
 	}
 	return m.browserModeKey(msg)
-}
-
-// sidebarKey handles msg while the sidebar has the keyboard.
-func (m *model) sidebarKey(msg string) tea.Cmd {
-	if m.focusPanel == sidebarFocus && slices.Contains(common.Hotkeys.CancelTyping, msg) {
-		if m.sidebarModel.IsSearchActive() {
-			m.sidebarModel.ClearSearch() // esc clears a search first
-			return nil
-		}
-		m.focusOnSideBar() // then closes the popup
-		return m.popupClosed()
-	}
-	// enter on a session goes to it in the Sessions box.
-	if id, ok := sidebar.SessionID(m.sidebarModel.GetCurrentDirectoryLocation()); ok &&
-		m.focusPanel == sidebarFocus && slices.Contains(common.Hotkeys.Confirm, msg) {
-		m.focusOnSideBar()
-		return m.focusDockSessionsOn(id)
-	}
-	if m.focusPanel == sidebarFocus && slices.Contains(common.Hotkeys.Confirm, msg) {
-		m.sidebarSelectDirectory()
-	}
-	if m.focusPanel == sidebarFocus && slices.Contains(common.Hotkeys.FilePanelItemRename, msg) {
-		m.sidebarModel.PinnedItemRename()
-	}
-	if m.focusPanel == sidebarFocus && slices.Contains(common.Hotkeys.SearchBar, msg) {
-		m.sidebarSearchBarFocus()
-	}
-	// Sidebar always does recursive search, so 'f' key also opens search bar
-	if m.focusPanel == sidebarFocus && slices.Contains(common.Hotkeys.SearchInFolder, msg) {
-		m.sidebarSearchBarFocus()
-	}
-	return nil
 }
 
 // selectModeFilePanelKey handles msg while the file panel is in select mode.
@@ -575,34 +464,6 @@ func (m *model) renamingKey(msg string) tea.Cmd {
 	}
 
 	return nil
-}
-
-func (m *model) sidebarRenamingKey(msg string) {
-	switch {
-	case slices.Contains(common.Hotkeys.CancelTyping, msg):
-		m.sidebarModel.CancelSidebarRename()
-	case slices.Contains(common.Hotkeys.ConfirmTyping, msg):
-		m.sidebarModel.ConfirmSidebarRename()
-	}
-}
-
-func (m *model) sidebarMoveKey(msg tea.KeyMsg) {
-	switch {
-	case slices.Contains(common.Hotkeys.CancelTyping, msg.String()):
-		m.sidebarModel.CancelPinnedMove(m.sidebarListHeight())
-	case slices.Contains(common.Hotkeys.ListUp, msg.String()):
-		m.sidebarModel.MovePinnedUp(m.sidebarListHeight())
-	case slices.Contains(common.Hotkeys.ListDown, msg.String()):
-		m.sidebarModel.MovePinnedDown(m.sidebarListHeight())
-	case slices.Contains(common.Hotkeys.ConfirmTyping, msg.String()) || slices.Contains(common.Hotkeys.Confirm, msg.String()):
-		if err := m.sidebarModel.ConfirmPinnedMove(m.sidebarListHeight()); err != nil {
-			slog.Error("error while moving pinned item", "error", err)
-		}
-	case msg.Type == tea.KeyBackspace:
-		m.sidebarModel.DeletePinnedMoveDigit()
-	case msg.Type == tea.KeyRunes && !msg.Alt && len(msg.Runes) == 1 && unicode.IsDigit(msg.Runes[0]):
-		m.sidebarModel.AppendPinnedMoveDigit(msg.Runes[0])
-	}
 }
 
 // Check the key input and cancel or confirms the search

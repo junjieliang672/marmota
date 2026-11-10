@@ -9,30 +9,8 @@ import (
 	"github.com/junjieliang672/marmota/src/internal/ui/rendering"
 )
 
-func SidebarRenderer(totalHeight int, totalWidth int, sidebarFocussed bool) *rendering.Renderer {
-	cfg := rendering.DefaultRendererConfig(totalHeight, totalWidth)
-
-	cfg.ContentFGColor = common.SidebarFGColor
-	cfg.ContentBGColor = common.SidebarBGColor
-
-	cfg.BorderRequired = true
-	cfg.BorderBGColor = common.SidebarBGColor
-	cfg.BorderFGColor = common.SidebarBorderColor
-	if sidebarFocussed {
-		cfg.BorderFGColor = common.SidebarBorderActiveColor
-	}
-	cfg.Border = DefaultLipglossBorder()
-
-	r, err := rendering.NewRenderer(cfg)
-	if err != nil {
-		slog.Error("Error in creating renderer. Falling back to default renderer", "error", err)
-		r = &rendering.Renderer{}
-	}
-	return r
-}
-
-// PopupRenderer draws the s and z popups' frame, in the focused panel's
-// frame color, titled with the popup's key and its name: "s sidebar".
+// PopupRenderer draws the s popup's frame, in the focused panel's frame
+// color, titled with the popup's key and its name: "s go to".
 func PopupRenderer(totalHeight int, totalWidth int, key, name string) *rendering.Renderer {
 	cfg := rendering.DefaultRendererConfig(totalHeight, totalWidth)
 	st := common.PopupStyles(false)
@@ -175,10 +153,6 @@ func PromptRenderer(totalHeight int, totalWidth int) *rendering.Renderer {
 		r = &rendering.Renderer{}
 	}
 	return r
-}
-
-func ZoxideRenderer(totalHeight int, totalWidth int) *rendering.Renderer {
-	return PromptRenderer(totalHeight, totalWidth)
 }
 
 // AskBarRenderer draws the Ask bar's frame.

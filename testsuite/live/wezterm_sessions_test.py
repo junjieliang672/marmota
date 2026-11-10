@@ -221,13 +221,13 @@ def main() -> int:
         # Hide the dock: the steps below bring it back when they need it.
         type_keys(spf, "F")
         print("ok   superfile is running in the test workspace")
-        # No sidebar column: s opens it as a popup over the panels.
+        # s opens the go to popup over the panels.
         type_keys(spf, "s")
-        wait_for("the sidebar popup", lambda: "Pinned" in screen(spf) and "Recent" in screen(spf)
-                 and "path /" in screen(spf))
+        wait_for("the go to popup", lambda: "Pinned" in screen(spf) and "Folders" in screen(spf)
+                 and "↓ pick" in screen(spf))
         type_keys(spf, "\x1b")
-        wait_for("the popup to close", lambda: "path /" not in screen(spf))
-        print("ok   s opens the sidebar as a popup with Pinned, Recent and the picked path; esc closes it")
+        wait_for("the popup to close", lambda: "↓ pick" not in screen(spf))
+        print("ok   s opens the go to popup with its sections; esc closes it")
 
         # 1. first agent opens beside Marmota
         type_keys(spf, ">")

@@ -9,7 +9,7 @@ to it.
 
 ## What it does
 
-- **Files**: panels, previews, copy, move, rename, trash, archives, zoxide (`z`).
+- **Files**: panels, previews, copy, move, rename, trash, archives, and `s` to go anywhere: pinned folders, sessions, folders zoxide knows, files edited lately.
 - **Sessions beside your files.** Claude Code and Codex sessions run in WezTerm panes next to
   Marmota. The Sessions box at the foot (`!`) lists the running ones; each row says `cc`
   (Claude Code) or `co` (Codex), how it stands (working, needs you, replied) and what it is doing.
@@ -75,7 +75,8 @@ y
 | `W` | The files the selected session changed |
 | `V` | Pin the preview to a session while you browse |
 | `w` · `r` · `x` · `m` | In the Sessions box: fork, rename, stop, mention a session |
-| `s` · `z` | Sidebar popup (pinned, sessions, recent) · zoxide |
+| `s` | Go to: pinned, sessions (running or ended, to resume), folders zoxide knows, recent files |
+| `ctrl+r` | In the Ask box, writing to a new session: resume an ended one instead |
 | `M` · `F` | Focus the Details box · hide or show the boxes at the foot |
 | `?` | All keys |
 | `q` | Quit |

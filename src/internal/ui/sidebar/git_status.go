@@ -119,11 +119,6 @@ func parseGitChanges(output string) map[string]string {
 	return changes
 }
 
-// GitStatusUnavailable returns a status indicating git is not available
-func GitStatusUnavailable() GitStatus {
-	return GitStatus{IsGitRepo: false}
-}
-
 // FetchGitStatus fetches git status for the given directory
 func FetchGitStatus(dir string) GitStatus {
 	status := GitStatus{LastPath: dir}

@@ -106,6 +106,7 @@ func (m *model) openDockAsk(target string) tea.Cmd {
 // closeDockAsk folds the Ask box back, giving the keyboard to what had it
 // before: a panel, or the Sessions box. The draft stays.
 func (m *model) closeDockAsk() {
+	m.ask.resume = nil
 	m.sessions.composer.Blur()
 	m.saveAskHistory() // the draft, for the next superfile too
 	m.sessions.composer.SetEscText("")
@@ -150,7 +151,16 @@ func askBackKey() string {
 // dockAskKey handles a key while the Ask box has the keyboard.
 func (m *model) dockAskKey(msg tea.KeyMsg) tea.Cmd {
 	key := msg.String()
+	if m.ask.resume != nil && (slices.Contains(common.Hotkeys.AskChooseAgent, key) ||
+		slices.Contains(common.Hotkeys.AskClear, key)) {
+		m.ask.resume = nil // the other agent, or a clean start: a new session again
+	}
 	switch {
+	case slices.Contains(common.Hotkeys.AskResume, key):
+		if m.askSending().New {
+			return m.openJumpForResume()
+		}
+		return nil
 	case slices.Contains(common.Hotkeys.CancelTyping, key):
 		m.closeDockAsk()
 		return nil

@@ -483,6 +483,9 @@ type Sending struct {
 	// New is set when sending starts a session: the bar's choice of Claude
 	// Code or Codex applies.
 	New bool
+	// Resume is the title of the ended session sending resumes in place of
+	// starting one; "" when it starts one.
+	Resume string
 	// Change is set when the model and effort keys change a running
 	// session's, from the next message; Changed when they have.
 	Change, Changed bool
@@ -635,6 +638,11 @@ func (c *Composer) keysLines(width int, sending Sending, st composerStyles) []st
 				other = "Claude Code"
 			}
 			keys = append(keys, [2]string{firstKey(common.Hotkeys.AskChooseAgent), other})
+			resume := "resume one"
+			if sending.Resume != "" {
+				resume = "another"
+			}
+			keys = append(keys, [2]string{firstKey(common.Hotkeys.AskResume), resume})
 		}
 		keys = append(keys, [2]string{"↑↓", "history"}, [2]string{firstKey(common.Hotkeys.AskClear), "clear"})
 		if !sending.Fixed {

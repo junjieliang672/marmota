@@ -401,7 +401,7 @@ ln -s "$HOME/.codex/auth.json" "$H/codex/auth.json"
 [ ! -e "$HOME/.codex/models_cache.json" ] || ln -s "$HOME/.codex/models_cache.json" "$H/codex/models_cache.json"
 printf '[projects."%s"]\ntrust_level = "trusted"\n' "$T" >"$H/codex/config.toml"
 
-# Pinned folders, recent files and zoxide's places, for the s and z popups.
+# Pinned folders, recent files and zoxide's places, for the s popup.
 mkdir -p "$H/xdg/data/marmota" "$H/xdg/state" "$H/xdg/cache" "$H/xdg/config" "$H/zoxide"
 now=$(date +%s)
 cat >"$H/xdg/data/marmota/pinned.json" <<EOF

@@ -51,36 +51,6 @@ func (m *model) pinParentDirectoryOfCursor() {
 	}
 }
 
-func (m *model) sidebarPinnedDirectory() {
-	location := m.sidebarModel.GetCurrentDirectoryLocation()
-	if location == "" {
-		return
-	}
-
-	if m.sidebarModel.IsCurrentDirectoryPinned() {
-		err := m.sidebarModel.TogglePinnedDirectory(location)
-		if err != nil {
-			slog.Error("Error while toggling pinned item from sidebar", "error", err)
-			return
-		}
-
-		m.sidebarModel.UpdateDirectories()
-		return
-	}
-
-	if !m.sidebarModel.IsCurrentItemRecentEdit() {
-		return
-	}
-
-	err := m.sidebarModel.RemoveRecentEdit(location)
-	if err != nil {
-		slog.Error("Error while removing recent edit from sidebar", "error", err)
-		return
-	}
-
-	m.sidebarModel.UpdateDirectories()
-}
-
 // Create new file panel
 func (m *model) createNewFilePanel(location string) error {
 	// In case we have model width and height zero, maxFilePanel would be 0
@@ -229,19 +199,6 @@ func (m *model) previousFilePanel() {
 	}
 
 	m.fileModel.filePanels[m.filePanelFocusIndex].isFocused = returnFocusType(m.focusPanel)
-}
-
-// Focus on sidebar
-func (m *model) focusOnSideBar() {
-	m.syncSidebarSessions()
-	if m.focusPanel == sidebarFocus {
-		m.focusPanel = nonePanelFocus
-		m.fileModel.filePanels[m.filePanelFocusIndex].isFocused = true
-	} else {
-		m.focusPanel = sidebarFocus
-		m.fileModel.filePanels[m.filePanelFocusIndex].isFocused = false
-		m.dock.popupFrom = false // opened from the files
-	}
 }
 
 // focusOnMetadata gives the Details box the keyboard, or gives it back. A

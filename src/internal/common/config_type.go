@@ -154,7 +154,9 @@ type HotkeysType struct {
 	OpenSortOptionsMenu    []string `toml:"open_sort_options_menu"`
 	ToggleReverseSort      []string `toml:"toggle_reverse_sort"`
 
-	FocusOnSidebar      []string `toml:"focus_on_sidebar"`
+	// GoTo opens the s popup: pinned folders, sessions, folders zoxide
+	// knows, files edited lately.
+	GoTo                []string `toml:"go_to"`
 	FocusOnMetaData     []string `toml:"focus_on_metadata"`
 	JumpToUnreadSession []string `toml:"jump_to_unread_session"`
 	NextSession         []string `toml:"next_session"`
@@ -162,9 +164,6 @@ type HotkeysType struct {
 	SendToAgent         []string `toml:"send_to_agent"`
 	MoveSessionHere     []string `toml:"move_session_here"`
 	OpenAskBar          []string `toml:"open_ask_bar"`
-	MovePinnedItem      []string `toml:"move_pinned_item"`
-	NextSidebarSection  []string `toml:"next_sidebar_section"`
-	PrevSidebarSection  []string `toml:"prev_sidebar_section"`
 
 	FilePanelItemCreate []string `toml:"file_panel_item_create" comment:"create file/directory and rename "`
 	FilePanelItemRename []string `toml:"file_panel_item_rename"`
@@ -193,7 +192,6 @@ type HotkeysType struct {
 	OpenHelpMenu    []string `toml:"open_help_menu"`
 	OpenCommandLine []string `toml:"open_command_line"`
 	OpenAgentPrompt []string `toml:"open_agent_prompt"`
-	OpenZoxide      []string `toml:"open_zoxide"`
 
 	CopyPath       []string `toml:"copy_path"`
 	CopyParentPath []string `toml:"copy_parent_path"`
@@ -247,4 +245,7 @@ type HotkeysType struct {
 	AskClear                []string `toml:"ask_clear"`
 	AskPrevious             []string `toml:"ask_previous"`
 	AskNext                 []string `toml:"ask_next"`
+	// Resume a session that has ended, picked from a list, in place of
+	// starting one.
+	AskResume []string `toml:"ask_resume"`
 }

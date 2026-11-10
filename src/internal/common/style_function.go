@@ -42,24 +42,6 @@ func FilePreviewBox(height int, width int) lipgloss.Style {
 		Height(height).Background(FilePanelBGColor)
 }
 
-// Generate border style for sidebar
-func SideBarBorderStyle(height int, sidebarFocussed bool) lipgloss.Style {
-	border := GenerateBorder()
-	sidebarBorderStateColor := SidebarBorderColor
-	if sidebarFocussed {
-		sidebarBorderStateColor = SidebarBorderActiveColor
-	}
-
-	return lipgloss.NewStyle().
-		BorderStyle(border).
-		BorderForeground(sidebarBorderStateColor).
-		BorderBackground(SidebarBGColor).
-		Width(SidebarWidth).
-		Height(height).
-		Background(SidebarBGColor).
-		Foreground(SidebarFGColor)
-}
-
 // Generate border style for process and can custom bottom border
 func ProcsssBarBorder(height int, width int, borderBottom string, processBarFocussed bool) lipgloss.Style {
 	border := GenerateBorder()
@@ -305,7 +287,7 @@ func GeneratePinnedRenameTextInput(cursorPos int, defaultValue string) textinput
 	ti.SetCursor(cursorPos)
 	ti.Focus()
 	ti.CharLimit = 156
-	ti.Width = SidebarWidth - PanelPadding
+	ti.Width = renameInputWidth
 	return ti
 }
 

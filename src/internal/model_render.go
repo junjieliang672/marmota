@@ -14,95 +14,12 @@ import (
 	"github.com/junjieliang672/marmota/src/pkg/icloud"
 
 	"github.com/junjieliang672/marmota/src/internal/common"
-	"github.com/junjieliang672/marmota/src/internal/ui/sidebar"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/junjieliang672/marmota/src/config/icon"
 )
-
-// The sidebar popup's place and size: over the left of the file panels.
-const (
-	// At the left edge: a panel's rows start with icons whose width the
-	// terminal and superfile can count differently, and an overlay that
-	// starts among them lands a column off.
-	sidebarPopupMaxWidth = 52
-	sidebarPopupMaxList  = 20
-)
-
-// sidebarListHeight is how many rows the popup's list has.
-func (m *model) sidebarListHeight() int {
-	return max(4, min(sidebarPopupMaxList, m.fullHeight-10)) //nolint:mnd // a short list; room for the frame
-}
-
-// popupWidth is the inside width of the s and z popups.
-func (m *model) popupWidth() int {
-	return max(20, min(sidebarPopupMaxWidth, m.fullWidth-common.BorderPadding)) //nolint:mnd // narrowest
-}
-
-// popupXY is where the s and z popups open: in the middle of the screen,
-// placed by their list area and a one-line path, so a path that wraps
-// doesn't move the top.
-func (m *model) popupXY() (int, int) {
-	width := m.popupWidth() + common.BorderPadding
-	height := m.sidebarListHeight() + common.BorderPadding + 2 //nolint:mnd // the path line's rule and one line
-	return max(0, (m.fullWidth-width)/common.CenterDivisor), max(0, (m.fullHeight-height)/common.CenterDivisor)
-}
-
-// sidebarPopupRender draws the sidebar as a popup: pinned folders, recent
-// files and disks, then the picked row's whole path.
-func (m *model) sidebarPopupRender() string {
-	common.SidebarWidth = m.popupWidth()
-	panel := &m.fileModel.filePanels[m.filePanelFocusIndex]
-	footer := sidebarPathLines(m.sidebarModel.GetCurrentDirectoryLocation(), common.SidebarWidth)
-	if id, ok := sidebar.SessionID(m.sidebarModel.GetCurrentDirectoryLocation()); ok {
-		footer = m.sidebarSessionLines(id, common.SidebarWidth)
-	}
-	return m.sidebarModel.Render(m.sidebarListHeight(), true, panel.location, footer...)
-}
-
-// syncSidebarSessions gives the sidebar the live sessions to list.
-func (m *model) syncSidebarSessions() {
-	var entries []sidebar.SessionEntry
-	for _, s := range m.dockSessions() {
-		entries = append(entries, sidebar.SessionEntry{ID: s.ID, Title: s.DisplayTitle(), Codex: s.IsCodex(),
-			Remote: s.RemoteControl})
-	}
-	m.sidebarModel.SetSessions(entries)
-	m.sidebarModel.UpdateDirectories()
-}
-
-// sidebarSessionLines is the popup's foot on a session: enter writes to it,
-// and where it works.
-func (m *model) sidebarSessionLines(id string, width int) []string {
-	s, ok := m.claude.snapshot.Find(id)
-	if !ok {
-		return nil
-	}
-	lines := sidebarPathLines(s.Cwd, width)
-	st := common.PopupStyles(false)
-	return append(lines, ansi.Truncate(st.Key.Render("enter")+st.Text.Render(" go to "+s.DisplayTitle()), width, "…"))
-}
-
-// sidebarPathLines is the picked row's whole path, wrapped at "/" to width
-// rather than cut, under a rule.
-func sidebarPathLines(path string, width int) []string {
-	if path == "" {
-		return nil
-	}
-	st := common.PopupStyles(false)
-	lines := []string{st.Rule.Render(strings.Repeat("─", width))}
-	const label = "path "
-	for i, l := range strings.Split(ansi.Wrap(path, max(1, width-len(label)), "/"), "\n") {
-		head := strings.Repeat(" ", len(label))
-		if i == 0 {
-			head = label
-		}
-		lines = append(lines, st.Muted.Render(head)+st.Value.Render(l))
-	}
-	return lines
-}
 
 // This also modifies the m.fileModel.filePanels, which it should not
 // what modifications we do on this model object are of no consequence.
@@ -522,17 +439,6 @@ func (m *model) introduceModalRender() string {
 
 func (m *model) promptModalRender() string {
 	return m.promptModal.Render()
-}
-
-// zoxideModalRender is the z popup, drawn as the s popup is: with the path
-// line of where enter goes.
-func (m *model) zoxideModalRender() string {
-	m.zoxideModal.ShortPath = shortPath
-	var footer []string
-	if target, ok := m.zoxideModal.Target(); ok {
-		footer = sidebarPathLines(target, m.zoxideModal.GetWidth()-common.BorderPadding)
-	}
-	return m.zoxideModal.Render(footer...)
 }
 
 func (m *model) helpMenuRender() string {

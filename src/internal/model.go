@@ -27,7 +27,6 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	variable "github.com/junjieliang672/marmota/src/config"
-	zoxideui "github.com/junjieliang672/marmota/src/internal/ui/zoxide"
 	"github.com/junjieliang672/marmota/src/pkg/codexsession"
 	filepreview "github.com/junjieliang672/marmota/src/pkg/file_preview"
 	stringfunction "github.com/junjieliang672/marmota/src/pkg/string_function"
@@ -106,13 +105,10 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Only the wheel does something, over a preview (mouse.go).
 		return m, m.handleMouse(msg)
 	}
-	var sidebarCmd, inputCmd, updateCmd, panelCmd, heartbeatCmd tea.Cmd
+	var inputCmd, updateCmd, panelCmd, heartbeatCmd tea.Cmd
 	gotModelUpdateMsg := false
 
-	sidebarCmd = m.sidebarModel.UpdateState(msg)
-
-	// this is similar to m.sidebarModel.UpdateState(msg) but since helpMenu is not a Model
-	// we call .Update() manually here
+	// The help menu isn't a Model: its search bar is updated here.
 	var helpMenuCmd tea.Cmd
 	if m.helpMenu.searchBar.Focused() {
 		m.helpMenu.searchBar, helpMenuCmd = m.helpMenu.searchBar.Update(msg)
@@ -143,13 +139,8 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case editorFinishedMsg:
 		updateCmd = m.applyEditorFinished(msg)
 
-	// Has to handle zoxide messages separately as they could be generated via
-	// zoxide update commands, or batched commands from textinput
-	// Cannot do it like processbar messages
-	case zoxideui.UpdateMsg:
-		slog.Debug("Got ModelUpdate message", "id", msg.GetReqID())
-		gotModelUpdateMsg = true
-		updateCmd = msg.Apply(&m.zoxideModal)
+	case jumpZoxideMsg:
+		m.applyJumpZoxide(msg)
 	case ModelUpdateMessage:
 		// TODO: Some of these updates messages should trigger filePanel state update
 		// For example a success message for delete operation
@@ -198,7 +189,7 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		refreshCmd = m.scheduleRefreshes(forcePreviewRender)
 	}
 
-	return m, tea.Batch(sidebarCmd, helpMenuCmd, inputCmd, updateCmd, panelCmd, refreshCmd, heartbeatCmd)
+	return m, tea.Batch(helpMenuCmd, inputCmd, updateCmd, panelCmd, refreshCmd, heartbeatCmd)
 }
 
 // handleOwnMsg handles the messages that update one thing and need no
@@ -247,6 +238,8 @@ func (m *model) handleOwnMsg(msg tea.Msg) (tea.Cmd, bool) {
 
 	case shelfSentMsg:
 		m.applyShelfSent(msg)
+	case resumeEndedMsg:
+		m.applyResumeEnded(msg)
 		return nil, true
 
 	case claudeMovedMsg:
@@ -415,23 +408,6 @@ func restoreMouseReporting() tea.Msg {
 // everything).
 func (m *model) updateModelStateAfterMsgForType(msg tea.Msg) {
 	// Sidebar refresh is I/O-heavy on macOS (disk.Partitions + tmutil).
-	// Async recursive search msgs only touch the focused file panel's
-	// search stack — the sidebar's directory list cannot have changed as
-	// a side-effect of them, so skip the refresh on the fast path. This
-	// keeps AC-PERF-7 (Update <50ms) honest and lets AC-PERF-5's
-	// cache-hit ratio target be observable without being drowned out by
-	// the sidebar's per-tick overhead.
-	skipSidebarRefresh := false
-	switch msg.(type) {
-	case asyncRecursiveSearchMsg,
-		asyncRecursiveSearchPartialMsg,
-		search.AsyncSearchCompleteMsg,
-		search.AsyncSearchPartialMsg:
-		skipSidebarRefresh = true
-	}
-	if !skipSidebarRefresh {
-		m.sidebarModel.UpdateDirectories()
-	}
 	m.getFilePanelItems()
 	// TODO: Move to utility
 	if m.focusPanel != metadataFocus {
@@ -497,10 +473,6 @@ func (m *model) requestFilePreviewRender(forcePreviewRender bool) tea.Cmd {
 }
 
 func (m *model) currentMetadataTargetPath() string {
-	if m.focusPanel == sidebarFocus {
-		return m.sidebarModel.GetCurrentDirectoryLocation()
-	}
-
 	selectedItem := m.getFocusedFilePanel().getSelectedItemPtr()
 	if selectedItem == nil {
 		return ""
@@ -528,7 +500,7 @@ func (m *model) getMetadataCmd() tea.Cmd {
 	}
 
 	selectedItem := m.getFocusedFilePanel().getSelectedItemPtr()
-	if m.focusPanel != sidebarFocus && selectedItem != nil && selectedItem.metaData != nil &&
+	if selectedItem != nil && selectedItem.metaData != nil &&
 		selectedItem.metaData.GetPath() == selectedItem.location {
 		m.fileMetaData.SetMetadata(*selectedItem.metaData)
 		return nil
@@ -540,9 +512,6 @@ func (m *model) getMetadataCmd() tea.Cmd {
 	// But need to implement it carefully if we do. Make sure cache is not unbounded
 	// Remove metadata from filepanel.elemets[] and have cache as source of truth.
 	// Have a TTL for expiry, or lister for file update events.
-	if m.focusPanel == sidebarFocus && m.fileMetaData.GetMetadata().GetPath() == targetPath {
-		return nil
-	}
 	if m.fileMetaData.IsBlank() {
 		m.fileMetaData.SetInfoMsg(icon.InOperation + icon.Space + "Loading metadata...")
 	}
@@ -571,12 +540,6 @@ func (m *model) getMetadataCmd() tea.Cmd {
 func (m *model) getGitStatusCmd() tea.Cmd {
 	panel := m.getFocusedFilePanel()
 	currentDir := panel.location
-
-	// Skip if sidebar is focused (show "not available")
-	if m.focusPanel == sidebarFocus {
-		m.sidebarModel.SetGitStatus(sidebar.GitStatusUnavailable())
-		return nil
-	}
 
 	// Skip if we already have status for this directory
 	currentStatus := m.sidebarModel.GetGitStatus()
@@ -609,7 +572,7 @@ func (m *model) handleWindowResize(msg tea.WindowSizeMsg) {
 	m.setHelpMenuSize()
 	m.setDetailsSize()
 	m.setPromptModelSize()
-	m.setZoxideModelSize()
+	m.setJumpSize()
 	m.setStatusLineModelSize()
 
 	if m.fileModel.maxFilePanel >= common.FilePanelMax {
@@ -725,12 +688,6 @@ func (m *model) setPromptModelSize() {
 	m.promptModal.SetWidth(m.fullWidth / 2) //nolint:mnd // modal uses half width for layout
 }
 
-func (m *model) setZoxideModelSize() {
-	// The s popup's size: its list area, and its width with the frame.
-	m.zoxideModal.SetMaxHeight(m.sidebarListHeight())
-	m.zoxideModal.SetWidth(m.popupWidth() + common.BorderPadding)
-}
-
 func (m *model) setStatusLineModelSize() {
 	m.statusLineModel.SetWidth(m.fullWidth)
 	m.statusLineModel.SetEnabled(common.Config.ShowStatusLine)
@@ -748,9 +705,6 @@ func (m *model) handleKeyInput(msg tea.KeyMsg) tea.Cmd {
 	if !m.isFilePanelCountJumpEligible() {
 		m.clearFilePanelJumpCount()
 	}
-	if !m.isSidebarCountJumpEligible() {
-		m.clearSidebarJumpCount()
-	}
 
 	var cmd tea.Cmd
 	cdOnQuit := common.Config.CdOnQuit
@@ -761,9 +715,8 @@ func (m *model) handleKeyInput(msg tea.KeyMsg) tea.Cmd {
 		// Ignore keypress. It will be handled in Update call via
 		// updateFilePanelState
 		// TODO: Convert that to async via tea.Cmd
-	case m.zoxideModal.IsOpen():
-		// Ignore keypress. It will be handled in Update call via
-		// updateFilePanelState
+	case m.jumpUI.IsOpen():
+		cmd = m.jumpKey(msg)
 
 	// Handles all warn models except the warn model for confirming to quit
 	case m.notifyModel.IsOpen():
@@ -779,10 +732,6 @@ func (m *model) handleKeyInput(msg tea.KeyMsg) tea.Cmd {
 	// If renaming a object
 	case m.fileModel.renaming:
 		cmd = m.renamingKey(msg.String())
-	case m.sidebarModel.IsRenaming():
-		m.sidebarRenamingKey(msg.String())
-	case m.sidebarModel.IsMovingPinned():
-		m.sidebarMoveKey(msg)
 	case m.escLeavesSelectMode(msg.String()):
 		m.getFocusedFilePanel().changeFilePanelMode() // Exit selection mode
 	// If search bar is open
@@ -797,8 +746,6 @@ func (m *model) handleKeyInput(msg tea.KeyMsg) tea.Cmd {
 	// If search layers are active (but search bar not focused), allow ESC to pop layers
 	case !m.fileModel.filePanels[m.filePanelFocusIndex].searchStack.IsEmpty() && slices.Contains(common.Hotkeys.CancelTyping, msg.String()):
 		m.cancelSearch()
-	case m.sidebarModel.SearchBarFocused():
-		cmd = m.sidebarModel.HandleSearchBarKey(msg.String())
 	// If help menu is open
 	case m.helpMenu.open:
 		m.helpMenuKey(msg.String())
@@ -834,7 +781,7 @@ func (m *model) escLeavesSelectMode(key string) bool {
 // regularKey handles msg in the regular state of the application: a count
 // typed before a jump, or the general hotkeys.
 func (m *model) regularKey(msg tea.KeyMsg) tea.Cmd {
-	if m.handleFilePanelJumpCountInput(msg) || m.handleSidebarJumpCountInput(msg) {
+	if m.handleFilePanelJumpCountInput(msg) {
 		return nil
 	}
 	if !slices.Contains(common.Hotkeys.ListBottom, msg.String()) &&
@@ -905,12 +852,6 @@ func (m *model) updateFilePanelsState(msg tea.Msg) tea.Cmd {
 		cwdLocation := m.fileModel.filePanels[m.filePanelFocusIndex].location
 		action, cmd = m.promptModal.HandleUpdate(msg, cwdLocation)
 		m.applyPromptModalAction(action)
-	case m.zoxideModal.IsOpen():
-		action, cmd = m.zoxideModal.HandleUpdate(msg)
-		m.applyZoxideModalAction(action)
-		if _, none := action.(common.NoAction); !m.zoxideModal.IsOpen() && none {
-			cmd = tea.Batch(cmd, m.popupClosed())
-		}
 	}
 
 	// TODO : This is like duct taping a bigger problem
@@ -967,10 +908,6 @@ func (m *model) logAndExecuteAction(action common.ModelAction) (string, error) {
 }
 
 // Apply the Action for zoxide modal (no result notifications needed)
-func (m *model) applyZoxideModalAction(action common.ModelAction) {
-	_, _ = m.logAndExecuteAction(action)
-}
-
 // TODO : Move them around to appropriate places
 func (m *model) applyShellCommandAction(shellCommand string) {
 	focusPanelDir := m.fileModel.filePanels[m.filePanelFocusIndex].location
@@ -1123,12 +1060,6 @@ func (m *model) View() string {
 }
 
 func (m *model) updateRenderForOverlay(finalRender string) string {
-	// The sidebar popup (s) sits over the file panels while it has the
-	// keyboard.
-	if m.focusPanel == sidebarFocus {
-		x, y := m.popupXY()
-		finalRender = stringfunction.PlaceOverlay(x, y, m.sidebarPopupRender(), finalRender)
-	}
 	// A toast sits in the top right corner, under any modal.
 	if t, ok := m.visibleClaudeToast(); ok {
 		toast := m.renderClaudeToast(t)
@@ -1150,9 +1081,11 @@ func (m *model) updateRenderForOverlay(finalRender string) string {
 		return stringfunction.PlaceOverlay(overlayX, overlayY, promptModal, finalRender)
 	}
 
-	if m.zoxideModal.IsOpen() {
-		x, y := m.popupXY()
-		return stringfunction.PlaceOverlay(x, y, m.zoxideModalRender(), finalRender)
+	if m.jumpUI.IsOpen() {
+		popup := m.jumpUI.Render()
+		x := max(0, (m.fullWidth-lipgloss.Width(popup))/common.CenterDivisor)
+		y := max(0, (m.fullHeight-lipgloss.Height(popup))/common.CenterDivisor)
+		return stringfunction.PlaceOverlay(x, y, popup, finalRender)
 	}
 
 	panel := m.fileModel.filePanels[m.filePanelFocusIndex]

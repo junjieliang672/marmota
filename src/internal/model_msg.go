@@ -275,12 +275,10 @@ func (msg MetadataMsg) ApplyToModel(m *model) tea.Cmd {
 		return nil
 	}
 	m.fileMetaData.SetMetadata(msg.meta)
-	if m.focusPanel != sidebarFocus {
-		selectedItem := m.getFocusedFilePanel().getSelectedItemPtr()
-		if selectedItem != nil && selectedItem.location == msg.meta.GetPath() {
-			meta := msg.meta
-			selectedItem.metaData = &meta
-		}
+	selectedItem := m.getFocusedFilePanel().getSelectedItemPtr()
+	if selectedItem != nil && selectedItem.location == msg.meta.GetPath() {
+		meta := msg.meta
+		selectedItem.metaData = &meta
 	}
 	return nil
 }

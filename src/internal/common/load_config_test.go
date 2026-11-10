@@ -23,13 +23,11 @@ func TestFillMissingHotkeysFromDefaults_MigratesMetadataMoveCollision(t *testing
 
 	Hotkeys = HotkeysType{
 		FocusOnMetaData: []string{"m", ""},
-		MovePinnedItem:  []string{"m", ""},
 	}
 
 	fillMissingHotkeysFromDefaults()
 
 	assert.Equal(t, "M", Hotkeys.FocusOnMetaData[0])
-	assert.Equal(t, "m", Hotkeys.MovePinnedItem[0])
 }
 
 // The Ask bar's key moved from ctrl+k to alt+k: a file that still has the

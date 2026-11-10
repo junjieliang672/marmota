@@ -18,9 +18,9 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 
+	jumpui "github.com/junjieliang672/marmota/src/internal/ui/jump"
 	"github.com/junjieliang672/marmota/src/internal/ui/preview"
 	"github.com/junjieliang672/marmota/src/internal/ui/prompt"
-	zoxideui "github.com/junjieliang672/marmota/src/internal/ui/zoxide"
 	"github.com/junjieliang672/marmota/src/pkg/sysstat"
 )
 
@@ -46,7 +46,6 @@ const (
 // Constants for panel with no focus
 const (
 	nonePanelFocus focusPanelType = iota
-	sidebarFocus
 	metadataFocus
 	// dockSessionsFocus is the Sessions box at the foot (!).
 	dockSessionsFocus
@@ -87,7 +86,10 @@ type model struct {
 	typingModal typingModal
 	helpMenu    helpMenuModal
 	promptModal prompt.Model
-	zoxideModal zoxideui.Model
+	// jumpUI is the s popup; jump its side of the model.
+	jumpUI jumpui.Model
+	jump   jumpState
+	resume resumeState
 	// sessions is what the dock shows of Claude sessions: the Sessions box's
 	// list, the Ask box's composer, the selected session's conversation.
 	sessions sessionsState
@@ -150,7 +152,6 @@ type model struct {
 
 	// Pending numeric prefix for file-panel `[count]G` navigation.
 	filePanelJumpCount string
-	sidebarJumpCount   string
 
 	// Asks the input method to pass keys through as plain ASCII while
 	// superfile is in hotkey mode. See src/pkg/ime and typing_state.go.

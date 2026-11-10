@@ -125,7 +125,7 @@ func TestFilePanelNavigation(t *testing.T) {
 				TeaUpdate(m, utils.TeaRuneKeyMsg(s))
 			}
 			if tt.cdTo != "" {
-				m.applyZoxideModalAction(common.CDCurrentPanelAction{Location: tt.cdTo})
+				_, _ = m.logAndExecuteAction(common.CDCurrentPanelAction{Location: tt.cdTo})
 			}
 
 			assert.Equal(t, tt.resultDir, m.getFocusedFilePanel().location)
@@ -136,7 +136,7 @@ func TestFilePanelNavigation(t *testing.T) {
 
 			// Go back to original directory
 
-			m.applyZoxideModalAction(common.CDCurrentPanelAction{Location: tt.startDir})
+			_, _ = m.logAndExecuteAction(common.CDCurrentPanelAction{Location: tt.startDir})
 
 			// Make sure we have original curson and render
 			assert.Equal(t, tt.startCursor, m.getFocusedFilePanel().cursor)

@@ -131,8 +131,6 @@ func (f focusPanelType) String() string {
 	switch f {
 	case nonePanelFocus:
 		return "nonePanelFocus"
-	case sidebarFocus:
-		return "sidebarFocus"
 	case metadataFocus:
 		return "metadataFocus"
 	case dockSessionsFocus:

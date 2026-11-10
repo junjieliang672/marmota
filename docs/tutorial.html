@@ -232,7 +232,7 @@ y</pre>
     <div class="case">
       <h3>Jump to a project and open a file</h3>
       <ol class="steps">
-        <li><kbd>z</kbd>, type part of the folder's name, <kbd>enter</kbd>. (<kbd>ctrl+n</kbd> opens it in a new panel instead.)</li>
+        <li><kbd>s</kbd>, type part of the folder's name, <kbd>enter</kbd>: the first match (marked ↵). (<kbd>ctrl+n</kbd> opens it in a new panel instead.)</li>
         <li><kbd>/</kbd> and a few letters filter the folder; <kbd>esc</kbd> clears it.</li>
         <li><kbd>e</kbd> opens the file in your editor; <kbd>E</kbd> in your second one.</li>
       </ol>
@@ -247,10 +247,6 @@ y</pre>
       </ol>
     </div>
   </div>
-  <figure class="shot wide">
-    <button type="button" aria-label="Show full size"><img src="shots/browse-zoxide.webp" width="1368" height="839" alt="The z popup over the panels: the query ti, and the folders tidepool and tides with how often each was visited." loading="lazy"></button>
-    <figcaption><kbd>z</kbd>, then <code>ti</code>: the folders you visit most whose names match, with how often you went there. <kbd>enter</kbd> goes to the picked one.</figcaption>
-  </figure>
   <div class="cases">
     <div class="case">
       <h3>Find a file deep in a folder</h3>
@@ -276,15 +272,11 @@ y</pre>
     <div class="case">
       <h3>Keep your places, and leave from one</h3>
       <ol class="steps">
-        <li><kbd>t</kbd> pins the folder under the cursor; <kbd>s</kbd> opens the popup with pinned folders and recent files.</li>
+        <li><kbd>t</kbd> pins the folder under the cursor. <kbd>s</kbd> lists your pins, sessions, the folders you visit most and the files you edited lately; <kbd>↓</kbd> picks one, and <kbd>t</kbd>, <kbd>r</kbd>, <kbd>p</kbd> act on it as they do in a panel.</li>
         <li><kbd>Q</kbd> quits and leaves your shell in the folder you were in.</li>
       </ol>
     </div>
   </div>
-  <figure class="shot wide">
-    <button type="button" aria-label="Show full size"><img src="shots/browse-sidebar.webp" width="1368" height="839" alt="The s popup: three pinned folders, two recent files, and the path enter goes to." loading="lazy"></button>
-    <figcaption><kbd>s</kbd>: your pinned folders and recent files. The line at the bottom shows the path <kbd>enter</kbd> goes to.</figcaption>
-  </figure>
 </section>
 
 <section class="flow" id="one-agent" aria-labelledby="one-h">

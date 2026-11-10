@@ -25,7 +25,7 @@ func (m *model) startingSession(st *askStart) (claudesession.Session, bool) {
 	if st == nil || st.listed || st.paneID == 0 {
 		return claudesession.Session{}, false
 	}
-	if st.codex {
+	if st.codex && !st.resumed {
 		if _, found := m.findCodexStart(st); found {
 			return claudesession.Session{}, false
 		}

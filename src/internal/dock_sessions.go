@@ -275,17 +275,12 @@ func (m *model) dockSessionsKey(msg tea.KeyMsg) tea.Cmd {
 		m.withSelectedSession(m.copySessionFolder)
 	case slices.Contains(common.Hotkeys.SendToShelf, key):
 		return m.sendSessionFilesToShelf()
-	case slices.Contains(common.Hotkeys.FocusOnSidebar, key):
-		// The s and z popups go to folders: they act on the files. Closed
-		// with esc, they give the keyboard back here.
-		m.leaveDockSessions()
-		m.focusOnSideBar()
-		m.dock.popupFrom = true
-		return nil
-	case slices.Contains(common.Hotkeys.OpenZoxide, key):
+	case slices.Contains(common.Hotkeys.GoTo, key):
+		// The s popup goes to folders, which acts on the files. Closed with
+		// esc, it gives the keyboard back here.
 		m.leaveDockSessions()
 		m.dock.popupFrom = true
-		return m.zoxideModal.Open()
+		return m.openJump()
 	}
 	if list.SelectedID() != prev {
 		m.sessions.scroll = 0
@@ -484,7 +479,7 @@ func (m *model) dockStatusLine() string {
 		{Key: firstKey(common.Hotkeys.SessionRename), Description: "rename"},
 		{Key: firstKey(common.Hotkeys.SessionFork), Description: "fork"},
 		{Key: firstKey(common.Hotkeys.SessionStop), Description: "stop"},
-		{Key: firstKey(common.Hotkeys.FocusOnSidebar) + "/" + firstKey(common.Hotkeys.OpenZoxide), Description: "go"},
+		{Key: firstKey(common.Hotkeys.GoTo), Description: "go to"},
 		{Key: firstKey(common.Hotkeys.OpenHelpMenu), Description: "help"},
 	}
 	switch {

@@ -28,10 +28,8 @@ func (m *model) isTextInputActive() bool {
 
 	if m.typingModal.open || // create a new file or directory
 		m.promptModal.IsOpen() || // SPF or shell prompt
-		m.zoxideModal.IsOpen() || // zoxide query
+		m.jumpUI.IsOpen() && (!m.jumpUI.Picking() || m.jumpUI.Renaming()) || // the s popup's search or rename
 		m.fileModel.renaming || // file panel rename
-		m.sidebarModel.IsRenaming() || // pinned directory rename
-		m.sidebarModel.SearchBarFocused() || // sidebar search
 		m.sessionsShown() && m.sessions.list.IsRenaming() || // session rename
 		m.sessionsShown() && m.sessions.focus == sessionsFocusAnswer || // typing an answer
 		m.focusPanel == dockAskFocus { // the Ask box in the dock
@@ -57,7 +55,7 @@ func (m *model) isBlockingModalOpen() bool {
 	if m.firstUse ||
 		m.notifyModel.IsOpen() ||
 		m.helpMenu.open ||
-		m.sidebarModel.IsMovingPinned() {
+		m.jumpUI.IsOpen() && m.jumpUI.Picking() && !m.jumpUI.Renaming() { // the s popup's item keys
 		return true
 	}
 

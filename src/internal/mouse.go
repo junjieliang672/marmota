@@ -145,6 +145,7 @@ func (m *model) scrollFilePreview(lines, cols int) tea.Cmd {
 // nothing then.
 func (m *model) overlayOpen() bool {
 	panel := m.getFocusedFilePanel()
-	return m.helpMenu.open || m.promptModal.IsOpen() || m.zoxideModal.IsOpen() || panel.sortOptions.open ||
+	return m.helpMenu.open || m.promptModal.IsOpen() || m.jumpUI.IsOpen() ||
+		panel.sortOptions.open ||
 		panel.iCloudFilter.open || m.firstUse || m.typingModal.open || m.notifyModel.IsOpen()
 }

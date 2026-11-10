@@ -1,17 +1,7 @@
 # sidebar package
-This is for the sidebar UI, and for fetching and updating sidebar directories
 
-# To-dos
-- Add missing unit tests
-- Separate out implementation of file I/O operations. (Disk listing, Reading and Updating pinned.json)
-  This package should only be concerned with UI/UX.
-- Implementing a proper state transitioning for the sidebar's different modes (normal, search, rename)
-- Some methods could be made more pure by reducing side effects
-
-# Coverage
-
-```bash
-cd /path/to/ui/sidebar
-go test -cover
-```
-Current coverage is 29.3%.
+What the sidebar popup used to list, without the popup: the pinned folders
+and files (`pinned.go`), the files edited lately (`recent_edits.go`), and the
+git status of the focused panel's folder (`git_status.go`). The s popup
+(`src/internal/ui/jump`) lists the pins and recent files through
+`entries.go`; the file rows and the Details box show the git status.

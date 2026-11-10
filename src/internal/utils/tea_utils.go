@@ -64,6 +64,10 @@ func TeaKeyMsg(hotkey string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeyLeft}
 	case "right":
 		return tea.KeyMsg{Type: tea.KeyRight}
+	case "shift+up":
+		return tea.KeyMsg{Type: tea.KeyShiftUp}
+	case "shift+down":
+		return tea.KeyMsg{Type: tea.KeyShiftDown}
 	case "home":
 		return tea.KeyMsg{Type: tea.KeyHome}
 	case "end":

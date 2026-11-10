@@ -846,19 +846,6 @@ func (m *model) openFileWithSecondEditor() tea.Cmd {
 	})
 }
 
-func (m *model) openSidebarRecentFileWithEditor() tea.Cmd {
-	if !m.sidebarModel.IsCurrentItemRecentEdit() {
-		return nil
-	}
-
-	location := m.sidebarModel.GetCurrentDirectoryLocation()
-	if location == "" {
-		return nil
-	}
-
-	return m.openPathWithEditor(location, true)
-}
-
 // Open directory with default editor
 func (m *model) openDirectoryWithEditor() tea.Cmd {
 	if variable.ChooserFile != "" {
@@ -1007,11 +994,6 @@ func (m *model) openPathsWithEditor(paths []string, recordRecent bool) tea.Cmd {
 // Copy file path
 // TODO: This is also an IO operations, do it via tea.Cmd
 func (m *model) copyPath() {
-	if m.focusPanel == sidebarFocus {
-		m.copySidebarPath()
-		return
-	}
-
 	panel := &m.fileModel.filePanels[m.filePanelFocusIndex]
 
 	if len(panel.element) == 0 {
@@ -1032,28 +1014,7 @@ func (m *model) copyPath() {
 	}
 }
 
-func (m *model) copySidebarPath() {
-	pathToCopy := m.sidebarModel.GetCurrentDirectoryLocation()
-	if pathToCopy == "" {
-		return
-	}
-	if err := writeClipboard(pathToCopy); err != nil {
-		slog.Error("Error while copy sidebar path", "error", err)
-	}
-}
-
 func (m *model) copyParentPath() {
-	if m.focusPanel == sidebarFocus {
-		location := m.sidebarModel.GetCurrentDirectoryLocation()
-		if location == "" {
-			return
-		}
-		if err := writeClipboard(filepath.Dir(location)); err != nil {
-			slog.Error("Error while copy sidebar parent path", "error", err)
-		}
-		return
-	}
-
 	m.copyPWD()
 }
 

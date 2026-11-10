@@ -359,7 +359,7 @@ func defaultHotkeys() []Hotkey {
 		{firstKey(common.Hotkeys.JumpToUnreadSession), "sessions"},
 		{firstKey(common.Hotkeys.OpenAgentPrompt), "agent"},
 		{firstKey(common.Hotkeys.SearchBar), "filter"},
-		{firstKey(common.Hotkeys.OpenZoxide), "zoxide"},
+		{firstKey(common.Hotkeys.GoTo), "go to"},
 		{firstKey(common.Hotkeys.OpenHelpMenu), "help"},
 		{firstKey(common.Hotkeys.Quit), "quit"},
 	}

@@ -260,6 +260,6 @@ func TransparentAllBackgroundColor() {
 	ModalBGColor = lipgloss.Color(TransparentBackgroundColor)
 }
 
-// SidebarWidth is how wide the inside of the sidebar popup (s) is. There is
-// no sidebar column: the popup sets it to fit the screen when it is drawn.
-var SidebarWidth = 40 //nolint:gochecknoglobals // set as the popup is drawn
+// renameInputWidth is how wide a pin's rename field starts; the s popup
+// widens it to fit.
+const renameInputWidth = 40
