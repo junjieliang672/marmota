@@ -111,7 +111,13 @@ def main() -> int:
         """The titles in the Sessions box, read with the keyboard in it."""
         if not in_sessions_box(spf):
             type_keys(spf, "!")
-            wait_for("the Sessions box", lambda: in_sessions_box(spf))
+            try:
+                wait_for("the Sessions box", lambda: in_sessions_box(spf), timeout=8)
+            except AssertionError:
+                # A Marmota that has just started may drop the first key; one
+                # that hangs fails this second time.
+                type_keys(spf, "!")
+                wait_for("the Sessions box", lambda: in_sessions_box(spf))
         titles = {title.split()[0] for _, title, _ in dock_rows(spf)}
         type_keys(spf, "\x1b")
         wait_for("the files", lambda: not in_sessions_box(spf))
