@@ -141,6 +141,11 @@ func (c *Client) pasteBuffer(paneID string, b []byte, bracketed bool) error {
 	if len(b) == 0 {
 		return nil
 	}
+	// What is typed reaches the program even in copy mode, but the pane
+	// wouldn't show it, or anything after.
+	if err := c.LeaveCopyMode(paneID); err != nil {
+		return err
+	}
 	c.mu.Lock()
 	c.shellN++
 	buffer := "marmota-send-" + strconv.Itoa(c.shellN)
@@ -187,6 +192,14 @@ func bufferWord(b []byte) string {
 	}
 	sb.WriteByte('"')
 	return sb.String()
+}
+
+// LeaveCopyMode brings a pane scrolled back (in copy mode) back to its
+// program, so it shows what the program draws again.
+func (c *Client) LeaveCopyMode(paneID string) error {
+	_, err := c.Command("if-shell -F -t " + Quote(paneID) + " '#{pane_in_mode}' " +
+		Quote("send-keys -t "+Quote(paneID)+" -X cancel"))
+	return err
 }
 
 // AttachCommand is the shell command, for this computer's pane, that shows a

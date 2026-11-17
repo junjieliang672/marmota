@@ -275,6 +275,10 @@ func (m *model) showTmuxPane(id int, title string, focus bool) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// Scrolled back, it would show an old screen and take no keys.
+	if err := c.LeaveCopyMode(ref.pane); err != nil {
+		slog.Debug("Could not leave copy mode", "pane", ref.pane, "error", err)
+	}
 	self, err := currentWeztermPaneID()
 	if err != nil {
 		return "", err

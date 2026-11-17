@@ -63,13 +63,19 @@ set -g prefix2 None
 unbind-key -a
 unbind-key -a -T copy-mode
 unbind-key -a -T copy-mode-vi
-# The wheel scrolls back through what the session printed.
-set -g mouse on
-bind-key -n WheelUpPane if-shell -F "#{||:#{alternate_on},#{mouse_any_flag}}" "send-keys -M" "copy-mode -e; send-keys -M"
-bind-key -T copy-mode WheelUpPane send-keys -X -N 3 scroll-up
-bind-key -T copy-mode WheelDownPane send-keys -X -N 3 scroll-down
-bind-key -T copy-mode q send-keys -X cancel
-bind-key -T copy-mode Escape send-keys -X cancel
+# The mouse is WezTerm's: dragging selects and copies, and the wheel scrolls
+# WezTerm's own scrollback, as in a pane without tmux. The pane beside
+# Marmota draws on WezTerm's main screen, so what scrolls off its top goes
+# into that scrollback.
+set -g mouse off
+set -as terminal-overrides ",*:smcup@:rmcup@"
+# Should a pane end up in copy mode, any key returns to the session, and a
+# line on top says so meanwhile: a pane in copy mode shows no new output
+# and takes no typing.
+bind-key -T copy-mode Any send-keys -X cancel
+set -g pane-border-status off
+set -g pane-border-format "#[fg=yellow] scrolled back · press any key to return "
+set-hook -g pane-mode-changed 'if-shell -F "#{pane_in_mode}" "set-option -w pane-border-status top" "set-option -w pane-border-status off"'
 set -g history-limit 100000
 set -sg escape-time 0
 set -g focus-events on
