@@ -42,8 +42,9 @@ var (
 	claudeSessionsAutoRefresh = true //nolint:gochecknoglobals // test seam
 	// stopProcess asks a session's process to exit.
 	stopProcess = utils.TerminateProcess //nolint:gochecknoglobals // test seam
-	// weztermSendText types text into a pane. It runs wezterm directly, not
-	// through a shell, so paths with quotes or spaces arrive unchanged.
+	// weztermSendText types text into a pane, not as a bracketed paste (see
+	// sessionhost.Client.Paste). It runs wezterm directly, not through a
+	// shell, so paths with quotes or spaces arrive unchanged.
 	weztermSendText = func(paneID int, text string) error { //nolint:gochecknoglobals // test seam
 		if isTmuxPane(paneID) {
 			return tmuxSendText(paneID, text)
@@ -51,7 +52,7 @@ var (
 		ctx, cancel := context.WithTimeout(context.Background(), claudeSendTextTimeout)
 		defer cancel()
 		//nolint:gosec // fixed binary and numeric pane id; text is an argument, never run by a shell
-		return exec.CommandContext(ctx, "wezterm", "cli", "send-text", "--pane-id",
+		return exec.CommandContext(ctx, "wezterm", "cli", "send-text", "--no-paste", "--pane-id",
 			strconv.Itoa(paneID), "--", text).Run()
 	}
 )

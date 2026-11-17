@@ -113,7 +113,10 @@ def main() -> int:
         "HOME": str(work / "home"),
         "TERM": "xterm-256color",
     }
-    env_args = ["env", *[f"{k}={v}" for k, v in env.items()]]
+    # Run from a session reached over ssh, or in tmux, Marmota would start
+    # its tmux servers through launchd, as on a Mac it was reached at.
+    env_args = ["env", "-u", "SSH_CONNECTION", "-u", "TMUX", "-u", "TMUX_PANE",
+                *[f"{k}={v}" for k, v in env.items()]]
 
     def spawn(*command: str) -> int:
         return int(subprocess.run(
@@ -268,7 +271,7 @@ def main() -> int:
         on = f"env MARMOTA_TMUX_SOCKET={remote_socket} /bin/sh -c"
 
         def y(*a: str) -> str:
-            return subprocess.run(["env", *[f"{k}={v}" for k, v in env.items()], new, "session", *a],
+            return subprocess.run([*env_args, new, "session", *a],
                                   check=True, capture_output=True, text=True, cwd=project).stdout
 
         started_out = y("start", "--on", on, "--cwd", str(project), "--", "from far away")

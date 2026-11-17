@@ -193,6 +193,25 @@ func TestBytesReachTheProgramAsTheyAre(t *testing.T) {
 	assert.Equal(t, sent[:32], string(got))
 }
 
+func TestTextIsTypedNotPasted(t *testing.T) {
+	c := localClient(t)
+	out := t.TempDir() + "/got"
+	// It asks for bracketed paste, as Claude Code does, and reads raw.
+	w, err := c.Start(NameFor(ClaudePrefix, "typed"), t.TempDir(),
+		`printf '\033[?2004h'; stty raw -echo; head -c 11 > `+out+"; sleep 30")
+	require.NoError(t, err)
+	time.Sleep(300 * time.Millisecond)
+	require.NoError(t, c.Paste(w.PaneID, "do it\nnow!!"))
+	waitFor(t, "the text", func() bool {
+		got, _ := os.ReadFile(out)
+		return len(got) >= 11
+	})
+	got, _ := os.ReadFile(out)
+	// Claude Code would wrap a paste in <pasted_content>, which Claude
+	// doesn't follow as the person's own words.
+	assert.Equal(t, "do it\nnow!!", string(got))
+}
+
 func TestAPaneNeverStaysInCopyMode(t *testing.T) {
 	c := localClient(t)
 	w, err := c.Start(NameFor(ClaudePrefix, "cm"), t.TempDir(),

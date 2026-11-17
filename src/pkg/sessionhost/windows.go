@@ -132,7 +132,7 @@ func (c *Client) SendBytes(paneID string, b []byte) error {
 		if part.key != "" {
 			_, err = c.Command("send-keys -t " + Quote(paneID) + " " + part.key)
 		} else {
-			err = c.pasteBuffer(paneID, part.text, false)
+			err = c.pasteBuffer(paneID, part.text)
 		}
 		if err != nil {
 			return err
@@ -207,15 +207,17 @@ func splitKeys(b []byte) []keyPart {
 	return parts
 }
 
-// Paste puts text into a pane as a paste, the way `wezterm cli send-text`
-// does: bracketed, when the program asked for that.
+// Paste puts text into a pane as if typed, newlines as line feeds, not as
+// a bracketed paste: Claude Code wraps a paste in <pasted_content>, and
+// Claude doesn't take what is inside as yours to follow.
 func (c *Client) Paste(paneID, text string) error {
-	return c.pasteBuffer(paneID, []byte(text), true)
+	return c.pasteBuffer(paneID, []byte(text))
 }
 
 // pasteBuffer writes b into a pane through a tmux buffer of its own, filled
-// in chunks and pasted at once. -r keeps newlines as they are.
-func (c *Client) pasteBuffer(paneID string, b []byte, bracketed bool) error {
+// in chunks and pasted at once, never bracketed. -r keeps newlines as they
+// are.
+func (c *Client) pasteBuffer(paneID string, b []byte) error {
 	if len(b) == 0 {
 		return nil
 	}
@@ -244,11 +246,7 @@ func (c *Client) pasteBuffer(paneID string, b []byte, bracketed bool) error {
 		}
 		b = b[n:]
 	}
-	flags := "-d -r"
-	if bracketed {
-		flags += " -p"
-	}
-	_, err := c.Command("paste-buffer " + flags + " -b " + buffer + " -t " + Quote(paneID))
+	_, err := c.Command("paste-buffer -d -r -b " + buffer + " -t " + Quote(paneID))
 	return err
 }
 
