@@ -285,7 +285,7 @@ func ApplySummary(s *Session, sum Summary) { applySummary(s, sum) }
 func applySummary(s *Session, sum Summary) {
 	switch {
 	case sum.CustomTitle != "":
-		s.Title = sum.CustomTitle
+		s.Title, s.Named = sum.CustomTitle, true
 	case sum.Title != "":
 		s.Title = sum.Title
 	case s.Title == "" && sum.LastPrompt != "":

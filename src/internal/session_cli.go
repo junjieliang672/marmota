@@ -110,7 +110,7 @@ func SessionList() ([]ListedSession, map[string]error) {
 	for _, s := range localTmuxSessions(tracker) {
 		add(s)
 	}
-	remote := listRemoteSessions(tracker)
+	remote := listRemoteSessions(tracker, nil)
 	for _, s := range remote.sessions {
 		add(s)
 	}

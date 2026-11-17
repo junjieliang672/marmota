@@ -46,7 +46,14 @@ type Session struct {
 	Agent Agent
 	// Host is the computer it runs on, as Marmota names it; "" for this one.
 	Host string
-	Name string // name from `claude agents`, accepted by `claude attach`
+	// Unreachable says why its computer can't be reached now, when it
+	// can't: the session is as it was when last seen.
+	Unreachable string
+	// NeedsLogin is set when logging in to its computer would reach it.
+	NeedsLogin bool
+	// Named is set once it was given a name of its own (/rename).
+	Named bool
+	Name       string // name from `claude agents`, accepted by `claude attach`
 	// Title is the best human label: the AI title, else the last prompt,
 	// else the agents name, else the folder name.
 	Title string
@@ -107,7 +114,16 @@ func (s Session) UpdateMark() time.Time {
 }
 
 // DisplayTitle returns Title, or a sensible fallback when it is empty.
+// A session on another computer that wasn't given a name of its own says
+// which computer: "nova · Fix the login bug".
 func (s Session) DisplayTitle() string {
+	if s.Host != "" && !s.Named {
+		return s.Host + " · " + s.ownTitle()
+	}
+	return s.ownTitle()
+}
+
+func (s Session) ownTitle() string {
 	if t := strings.TrimSpace(s.Title); t != "" {
 		return t
 	}

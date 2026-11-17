@@ -146,6 +146,7 @@ func (m *model) claudeSessionsRefreshCmd() tea.Cmd {
 	tracker := m.claude.tracker
 	layoutGen := m.claude.layoutGen
 	remote := m.tmuxSessionsOn()
+	loggingIn := m.settleLoginPanes()
 	run := claudeSessionRunner
 	projects := claudeProjectsDir()
 	order := m.claudeSessionsOrder()
@@ -172,7 +173,7 @@ func (m *model) claudeSessionsRefreshCmd() tea.Cmd {
 		msg.codex = collectCodexSessions(codexsession.Options{Home: codexDir, Tracker: codexTracker,
 			Since: opts.Since, Folders: snap.Folders, Include: opts.Include})
 		if remote {
-			msg.remote = listRemoteSessions(tracker)
+			msg.remote = listRemoteSessions(tracker, loggingIn)
 		}
 		if os.Getenv("WEZTERM_PANE") != "" {
 			if listed, err := listWeztermPanes(folder); err == nil {
@@ -411,6 +412,9 @@ func (m *model) openClaudeSession(id string) {
 // or a new pane resuming it, in bypass mode, when it has ended. With focus
 // the keyboard moves into it as well.
 func (m *model) jumpToClaudeSession(s claudesession.Session, focus bool) (string, error) {
+	if s.Unreachable != "" {
+		return m.reachHost(s)
+	}
 	if s.IsCodex() {
 		return m.jumpToCodexSession(s, focus)
 	}

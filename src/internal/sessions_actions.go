@@ -246,6 +246,10 @@ func (m *model) renameClaudeSession(id, name string) tea.Cmd {
 	if name == s.DisplayTitle() {
 		return nil
 	}
+	if s.Unreachable != "" {
+		m.flashClaude("Can't reach " + s.Host + " to rename it: enter on its row reaches it")
+		return nil
+	}
 	if s.IsCodex() {
 		// Codex's server names it, as Codex's own rename does.
 		if name == "" {
@@ -334,7 +338,7 @@ func (m *model) setClaudeSessionTitle(id, name string) {
 	for _, list := range [][]claudesession.Session{m.claude.snapshot.Live, m.claude.snapshot.Past} {
 		for i := range list {
 			if list[i].ID == id {
-				list[i].Title = name
+				list[i].Title, list[i].Named = name, name != ""
 			}
 		}
 	}
@@ -343,6 +347,10 @@ func (m *model) setClaudeSessionTitle(id, name string) {
 
 // confirmStopClaudeSession asks before stopping a running session.
 func (m *model) confirmStopClaudeSession(s claudesession.Session) {
+	if s.Unreachable != "" {
+		m.flashClaude("Can't reach " + s.Host + " to stop it: enter on its row reaches it")
+		return
+	}
 	if !s.Live {
 		m.flashClaude(s.DisplayTitle() + " has already ended")
 		return

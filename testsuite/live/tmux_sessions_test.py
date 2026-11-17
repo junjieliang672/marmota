@@ -52,6 +52,23 @@ TEST_WORKSPACE = "spf-tmux-test"
 HIDDEN_WORKSPACE = "superfile-agents"
 
 
+def row_of_host(text: str, host: str, title: str) -> str | None:
+    """The Sessions box's row of a session on host. Its name is "host · title"
+    until it is renamed; a narrow box may cut the title short."""
+    for line in text.splitlines():
+        box = line.split("││", 1)[0]  # the Sessions box's part: the Ask box is on the same lines
+        if not box.startswith("│") or " cc " not in box:
+            continue  # not a session's row: the preview's title says the name too
+        if host + " · " in box and (title in box or title[:3] in box.split(host + " · ", 1)[1]):
+            return box
+    return None
+
+
+def title_after(row: str, host: str) -> str:
+    """The title in a row whose session's name is "host · title"."""
+    return row.split(host + " · ", 1)[1].split()[0]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--binary", required=True)
@@ -266,9 +283,8 @@ def main() -> int:
         assert "from far away" in y("read", remote_id[:8])
         type_keys(spf, "!")
         wait_for("the Sessions box", lambda: in_sessions_box(spf))
-        row = wait_for("the remote session's row", lambda: next(
-            (line for line in screen(spf).splitlines() if host in line), None))
-        remote_title = row.split(host, 1)[1].split()[0]
+        row = wait_for("the remote session's row", lambda: row_of_host(screen(spf), host, ""))
+        remote_title = title_after(row, host)
 
         def pick_remote() -> None:
             """Puts the Sessions box on the remote row by its number: the Ask box
@@ -277,11 +293,11 @@ def main() -> int:
             for key in number + "g":
                 type_keys(spf, key)
                 time.sleep(0.1)
-            wait_for("the remote session picked", lambda: f"→ {remote_title}" in screen(spf))
+            wait_for("the remote session picked",
+                     lambda: (row_of_host(screen(spf), host, remote_title) or "").startswith("│▌"))
 
         def row_of(title: str) -> str:
-            return wait_for(f"{title}'s row", lambda: next(
-                (line for line in screen(spf).splitlines() if host in line and title in line), None))
+            return wait_for(f"{title}'s row", lambda: row_of_host(screen(spf), host, title))
 
         pick_remote()
         type_keys(spf, "\r")
@@ -305,6 +321,101 @@ def main() -> int:
         print(f"ok   y session start --on started a session on {host}; it showed in the Sessions box with its "
               "computer's name; send and read reached it; enter showed it beside Marmota; x stopped it")
 
+        # 8. a computer that needs a login: its session stays, marked; enter
+        # logs in, in a pane below Marmota, and it is reached again
+        remote_socket2 = socket + "-remote2"
+        marker = work / "logged-in"
+        marker.touch()
+        gate = (f"[ -f {marker} ] || {{ echo 'Permission denied (live test)' >&2; exit 255; }}; "
+                f"export MARMOTA_TMUX_SOCKET={remote_socket2}; eval \"$1\"")
+        on2 = f"/bin/sh -c {shlex.quote(gate)} sh"
+        out2 = y("start", "--on", on2, "--cwd", str(project), "--", "behind a login")
+        host2 = out2.split(" on ")[1].split(" in ")[0]
+        remotes_file = iso / "state" / "marmota" / "remotes.json"
+        hosts = json.loads(remotes_file.read_text())
+        for h in hosts:
+            if h["name"] == host2:
+                h["login"] = ["touch", str(marker)]
+        remotes_file.write_text(json.dumps(hosts))
+        row2 = wait_for("its row", lambda: row_of_host(screen(spf), host2, ""))
+        title2 = title_after(row2, host2)
+
+        def screen_after(title: str) -> str:
+            """The line under a session's row: what it is doing."""
+            lines = screen(spf).splitlines()
+            for i, line in enumerate(lines):
+                box = line.split("││", 1)[0]
+                if box.startswith("│") and " cc " in box and host2 + " · " in box and title[:3] in box \
+                        and i + 1 < len(lines):
+                    return lines[i + 1].split("││", 1)[0]
+            return ""
+
+        # The connection drops, and the login has run out.
+        marker.unlink()
+        clients = subprocess.run(["tmux", "-L", remote_socket2, "list-clients", "-F",
+                                  "#{client_name} #{client_control_mode}"], capture_output=True, text=True).stdout
+        for line in clients.splitlines():
+            name, control = line.rsplit(" ", 1)
+            if control == "1":
+                subprocess.run(["tmux", "-L", remote_socket2, "detach-client", "-t", name], capture_output=True)
+        wait_for("its row to say it needs a login", lambda: "needs login" in screen_after(title2), timeout=30)
+        type_keys(spf, "!")
+        wait_for("the Sessions box", lambda: in_sessions_box(spf))
+        number2 = re.search(r"│\S?\s*(\d+) ", row_of_host(screen(spf), host2, title2)).group(1)
+        for key in number2 + "g":
+            type_keys(spf, key)
+            time.sleep(0.1)
+        wait_for("its row picked", lambda: (row_of_host(screen(spf), host2, title2) or "").startswith("│▌"))
+        type_keys(spf, "\r")
+        wait_for("the login to run", lambda: marker.exists())
+        wait_for("it reached again", lambda: "waiting for your next" in screen_after(title2), timeout=40)
+        type_keys(spf, "\x1b")
+        print(f"ok   {host2} needing a login kept its session in the list, marked; enter logged in in a pane, "
+              "and it was reached again")
+
+        # 9. Marmota restarts in its pane: the pane beside it that shows the
+        # other computer's session is taken back, not opened twice
+        spf3 = spawn("/bin/sh", "-c", f"{shlex.quote(new)}; {shlex.quote(new)}; sleep 600")
+        tab3 = pane_by_id(spf3)["tab_id"]
+        main_screen(spf3)
+        type_keys(spf3, "F")
+
+        def open_remote(pane: int) -> None:
+            type_keys(pane, "!")
+            try:
+                wait_for("the Sessions box", lambda: in_sessions_box(pane), timeout=8)
+            except AssertionError:
+                type_keys(pane, "!")
+                wait_for("the Sessions box", lambda: in_sessions_box(pane))
+            # Its computer has this one session: a narrow box cuts its title.
+            line = wait_for("the remote row", lambda: row_of_host(screen(pane), host2, ""))
+            number = re.search(r"│\S?\s*(\d+) ", line).group(1)
+            for key in number + "g":
+                type_keys(pane, key)
+                time.sleep(0.1)
+            wait_for("it picked", lambda: (row_of_host(screen(pane), host2, "") or "").startswith("│▌"))
+            type_keys(pane, "\r")
+
+        def beside(pane: int) -> list[int]:
+            return [p["pane_id"] for p in panes() if p["tab_id"] == tab3 and p["pane_id"] != pane]
+
+        open_remote(spf3)
+        first_viewer = wait_for("the remote session beside Marmota", lambda: beside(spf3))
+        type_keys(spf3, "\x1b")
+        wait_for("the files", lambda: not in_sessions_box(spf3))
+        type_keys(spf3, "q")
+        wait_for("Marmota to quit", lambda: "K:ask" not in screen(spf3))
+        main_screen(spf3)
+        type_keys(spf3, "F")
+        time.sleep(3)  # its first refresh reaches the other computer
+        open_remote(spf3)
+        time.sleep(3)
+        assert beside(spf3) == first_viewer, f"a second pane opened beside Marmota: {beside(spf3)} vs {first_viewer}"
+        type_keys(spf3, "\x1b")
+        subprocess.run(["tmux", "-L", remote_socket2, "kill-server"], capture_output=True)
+        print("ok   restarted in its pane, Marmota took back the pane beside it that shows the other computer's "
+              "session; enter didn't open a second one")
+
         after = client_state()
         assert after == (before_workspace, before_focus), f"the test changed your window: {after}"
         print("ok   your active workspace and focused pane are unchanged")
@@ -326,7 +437,8 @@ def main() -> int:
             subprocess.run(["tmux", "-L", socket + "-remote", "kill-server"], capture_output=True)
             # A killed server leaves its socket file behind.
             sockets = Path(os.environ.get("TMUX_TMPDIR", "/tmp")) / f"tmux-{os.getuid()}"
-            for name in (socket, socket + "-remote"):
+            subprocess.run(["tmux", "-L", socket + "-remote2", "kill-server"], capture_output=True)
+            for name in (socket, socket + "-remote", socket + "-remote2"):
                 (sockets / name).unlink(missing_ok=True)
             shutil.rmtree(work, ignore_errors=True)
 

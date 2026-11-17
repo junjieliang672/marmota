@@ -102,7 +102,9 @@ func (m *model) sessionsHere() string {
 func (m *model) sessionsGroups() ([]claudeSessionsGroup, string) {
 	var shown []claudesession.Session
 	for _, s := range m.claude.snapshot.Live {
-		if _, ok := m.weztermPaneForSession(s); ok {
+		// One whose computer can't be reached has no pane now: it shows as
+		// last seen.
+		if _, ok := m.weztermPaneForSession(s); ok || s.Unreachable != "" {
 			shown = append(shown, s)
 		}
 	}

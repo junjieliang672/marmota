@@ -129,7 +129,10 @@ func TestCodexSessionsJoinTheList(t *testing.T) {
 	assert.Regexp(t, `2 \S cc \S Tidy`, claudeRow, "cc: Claude Code")
 	remoteRow := ansi.Strip(strings.Join(m.dockRow(3, claudesession.Session{ID: "r", Title: "Sweep", Live: true,
 		Host: "nova"}, false, 40, now), "\n"))
-	assert.Regexp(t, `3 \S cc \S nova Sweep`, remoteRow, "another computer's session says which")
+	assert.Regexp(t, `3 \S cc \S nova · Sweep`, remoteRow, "another computer's session says which, in its name")
+	named := ansi.Strip(strings.Join(m.dockRow(4, claudesession.Session{ID: "n", Title: "eval", Live: true,
+		Host: "nova", Named: true}, false, 40, now), "\n"))
+	assert.Regexp(t, `4 \S cc \S eval`, named, "renamed, it is its name alone; the cloud says it is elsewhere")
 }
 
 // Choosing Codex's model in the Ask box starts a Codex session. Its id

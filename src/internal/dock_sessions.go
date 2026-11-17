@@ -402,6 +402,9 @@ func (m *model) dockRow(n int, s claudesession.Session, selected bool, width int
 	if selected {
 		titleStyle = titleStyle.Bold(true)
 	}
+	if s.Unreachable != "" { // as last seen: its computer can't be reached
+		titleStyle = titleStyle.Foreground(lipgloss.Color(common.Theme.FooterBorder))
+	}
 	if state == sessionsui.NeedsYou {
 		titleStyle = titleStyle.Foreground(sessionsui.StateColor(state))
 	}
@@ -429,6 +432,14 @@ func (m *model) dockRow(n int, s claudesession.Session, selected bool, width int
 
 // dockDoing is what a session is doing, in a few words.
 func (m *model) dockDoing(s claudesession.Session, state sessionsui.State) string {
+	switch {
+	case s.Unreachable == errLoggingIn.Error():
+		return "logging in to " + s.Host + "…"
+	case s.Unreachable != "" && s.NeedsLogin:
+		return "needs login · enter logs in"
+	case s.Unreachable != "":
+		return "can't reach " + s.Host + " · enter tries again"
+	}
 	switch state {
 	case sessionsui.NeedsYou:
 		return "asks: " + firstNonEmpty(s.PendingTool, s.WaitingFor, "a question")

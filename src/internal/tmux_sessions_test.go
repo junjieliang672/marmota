@@ -1,9 +1,11 @@
 package internal
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	variable "github.com/junjieliang672/marmota/src/config"
 	"github.com/junjieliang672/marmota/src/pkg/claudesession"
 	"github.com/junjieliang672/marmota/src/pkg/sessionhost"
 )
@@ -262,4 +265,39 @@ func TestARestartedMarmotaTakesBackThePaneBesideIt(t *testing.T) {
 	assert.Equal(t, 31, m.tmux.viewer, "the first pane attached to its view is taken back")
 	assert.Nil(t, wez.panes[32], "a second pane attached to it closes")
 	assert.NotNil(t, wez.panes[33], "a pane of the tab that shows no view stays")
+}
+
+func TestAComputerThatCantBeReachedKeepsItsSessionsAsLastSeen(t *testing.T) {
+	m := newClaudeTestModel(t)
+	file := variable.RemotesFile
+	variable.RemotesFile = filepath.Join(t.TempDir(), "remotes.json") //nolint:reassign // its own file
+	t.Cleanup(func() { variable.RemotesFile = file })                 //nolint:reassign // restored
+	require.NoError(t, saveRemoteHosts([]sessionhost.Host{{Name: "nova", SSH: "me@nova"}}))
+
+	seen := claudesession.Session{ID: "r1", Host: "nova", Title: "Sweep", Live: true,
+		Status: claudesession.StatusIdle, TTY: remoteTTY("nova", "%1")}
+	m.mergeRemoteSessions(remoteListing{sessions: []claudesession.Session{seen}, failed: map[string]error{}})
+	require.Len(t, m.claude.snapshot.Live, 1)
+
+	m.claude.snapshot.Live = nil // the next refresh
+	m.mergeRemoteSessions(remoteListing{failed: map[string]error{
+		"nova": &sessionhost.DialError{Output: "me@nova: Permission denied (publickey)."}}})
+	require.Len(t, m.claude.snapshot.Live, 1, "it stays, as last seen")
+	s := m.claude.snapshot.Live[0]
+	assert.Equal(t, "Sweep", s.Title)
+	assert.True(t, s.NeedsLogin)
+	assert.Contains(t, s.Unreachable, "Permission denied")
+	assert.Equal(t, "needs login · enter logs in", m.dockDoing(s, m.sessionState(s)))
+
+	m.dropSessionsOutsideMarmota()
+	assert.Len(t, m.claude.snapshot.Live, 1, "a session on another computer isn't taken for one outside Marmota")
+
+	_, err := m.sendAskTo(s, "hello")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "can't reach nova")
+
+	m.claude.snapshot.Live = nil
+	m.mergeRemoteSessions(remoteListing{failed: map[string]error{"nova": errors.New("network is unreachable")}})
+	assert.Equal(t, "can't reach nova · enter tries again", m.dockDoing(m.claude.snapshot.Live[0],
+		m.sessionState(m.claude.snapshot.Live[0])))
 }

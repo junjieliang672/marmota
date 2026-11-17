@@ -138,9 +138,13 @@ type remoteListing struct {
 // computer it remembers, copying the new part of each one's transcript.
 // Computers are asked one after another; one that can't be reached is left
 // out, and tried again later.
-func listRemoteSessions(tracker *claudesession.Tracker) remoteListing {
+func listRemoteSessions(tracker *claudesession.Tracker, skip map[string]bool) remoteListing {
 	out := remoteListing{failed: map[string]error{}}
 	for _, h := range loadRemoteHosts() {
+		if skip[h.Name] {
+			out.failed[h.Name] = errLoggingIn
+			continue
+		}
 		sessions, panes, err := listHostSessions(h.Name, tracker)
 		if err != nil {
 			out.failed[h.Name] = err
@@ -268,10 +272,32 @@ func writeMirror(path string, data []byte, fresh bool) error {
 	return f.Close()
 }
 
-// mergeRemoteSessions lists the other computers' sessions with this one's,
-// and says once when a computer can't be reached, and why.
+// errLoggingIn is why a computer isn't asked while you log in to it.
+var errLoggingIn = errors.New("logging in")
+
+// mergeRemoteSessions lists the other computers' sessions with this one's.
+// A computer that can't be reached keeps its sessions in the list as they
+// were last seen, marked with why; that is said once, as it happens.
 func (m *model) mergeRemoteSessions(r remoteListing) {
+	if m.remote.last == nil {
+		m.remote.last = map[string][]claudesession.Session{}
+	}
+	byHost := map[string][]claudesession.Session{}
+	for _, s := range r.sessions {
+		byHost[s.Host] = append(byHost[s.Host], s)
+	}
+	for _, h := range loadRemoteHosts() {
+		if _, failed := r.failed[h.Name]; !failed {
+			m.remote.last[h.Name] = byHost[h.Name]
+		}
+	}
 	m.claude.snapshot.Live = append(m.claude.snapshot.Live, r.sessions...)
+	for name, err := range r.failed {
+		for _, s := range m.remote.last[name] {
+			s.Unreachable, s.NeedsLogin = err.Error(), sessionhost.NeedsLogin(err) || errors.Is(err, errLoggingIn)
+			m.claude.snapshot.Live = append(m.claude.snapshot.Live, s)
+		}
+	}
 	// The panes of the last listing go: these take their place.
 	m.claude.panes = slices.DeleteFunc(m.claude.panes, func(p weztermPane) bool {
 		return strings.HasPrefix(p.TTYName, "remote:")
@@ -281,7 +307,7 @@ func (m *model) mergeRemoteSessions(r remoteListing) {
 		m.remote.failed = map[string]string{}
 	}
 	for name, err := range r.failed {
-		if m.remote.failed[name] != err.Error() {
+		if m.remote.failed[name] != err.Error() && !errors.Is(err, errLoggingIn) {
 			m.flashClaude(err.Error())
 			slog.Warn("A remote computer can't be reached", "host", name, "error", err)
 		}
@@ -298,4 +324,80 @@ func (m *model) mergeRemoteSessions(r remoteListing) {
 type remoteState struct {
 	// failed is why each computer that can't be reached can't, as last said.
 	failed map[string]string
+	// last is each computer's sessions as last listed, shown while it can't
+	// be reached.
+	last map[string][]claudesession.Session
+	// loginPanes are the panes where you log in to a computer, by its name:
+	// it isn't asked while one is open, and is asked at once after.
+	loginPanes map[string]int
+}
+
+// reachHost is enter on a session whose computer can't be reached: a pane
+// beside Marmota logs in to it, where ssh, or the company CLI, asks what it
+// asks; or, when logging in wouldn't help, it is asked again now.
+func (m *model) reachHost(s claudesession.Session) (string, error) {
+	h, ok := remoteHostNamed(s.Host)
+	if !ok {
+		return "", errors.New("Marmota no longer knows " + s.Host)
+	}
+	argv := h.LoginArgv()
+	if !s.NeedsLogin || len(argv) == 0 {
+		forgetHostFailure(s.Host)
+		return "Trying " + s.Host + " again", nil
+	}
+	if _, open := m.remote.loginPanes[s.Host]; open {
+		return "", errors.New("log in to " + s.Host + " in the pane beside Marmota")
+	}
+	self, err := currentWeztermPaneID()
+	if err != nil {
+		return "", err
+	}
+	words := make([]string, len(argv))
+	for i, a := range argv {
+		words[i] = shellQuote(a)
+	}
+	cwd := m.getFocusedFilePanel().location
+	pane, err := splitWeztermPane(cwd, fmt.Sprintf("wezterm cli split-pane --pane-id %d --bottom --percent 40 "+
+		"--cwd %q -- /bin/sh -c %s", self, cwd, shellQuote(strings.Join(words, " "))))
+	if err != nil {
+		return "", err
+	}
+	if err := activateWeztermPane(cwd, pane); err != nil {
+		slog.Debug("Could not focus the login pane", "error", err)
+	}
+	if m.remote.loginPanes == nil {
+		m.remote.loginPanes = map[string]int{}
+	}
+	m.remote.loginPanes[s.Host] = pane
+	return "Log in to " + s.Host + " in the pane below", nil
+}
+
+// settleLoginPanes forgets the login panes that have closed, and has their
+// computers asked at once. It returns the computers still logging in.
+func (m *model) settleLoginPanes() map[string]bool {
+	open := map[string]bool{}
+	if len(m.remote.loginPanes) == 0 {
+		return open
+	}
+	panes, err := listWeztermPanes(m.getFocusedFilePanel().location)
+	if err != nil {
+		return open
+	}
+	for host, id := range m.remote.loginPanes {
+		if slices.ContainsFunc(panes, func(p weztermPane) bool { return p.PaneID == id }) {
+			open[host] = true
+			continue
+		}
+		delete(m.remote.loginPanes, host)
+		forgetHostFailure(host)
+	}
+	return open
+}
+
+// forgetHostFailure has a computer that couldn't be reached asked at the
+// next chance, rather than after a while.
+func forgetHostFailure(name string) {
+	tmuxPanes.mu.Lock()
+	delete(tmuxPanes.failed, name)
+	tmuxPanes.mu.Unlock()
 }

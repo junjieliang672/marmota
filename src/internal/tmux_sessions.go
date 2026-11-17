@@ -371,25 +371,71 @@ func (m *model) tmuxViewerPane() (weztermPane, bool) {
 // this pane left showing tmux: the panes in its tab attached to its view.
 // Of two, one stays; the other closes, or both would show the same window.
 func (m *model) adoptTmuxViewer(self int, panes []weztermPane) {
-	if !useTmuxSessions() || !tmuxServerRunning() {
+	if !useTmuxSessions() {
 		return
 	}
-	c, err := localTmux()
-	if err != nil {
-		return
-	}
-	lines, err := c.Command("list-clients -t " + sessionhost.Quote(tmuxView(self)) + " -F " +
-		sessionhost.Quote("#{client_tty}"))
-	if err != nil {
-		return
-	}
-	m.keepOneViewer(self, panes, lines)
-	if m.tmux.viewer == 0 {
-		return
-	}
-	// Its scrollback may hold another session's history: it attaches anew
-	// to the window it shows, with that window's.
 	view := tmuxView(self)
+	if tmuxServerRunning() {
+		if c, err := localTmux(); err == nil {
+			lines, err := c.Command("list-clients -t " + sessionhost.Quote(view) + " -F " +
+				sessionhost.Quote("#{client_tty}"))
+			if err == nil {
+				m.keepOneViewer(self, panes, lines)
+			}
+			if m.tmux.viewer != 0 {
+				m.attachViewerAnew(c, view)
+				return
+			}
+		}
+	}
+	m.adoptRemoteViewer(self, panes, view)
+}
+
+// adoptRemoteViewer takes back a pane beside Marmota that shows another
+// computer's tmux. Its tmux client runs over there, so its terminal can't
+// say which pane it is: the window that computer's view of this Marmota
+// shows does, by its title, which the pane carries.
+func (m *model) adoptRemoteViewer(self int, panes []weztermPane, view string) {
+	tmuxPanes.mu.Lock()
+	hosts := make([]string, 0, len(tmuxPanes.clients))
+	for name := range tmuxPanes.clients {
+		if name != "" {
+			hosts = append(hosts, name)
+		}
+	}
+	tmuxPanes.mu.Unlock()
+	slices.Sort(hosts)
+	for _, host := range hosts {
+		c, err := hostClient(host)
+		if err != nil {
+			continue
+		}
+		window := c.ViewWindow(view)
+		if window == "" {
+			continue
+		}
+		title := ""
+		for _, p := range m.claude.panes {
+			if ref, ok := tmuxPanes.ref(p.PaneID); ok && ref.host == host && ref.window == window {
+				title = p.Title
+			}
+		}
+		if title == "" {
+			continue
+		}
+		for _, p := range panes {
+			if p.PaneID != self && p.Title == title && !isViewerPane(p) {
+				m.tmux.viewer, m.tmux.viewerHost = p.PaneID, host
+				m.attachViewerAnew(c, view)
+				return
+			}
+		}
+	}
+}
+
+// attachViewerAnew attaches the pane beside Marmota it took back anew, to
+// the window it shows: its scrollback may hold another session's history.
+func (m *model) attachViewerAnew(c *sessionhost.Client, view string) {
 	if window := c.ViewWindow(view); window != "" {
 		if err := c.Show(view, window); err != nil {
 			slog.Debug("Could not attach the pane beside Marmota anew", "error", err)
@@ -677,7 +723,8 @@ func (m *model) dropSessionsOutsideMarmota() {
 	for _, s := range snap.Live {
 		pane, inPane := m.weztermPaneForSession(s)
 		switch {
-		case inPane && (isTmuxPane(pane.PaneID) || legacy[pane.PaneID]),
+		case s.Host != "", // only those in Marmota's windows there are listed
+			inPane && (isTmuxPane(pane.PaneID) || legacy[pane.PaneID]),
 			!s.StartedAt.IsZero() && s.StartedAt.Before(since):
 			live = append(live, s)
 		}
