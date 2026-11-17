@@ -31,6 +31,7 @@ func ownTmux(t *testing.T) string {
 	t.Cleanup(func() {
 		resetTmuxRegistry()
 		_ = exec.Command("tmux", "-L", own, "kill-server").Run()
+		_ = os.Remove(tmuxSocketPath(own))
 		sessionhost.Socket, useTmuxSessions = socket, use
 	})
 	return own
@@ -212,4 +213,14 @@ func TestAMovedSessionResumesAsItRan(t *testing.T) {
 		movedSessionCommand(claudesession.Session{ID: "b2", PermissionMode: "bypassPermissions"}))
 	assert.Equal(t, "claude --resume c3 --permission-mode default",
 		movedSessionCommand(claudesession.Session{ID: "c3", PermissionMode: "default"}))
+}
+
+// tmuxSocketPath is where tmux keeps a server's socket, which a server
+// killed from outside can leave behind.
+func tmuxSocketPath(name string) string {
+	dir := os.Getenv("TMUX_TMPDIR")
+	if dir == "" {
+		dir = "/tmp"
+	}
+	return fmt.Sprintf("%s/tmux-%d/%s", dir, os.Getuid(), name)
 }

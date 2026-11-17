@@ -27,6 +27,7 @@ func localClient(t *testing.T) *Client {
 	socket := Socket
 	t.Cleanup(func() {
 		_ = exec.Command("tmux", "-L", socket, "kill-server").Run()
+		_ = os.Remove(tmuxSocketPath(socket))
 		Socket = original
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -204,4 +205,14 @@ func TestAPaneScrolledBackSaysSoAndIsLeftWhenTypedInto(t *testing.T) {
 
 func TestQuoteKeepsSingleQuotesForTmux(t *testing.T) {
 	assert.Equal(t, `'it'\''s'`, Quote("it's"))
+}
+
+// tmuxSocketPath is where tmux keeps a server's socket, which a server
+// killed from outside can leave behind.
+func tmuxSocketPath(name string) string {
+	dir := os.Getenv("TMUX_TMPDIR")
+	if dir == "" {
+		dir = "/tmp"
+	}
+	return fmt.Sprintf("%s/tmux-%d/%s", dir, os.Getuid(), name)
 }
