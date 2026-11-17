@@ -123,8 +123,18 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		// Must re-render file preview on resize
+		shrank := m.fullHeight > 0 && msg.Height < m.fullHeight
 		m.handleWindowResize(msg)
 		forcePreviewRender = true
+		if shrank {
+			// The terminal pushes what it shows up as it loses rows, as when a
+			// pane opens below Marmota, and the next frame, drawn from where
+			// the last one ended, misses the top rows. Once the terminal has
+			// settled, the screen is cleared and drawn whole.
+			updateCmd = tea.Tick(resizeSettle, func(time.Time) tea.Msg { return clearAfterResizeMsg{} })
+		}
+	case clearAfterResizeMsg:
+		updateCmd = tea.ClearScreen
 	case tea.KeyMsg:
 		inputCmd = m.handleKeyInput(msg)
 
@@ -571,6 +581,13 @@ func (m *model) getGitStatusCmd() tea.Cmd {
 }
 
 // Adjust window size based on msg information
+// resizeSettle is how long the terminal is given to settle after Marmota's
+// screen loses rows.
+const resizeSettle = 150 * time.Millisecond
+
+// clearAfterResizeMsg asks for the screen to be cleared and drawn whole.
+type clearAfterResizeMsg struct{}
+
 func (m *model) handleWindowResize(msg tea.WindowSizeMsg) {
 	m.fullHeight = msg.Height
 	m.fullWidth = msg.Width
@@ -1073,7 +1090,6 @@ func (m *model) View() string {
 	}
 
 	finalRender = m.updateRenderForOverlay(finalRender)
-
 	return finalRender
 }
 

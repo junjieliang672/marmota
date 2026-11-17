@@ -76,7 +76,9 @@ func TestMain(m *testing.M) {
 	variable.AskHistoryFile = filepath.Join(testDir, "ask_history.json") //nolint:reassign // test isolation
 	//nolint:reassign // test isolation
 	variable.ClaudeSessionsOrderFile = filepath.Join(testDir, "claude_sessions_order.json")
-	variable.TmuxSinceFile = filepath.Join(testDir, "tmux_since") //nolint:reassign // test isolation
+	variable.TmuxSinceFile = filepath.Join(testDir, "tmux_since")                //nolint:reassign // test isolation
+	variable.RemotesFile = filepath.Join(testDir, "remotes.json")                //nolint:reassign // test isolation
+	variable.RemoteSessionsFile = filepath.Join(testDir, "remote_sessions.json") //nolint:reassign // test isolation
 	// Sessions start in WezTerm panes, unless a test starts them in a tmux
 	// of its own.
 	useTmuxSessions = func() bool { return false }

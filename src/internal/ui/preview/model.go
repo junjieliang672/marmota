@@ -24,6 +24,7 @@ import (
 
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/junjieliang672/marmota/src/config/icon"
 	filepreview "github.com/junjieliang672/marmota/src/pkg/file_preview"
@@ -158,8 +159,27 @@ func (m *Model) SetContentWithRenderText(text string) {
 	m.content = m.RenderText(text)
 }
 
+// GetContent is what the preview shows, never more than its box: drawn for
+// a taller or wider box, as until a resize's new rendering arrives, it is
+// cut to fit, or Marmota's screen would scroll.
 func (m *Model) GetContent() string {
-	return m.content
+	if m.height <= 0 || m.width <= 0 {
+		return m.content
+	}
+	lines := strings.Split(m.content, "\n")
+	cut := false
+	if len(lines) > m.height {
+		lines, cut = lines[:m.height], true
+	}
+	for i, line := range lines {
+		if ansi.StringWidth(line) > m.width {
+			lines[i], cut = ansi.Truncate(line, m.width, ""), true
+		}
+	}
+	if !cut {
+		return m.content
+	}
+	return strings.Join(lines, "\n")
 }
 
 func (m *Model) GetWidth() int {

@@ -218,6 +218,12 @@ func TestAPaneNeverStaysInCopyMode(t *testing.T) {
 	})
 }
 
+func TestKeysAreSentByTheirNames(t *testing.T) {
+	assert.Equal(t, []keyPart{{text: []byte("hi")}, {key: "Down"}, {key: "Enter"}, {key: "C-s"},
+		{text: []byte("a\nb")}, {key: "Escape"}, {text: []byte("x")}},
+		splitKeys([]byte("hi\x1b[B\r\x13a\nb\x1bx")))
+}
+
 func TestQuoteKeepsSingleQuotesForTmux(t *testing.T) {
 	assert.Equal(t, `'it'\''s'`, Quote("it's"))
 }

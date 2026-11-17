@@ -30,6 +30,8 @@ func (m *model) visibleSessionID() string {
 func (m *model) sessionPlace(s claudesession.Session) string {
 	pane, ok := m.weztermPaneForSession(s)
 	switch {
+	case s.Unreachable != "":
+		return "can't reach " + s.Host
 	case ok && m.isClaudeSessionVisible(s):
 		return "beside Marmota"
 	case ok && pane.Workspace == managedAgentHiddenWorkspace, ok && isTmuxPane(pane.PaneID):

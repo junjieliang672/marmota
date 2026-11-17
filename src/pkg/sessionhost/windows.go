@@ -122,11 +122,89 @@ func (c *Client) Capture(paneID string) (string, error) {
 const bufferChunk = 2048
 
 // SendBytes types bytes into a pane as if they came from the keyboard: keys
-// are their escape sequences ("\r" for enter, "\x1b" for esc). They reach
-// the program as they are, the way `wezterm cli send-text --no-paste` sends
-// them: send-keys would take them for keys and encode them anew.
+// are their escape sequences ("\r" for enter, "\x1b[B" for down, "\x13"
+// for ctrl+s). A key goes through tmux by its name, which tmux encodes as
+// the program asked for: a program in tmux took the raw sequence for down
+// as nothing at all. Text between keys reaches the program as it is.
 func (c *Client) SendBytes(paneID string, b []byte) error {
-	return c.pasteBuffer(paneID, b, false)
+	for _, part := range splitKeys(b) {
+		var err error
+		if part.key != "" {
+			_, err = c.Command("send-keys -t " + Quote(paneID) + " " + part.key)
+		} else {
+			err = c.pasteBuffer(paneID, part.text, false)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// keySequences are the keys whose escape sequences become tmux key names.
+var keySequences = []struct{ seq, name string }{ //nolint:gochecknoglobals // a table
+	{"\x1b[A", "Up"}, {"\x1b[B", "Down"}, {"\x1b[C", "Right"}, {"\x1b[D", "Left"},
+	{"\x1bOA", "Up"}, {"\x1bOB", "Down"}, {"\x1bOC", "Right"}, {"\x1bOD", "Left"},
+	{"\x1b[H", "Home"}, {"\x1b[F", "End"}, {"\x1b[5~", "PPage"}, {"\x1b[6~", "NPage"},
+	{"\x1b[3~", "DC"}, {"\x1b[Z", "BTab"},
+}
+
+type keyPart struct {
+	key  string // a tmux key name, or "" for text
+	text []byte
+}
+
+// splitKeys cuts bytes into keys and the text between them. Esc on its own,
+// enter, tab, backspace and control characters are keys; a newline is text.
+func splitKeys(b []byte) []keyPart {
+	var parts []keyPart
+	var text []byte
+	flush := func() {
+		if len(text) > 0 {
+			parts = append(parts, keyPart{text: text})
+			text = nil
+		}
+	}
+	for i := 0; i < len(b); {
+		matched := false
+		for _, k := range keySequences {
+			if strings.HasPrefix(string(b[i:]), k.seq) {
+				flush()
+				parts = append(parts, keyPart{key: k.name})
+				i += len(k.seq)
+				matched = true
+				break
+			}
+		}
+		if matched {
+			continue
+		}
+		switch ch := b[i]; {
+		case ch == '\r':
+			flush()
+			parts = append(parts, keyPart{key: "Enter"})
+		case ch == '\t':
+			flush()
+			parts = append(parts, keyPart{key: "Tab"})
+		case ch == 0x7f:
+			flush()
+			parts = append(parts, keyPart{key: "BSpace"})
+		case ch == 0x1b:
+			flush()
+			parts = append(parts, keyPart{key: "Escape"})
+		case ch == 0x1f:
+			flush()
+			parts = append(parts, keyPart{key: "C-_"})
+		case ch >= 0x01 && ch <= 0x1a && ch != '\n':
+			flush()
+			parts = append(parts, keyPart{key: "C-" + string(rune('a'+ch-1))})
+		default:
+			text = append(text, ch)
+		}
+		i++
+	}
+	flush()
+	return parts
 }
 
 // Paste puts text into a pane as a paste, the way `wezterm cli send-text`

@@ -117,6 +117,9 @@ def select_session(pane_id: int, name: str) -> None:
     number: [n]g, as in the file panel."""
     n = wait_for(f"{name} in the Sessions box",
                  lambda: next((number for number, title, _ in dock_rows(pane_id) if name in title), None))
+    if not in_sessions_box(pane_id):
+        type_keys(pane_id, "!")
+        wait_for("the Sessions box", lambda: in_sessions_box(pane_id))
     # One key at a time, as typed: sent together they arrive as one key.
     for key in n + "g":
         type_keys(pane_id, key)

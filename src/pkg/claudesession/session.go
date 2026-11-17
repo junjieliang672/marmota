@@ -53,7 +53,11 @@ type Session struct {
 	NeedsLogin bool
 	// Named is set once it was given a name of its own (/rename).
 	Named bool
-	Name  string // name from `claude agents`, accepted by `claude attach`
+	// Starting is set for one Claude Code doesn't list yet: Marmota knows
+	// it by its window, which shows it starting or asking something first,
+	// such as whether to trust its folder.
+	Starting bool
+	Name     string // name from `claude agents`, accepted by `claude attach`
 	// Title is the best human label: the AI title, else the last prompt,
 	// else the agents name, else the folder name.
 	Title string

@@ -269,9 +269,10 @@ func TestARestartedMarmotaTakesBackThePaneBesideIt(t *testing.T) {
 
 func TestAComputerThatCantBeReachedKeepsItsSessionsAsLastSeen(t *testing.T) {
 	m := newClaudeTestModel(t)
-	file := variable.RemotesFile
-	variable.RemotesFile = filepath.Join(t.TempDir(), "remotes.json") //nolint:reassign // its own file
-	t.Cleanup(func() { variable.RemotesFile = file })                 //nolint:reassign // restored
+	file, last := variable.RemotesFile, variable.RemoteSessionsFile
+	variable.RemotesFile = filepath.Join(t.TempDir(), "remotes.json")                //nolint:reassign // its own
+	variable.RemoteSessionsFile = filepath.Join(t.TempDir(), "remote_sessions.json") //nolint:reassign // its own
+	t.Cleanup(func() { variable.RemotesFile, variable.RemoteSessionsFile = file, last })
 	require.NoError(t, saveRemoteHosts([]sessionhost.Host{{Name: "nova", SSH: "me@nova"}}))
 
 	seen := claudesession.Session{ID: "r1", Host: "nova", Title: "Sweep", Live: true,
@@ -300,6 +301,14 @@ func TestAComputerThatCantBeReachedKeepsItsSessionsAsLastSeen(t *testing.T) {
 	m.mergeRemoteSessions(remoteListing{failed: map[string]error{"nova": errors.New("network is unreachable")}})
 	assert.Equal(t, "can't reach nova · enter tries again", m.dockDoing(m.claude.snapshot.Live[0],
 		m.sessionState(m.claude.snapshot.Live[0])))
+
+	// Marmota starts again, and nova still can't be reached.
+	again := newClaudeTestModel(t)
+	again.mergeRemoteSessions(remoteListing{failed: map[string]error{
+		"nova": &sessionhost.DialError{Output: "Permission denied"}}})
+	require.Len(t, again.claude.snapshot.Live, 1, "its sessions as last seen came from the file")
+	assert.Equal(t, "Sweep", again.claude.snapshot.Live[0].Title)
+	assert.True(t, again.claude.snapshot.Live[0].NeedsLogin)
 }
 
 func TestAFolderUnderThisHomeIsTheOtherComputersHome(t *testing.T) {

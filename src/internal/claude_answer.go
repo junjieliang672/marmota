@@ -39,9 +39,10 @@ type claudeQuestion struct {
 	paneID int
 	// codex is set for a Codex session, which draws its questions its way;
 	// start for a session that hasn't started, whose pane the Ask box's
-	// watch reads (see setStartDialog).
-	codex, start bool
-	lines        []string
+	// watch reads (see setStartDialog); dialog for one Claude Code doesn't
+	// list yet, which asks something first, cut out of its pane as a start's.
+	codex, start, dialog bool
+	lines                []string
 	// reading and ticking say a read is under way, or one is due, so only
 	// one loop reads the pane.
 	reading, ticking bool
@@ -97,7 +98,7 @@ func (m *model) watchClaudeQuestion() tea.Cmd {
 		return m.readClaudeQuestion()
 	}
 	m.forgetClaudeQuestion()
-	q.id, q.paneID, q.codex = s.ID, pane.PaneID, s.IsCodex()
+	q.id, q.paneID, q.codex, q.dialog = s.ID, pane.PaneID, s.IsCodex(), s.Starting
 	return m.readClaudeQuestion()
 }
 
@@ -116,11 +117,15 @@ func (m *model) readClaudeQuestion() tea.Cmd {
 		return nil
 	}
 	q.reading = true
-	gen, paneID, codex, start := q.gen, q.paneID, q.codex, q.start
+	gen, paneID, codex, start, dialog := q.gen, q.paneID, q.codex, q.start, q.dialog
 	return func() tea.Msg {
 		screen, err := weztermGetText(paneID)
 		if err != nil {
 			return claudeQuestionMsg{gen: gen, err: err}
+		}
+		if dialog {
+			lines, asks := startDialog(screen)
+			return claudeQuestionMsg{gen: gen, lines: lines, over: asks == ""}
 		}
 		if start {
 			lines, asks := startDialog(screen)

@@ -186,9 +186,15 @@ func listHostSessions(name string, tracker *claudesession.Tracker) ([]claudesess
 		pane := tmuxPaneOf(name, w)
 		panes = append(panes, pane)
 		prefix, id, _ := sessionhost.SessionOf(w.Name)
+		if prefix != sessionhost.ClaudePrefix {
+			continue
+		}
 		s, listed := byID[id]
-		if prefix != sessionhost.ClaudePrefix || !listed {
-			continue // starting, or not Claude Code's
+		if !listed {
+			if starting, ok := startingInWindow(c, name, id, w, pane); ok {
+				sessions = append(sessions, starting)
+			}
+			continue
 		}
 		s.Host, s.TTY = name, pane.TTYName
 		if path, err := mirrorTranscript(c, name, s.ID); err == nil && path != "" {
@@ -280,16 +286,25 @@ var errLoggingIn = errors.New("logging in")
 // were last seen, marked with why; that is said once, as it happens.
 func (m *model) mergeRemoteSessions(r remoteListing) {
 	if m.remote.last == nil {
-		m.remote.last = map[string][]claudesession.Session{}
+		m.remote.last = loadLastRemoteSessions()
 	}
 	byHost := map[string][]claudesession.Session{}
 	for _, s := range r.sessions {
-		byHost[s.Host] = append(byHost[s.Host], s)
+		if !s.Starting {
+			byHost[s.Host] = append(byHost[s.Host], s)
+		}
 	}
+	changed := false
 	for _, h := range loadRemoteHosts() {
 		if _, failed := r.failed[h.Name]; !failed {
+			if !sameSessions(m.remote.last[h.Name], byHost[h.Name]) {
+				changed = true
+			}
 			m.remote.last[h.Name] = byHost[h.Name]
 		}
+	}
+	if changed {
+		saveLastRemoteSessions(m.remote.last)
 	}
 	m.claude.snapshot.Live = append(m.claude.snapshot.Live, r.sessions...)
 	for name, err := range r.failed {
@@ -356,9 +371,15 @@ func (m *model) reachHost(s claudesession.Session) (string, error) {
 	for i, a := range argv {
 		words[i] = shellQuote(a)
 	}
+	// Beside Marmota, so its height stays: below the pane that shows a
+	// session there, else on its right.
 	cwd := m.getFocusedFilePanel().location
-	pane, err := splitWeztermPane(cwd, fmt.Sprintf("wezterm cli split-pane --pane-id %d --bottom --percent 40 "+
-		"--cwd %q -- /bin/sh -c %s", self, cwd, shellQuote(strings.Join(words, " "))))
+	anchor, where := self, "--right --percent 45"
+	if viewer, shown := m.tmuxViewerPane(); shown {
+		anchor, where = viewer.PaneID, "--bottom --percent 40"
+	}
+	pane, err := splitWeztermPane(cwd, fmt.Sprintf("wezterm cli split-pane --pane-id %d %s --cwd %q -- /bin/sh -c %s",
+		anchor, where, cwd, shellQuote(strings.Join(words, " "))))
 	if err != nil {
 		return "", err
 	}
@@ -369,7 +390,7 @@ func (m *model) reachHost(s claudesession.Session) (string, error) {
 		m.remote.loginPanes = map[string]int{}
 	}
 	m.remote.loginPanes[s.Host] = pane
-	return "Log in to " + s.Host + " in the pane below", nil
+	return "Log in to " + s.Host + " in the pane beside Marmota", nil
 }
 
 // settleLoginPanes forgets the login panes that have closed, and has their
@@ -400,4 +421,64 @@ func forgetHostFailure(name string) {
 	tmuxPanes.mu.Lock()
 	delete(tmuxPanes.failed, name)
 	tmuxPanes.mu.Unlock()
+}
+
+// startingInWindow is the row of a session in one of Marmota's windows
+// that Claude Code doesn't list yet: one `y session start` started, still
+// starting, or asking something first, such as whether to trust its
+// folder. Its screen says which; the question is answered from Marmota as
+// any session's. A window whose screen can't be read has no row.
+func startingInWindow(c *sessionhost.Client, host, id string, w sessionhost.Window, pane weztermPane,
+) (claudesession.Session, bool) {
+	screen, err := c.Capture(w.PaneID)
+	if err != nil {
+		return claudesession.Session{}, false
+	}
+	s := claudesession.Session{ID: id, Host: host, Cwd: w.Cwd, Live: true, Starting: true, TTY: pane.TTYName,
+		Status: claudesession.StatusWorking, PendingTool: "starting"}
+	if _, asks := startDialog(screen); asks != "" {
+		s.Status, s.PendingTool = claudesession.StatusWaiting, asks
+	}
+	return s, true
+}
+
+// loadLastRemoteSessions reads each computer's sessions as last seen.
+func loadLastRemoteSessions() map[string][]claudesession.Session {
+	last := map[string][]claudesession.Session{}
+	data, err := os.ReadFile(variable.RemoteSessionsFile)
+	if err != nil {
+		return last
+	}
+	if err := json.Unmarshal(data, &last); err != nil {
+		slog.Debug("Ignoring an unreadable file of remote sessions", "error", err)
+		return map[string][]claudesession.Session{}
+	}
+	return last
+}
+
+func saveLastRemoteSessions(last map[string][]claudesession.Session) {
+	data, err := json.Marshal(last)
+	if err == nil {
+		err = os.MkdirAll(filepath.Dir(variable.RemoteSessionsFile), 0o755)
+	}
+	if err == nil {
+		err = os.WriteFile(variable.RemoteSessionsFile, data, 0o600)
+	}
+	if err != nil {
+		slog.Debug("Could not save the remote sessions as last seen", "error", err)
+	}
+}
+
+// sameSessions reports two lists of the same sessions, in the same states.
+func sameSessions(a, b []claudesession.Session) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i].ID != b[i].ID || a[i].Status != b[i].Status || a[i].Title != b[i].Title ||
+			!a[i].LastActivity.Equal(b[i].LastActivity) {
+			return false
+		}
+	}
+	return true
 }

@@ -296,6 +296,14 @@ def main() -> int:
             wait_for("the remote session picked",
                      lambda: (row_of_host(screen(spf), host, remote_title) or "").startswith("│▌"))
 
+        def screen_of(pane_id: int) -> str:
+            """A pane's screen, or nothing if it closed since it was listed:
+            the viewer of another computer closes as this one opens."""
+            try:
+                return screen(pane_id)
+            except subprocess.CalledProcessError:
+                return ""
+
         def row_of(title: str) -> str:
             return wait_for(f"{title}'s row", lambda: row_of_host(screen(spf), host, title))
 
@@ -303,7 +311,7 @@ def main() -> int:
         type_keys(spf, "\r")
         remote_viewer = wait_for("it beside Marmota", lambda: next(
             (p for p in panes() if p["tab_id"] == spf_tab and p["pane_id"] != spf
-             and "and one more" in screen(p["pane_id"])), None))
+             and "and one more" in screen_of(p["pane_id"])), None))
         type_keys(spf, "\x1b")
         wait_for("the files", lambda: not in_sessions_box(spf))
         type_keys(spf, "!")
@@ -375,7 +383,9 @@ def main() -> int:
 
         # 9. Marmota restarts in its pane: the pane beside it that shows the
         # other computer's session is taken back, not opened twice
-        spf3 = spawn("/bin/sh", "-c", f"{shlex.quote(new)}; {shlex.quote(new)}; sleep 600")
+        # Between the two, a line the test waits for: the second Marmota can
+        # draw before a look at the screen finds the first one gone.
+        spf3 = spawn("/bin/sh", "-c", f"{shlex.quote(new)}; echo marmota-quit; sleep 2; {shlex.quote(new)}; sleep 600")
         tab3 = pane_by_id(spf3)["tab_id"]
         main_screen(spf3)
         type_keys(spf3, "F")
@@ -404,7 +414,7 @@ def main() -> int:
         type_keys(spf3, "\x1b")
         wait_for("the files", lambda: not in_sessions_box(spf3))
         type_keys(spf3, "q")
-        wait_for("Marmota to quit", lambda: "K:ask" not in screen(spf3))
+        wait_for("Marmota to quit", lambda: "marmota-quit" in screen(spf3))
         main_screen(spf3)
         type_keys(spf3, "F")
         time.sleep(3)  # its first refresh reaches the other computer

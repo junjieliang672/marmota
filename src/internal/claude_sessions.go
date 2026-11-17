@@ -123,6 +123,9 @@ type claudeSessionsSnapshotMsg struct {
 	codex []claudesession.Session
 	// remote is what the other computers Marmota remembers run.
 	remote remoteListing
+	// starting are the sessions in this computer's Marmota windows that
+	// Claude Code doesn't list yet.
+	starting []claudesession.Session
 }
 
 // claudeSessionsRefreshCmd lists sessions in the background. Only one refresh
@@ -174,6 +177,7 @@ func (m *model) claudeSessionsRefreshCmd() tea.Cmd {
 			Since: opts.Since, Folders: snap.Folders, Include: opts.Include})
 		if remote {
 			msg.remote = listRemoteSessions(tracker, loggingIn)
+			msg.starting = localStartingSessions(snap.Live)
 		}
 		if os.Getenv("WEZTERM_PANE") != "" {
 			if listed, err := listWeztermPanes(folder); err == nil {
@@ -215,6 +219,11 @@ func (m *model) applyClaudeSessionsSnapshot(msg claudeSessionsSnapshotMsg) tea.C
 	}
 	m.mergeCodexSessions(msg.codex)
 	m.mergeRemoteSessions(msg.remote)
+	for _, s := range msg.starting {
+		if _, askStarted := m.ask.starts[s.ID]; !askStarted { // the Ask box shows its own
+			m.claude.snapshot.Live = append(m.claude.snapshot.Live, s)
+		}
+	}
 	if m.tmuxSessionsOn() {
 		m.settleTmuxShown()
 		m.dropSessionsOutsideMarmota()

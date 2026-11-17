@@ -882,3 +882,40 @@ func (m *model) sessionInPane(paneID int) (claudesession.Session, bool) {
 	}
 	return claudesession.Session{}, false
 }
+
+// localStartingSessions are the rows of the sessions in this computer's
+// Marmota windows that Claude Code doesn't list yet (see startingInWindow).
+func localStartingSessions(live []claudesession.Session) []claudesession.Session {
+	if !useTmuxSessions() || !tmuxServerRunning() {
+		return nil
+	}
+	c, err := localTmux()
+	if err != nil {
+		return nil
+	}
+	windows, err := c.Windows()
+	if err != nil {
+		return nil
+	}
+	listed, ttys, names := map[string]bool{}, map[string]bool{}, map[string]bool{}
+	for _, s := range live {
+		listed[s.ID], ttys[s.TTY] = true, true
+		if s.Name != "" {
+			names[s.Name] = true
+		}
+	}
+	var out []claudesession.Session
+	for _, w := range windows {
+		prefix, id, _ := sessionhost.SessionOf(w.Name)
+		switch {
+		case prefix != sessionhost.ClaudePrefix, listed[id], strings.HasPrefix(id, "new-"),
+			// It shows a listed session: /resume brought one into it.
+			ttys[w.TTY], names[sessionNameInTitle(w.Title)]:
+			continue
+		}
+		if s, ok := startingInWindow(c, "", id, w, tmuxPaneOf("", w)); ok {
+			out = append(out, s)
+		}
+	}
+	return out
+}
