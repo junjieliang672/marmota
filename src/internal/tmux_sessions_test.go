@@ -301,3 +301,13 @@ func TestAComputerThatCantBeReachedKeepsItsSessionsAsLastSeen(t *testing.T) {
 	assert.Equal(t, "can't reach nova · enter tries again", m.dockDoing(m.claude.snapshot.Live[0],
 		m.sessionState(m.claude.snapshot.Live[0])))
 }
+
+func TestAFolderUnderThisHomeIsTheOtherComputersHome(t *testing.T) {
+	home, err := os.UserHomeDir()
+	require.NoError(t, err)
+	assert.Equal(t, "~/proj", remoteFolder(home+"/proj", "nova"), "the shell expanded ~/proj here")
+	assert.Equal(t, "~", remoteFolder(home, "nova"))
+	assert.Equal(t, "~", remoteFolder("", "nova"))
+	assert.Equal(t, "/srv/app", remoteFolder("/srv/app", "nova"))
+	assert.Equal(t, home+"/proj", remoteFolder(home+"/proj", ""), "here a folder stays as it is")
+}

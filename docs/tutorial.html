@@ -101,6 +101,8 @@ a:focus-visible, kbd:focus-visible { outline: 2px solid var(--co); outline-offse
 .flow-card img { display: block; width: 100%; height: auto; border-radius: 6px; background: #1A1B26; }
 .flow-card strong { font-size: 15px; line-height: 1.3; }
 .flow-card span { font-size: 13px; color: var(--muted); line-height: 1.4; }
+.flow-card .card-art { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; aspect-ratio: 1368 / 839; border-radius: 6px; background: #1A1B26; color: #a9b1d6; font-family: ui-monospace, Menlo, monospace; font-size: 11px; text-align: center; padding: 6px; }
+.flow-card .card-art span { font-size: 30px; line-height: 1; color: #7dcfff; }
 .flow { display: flex; flex-direction: column; gap: 22px; scroll-margin-top: 16px; }
 .flow-intro { display: flex; flex-direction: column; gap: 10px; }
 .eyebrow.small { font-size: 12px; }
@@ -158,19 +160,19 @@ dialog.zoom img { display: block; max-width: 98vw; max-height: 96vh; width: auto
   </div>
   <h1>Getting started with Marmota</h1>
   <p class="lede">Marmota is a terminal file manager that works beside your Claude Code and Codex sessions; you start it with <code>y</code>. You browse files on top; at the foot you see every session that runs, what each one is doing, and you can write to any of them without leaving your files.</p>
-  <p class="note"><strong>You need</strong> a Mac, <a href="https://wezterm.org">WezTerm</a> (y opens sessions in its panes), and <a href="https://claude.com/claude-code">Claude Code</a>, the <a href="https://github.com/openai/codex">Codex CLI</a>, or both.</p>
+  <p class="note"><strong>You need</strong> a Mac, <a href="https://wezterm.org">WezTerm</a> (y shows sessions in its panes), <a href="https://github.com/tmux/tmux">tmux</a> (sessions run in it, so they outlive WezTerm; <code>build.sh</code> installs it), and <a href="https://claude.com/claude-code">Claude Code</a>, the <a href="https://github.com/openai/codex">Codex CLI</a>, or both.</p>
 </header>
 
 <section aria-labelledby="s1">
   <div class="step-head"><span class="step-num">1</span><h2 id="s1">Install it and start it</h2></div>
-  <pre><span class="c"># the first time, build.sh installs everything: Go, WezTerm, a Nerd Font, the y command</span>
+  <pre><span class="c"># the first time, build.sh installs everything: Go, tmux, WezTerm, a Nerd Font, the y command</span>
 git clone https://github.com/junjieliang672/marmota.git
 cd marmota
 ./build.sh
 
 <span class="c"># then, in a new terminal (WezTerm)</span>
 y</pre>
-  <p><code>build.sh</code> builds the program into <code>bin/y</code>, adds a short block to your shell config that puts it on your PATH, and gives WezTerm its look: the pane you type in stays bright and a blue edge marks it. Run <code>./build.sh</code> again whenever you pull new changes; it keeps your settings and adds any new ones.</p>
+  <p><code>build.sh</code> builds the program into <code>bin/y</code>, adds a short block to your shell config that puts it on your PATH, and gives WezTerm its look: the pane you type in stays bright and a blue edge marks it. It also installs a skill that tells Claude Code about <code>y session</code> (see <a href="#remote">Sessions on other computers</a>). Run <code>./build.sh</code> again whenever you pull new changes; it keeps your settings and adds any new ones.</p>
 </section>
 
 <section aria-labelledby="s2">
@@ -214,6 +216,10 @@ y</pre>
     <a class="flow-card" href="#away">
       <img src="shots/away.webp" width="1368" height="839" alt="" loading="lazy">
       <strong>Leave them running</strong><span>Come back when a session needs you.</span>
+    </a>
+    <a class="flow-card" href="#remote">
+      <span class="card-art" aria-hidden="true"><span>☁</span>nova · fix the flaky test</span>
+      <strong>Sessions on other computers</strong><span>Over ssh, used as one on this Mac.</span>
     </a>
   </nav>
 </section>
@@ -283,7 +289,7 @@ y</pre>
   <div class="flow-intro">
     <span class="eyebrow small">Workflow 2</span>
     <h2 id="one-h">One coding agent beside you</h2>
-    <p>Claude Code or Codex runs in a WezTerm pane next to Marmota, in the folder you are in. You browse on the left and talk to it on the right; <kbd>Cmd+Opt+←</kbd> <kbd>→</kbd> move between the two.</p>
+    <p>Claude Code or Codex shows in a WezTerm pane next to Marmota, in the folder you are in. You browse on the left and talk to it on the right; <kbd>Cmd+Opt+←</kbd> <kbd>→</kbd> move between the two. The session itself runs in Marmota's tmux: close the pane, or WezTerm, and it keeps going.</p>
   </div>
   <figure class="shot wide">
     <button type="button" aria-label="Show full size"><img src="shots/agent-working.webp" width="1368" height="839" alt="Marmota on the left with server.go and server_test.go marked as changed; Claude Code on the right, writing tests and running them." loading="lazy"></button>
@@ -351,7 +357,7 @@ y</pre>
   <div class="flow-intro">
     <span class="eyebrow small">Workflow 3</span>
     <h2 id="many-h">Several sessions, one beside you</h2>
-    <p>Hand tasks to sessions that run in the background, each in its own folder, while one stays beside you. The Sessions box lists them all; the others wait in a hidden WezTerm workspace until you bring one in.</p>
+    <p>Hand tasks to sessions that run in the background, each in its own folder, while one stays beside you. The Sessions box lists them all; the others keep running in Marmota's tmux, out of sight, until you bring one in.</p>
   </div>
   <figure class="shot wide">
     <button type="button" aria-label="Show full size"><img src="shots/many-hero.webp" width="1368" height="839" alt="The Sessions box with four sessions in different states, the second selected; the preview shows its permission question; Claude Code works beside Marmota." loading="lazy"></button>
@@ -389,7 +395,8 @@ y</pre>
       <h3>Swap which one is beside you</h3>
       <ol class="steps">
         <li>In the Sessions box, <kbd>j</kbd> <kbd>k</kbd> to a session (or <kbd>3</kbd><kbd>g</kbd> for the third). From your files, <kbd>]</kbd> and <kbd>[</kbd> go straight to the next and the previous one.</li>
-        <li><kbd>enter</kbd> brings its pane beside Marmota with the keyboard; the one that was there waits out of sight.</li>
+        <li><kbd>enter</kbd> brings it beside Marmota with the keyboard; the one that was there goes on out of sight. Scrolling up in that pane shows that session's own history.</li>
+        <li>In the <kbd>s</kbd> list, <kbd>enter</kbd> on a session only puts the Sessions box on it: the pane beside Marmota stays as it is until you press <kbd>enter</kbd> there.</li>
       </ol>
     </div>
     <div class="case">
@@ -459,7 +466,48 @@ y</pre>
       <li>The status line keeps count: <span class="tag cc">✳ working</span>, <span style="color: var(--accent)">⚑ needs you</span>, <span class="tag co">● unread</span>.</li>
       <li><kbd>!</kbd> opens the session the note is about; answer it with <kbd>K</kbd>, or <kbd>esc</kbd> to put the note away.</li>
       <li>Away from your desk? Start the session with <code>&gt;claude rc</code>: Remote Control lets you follow and answer it from the Claude app.</li>
+      <li>Quit WezTerm, or let it crash: the sessions keep running in tmux. Open WezTerm, run <code>y</code>, and every one of them is back in the Sessions box; <kbd>enter</kbd> shows one beside Marmota again.</li>
     </ol>
+  </div>
+</section>
+
+<section class="flow" id="remote" aria-labelledby="remote-h">
+  <div class="flow-intro">
+    <span class="eyebrow small">Workflow 6</span>
+    <h2 id="remote-h">Sessions on other computers</h2>
+    <p>Run a session on another machine, a Mac mini in the next room or a server you reach over ssh, and use it from Marmota as you would one on this Mac. It runs in Marmota's tmux over there, so it keeps going when your connection drops; with Remote Control on, the Claude app has it too.</p>
+  </div>
+  <div class="cases">
+    <div class="case">
+      <h3>Start one there</h3>
+      <ol class="steps">
+        <li>Ask a coding agent in one of your sessions, in your own words: <em>"open a session on my Mac mini in ~/proj that fixes the flaky test"</em>. The skill <code>build.sh</code> installed tells it how.</li>
+        <li>Or run it yourself: <code>y session start --on "ssh me@192.168.1.20" --cwd ~/proj -- "fix the flaky test"</code>. <code>--on</code> is how you reach the machine from a terminal: <code>ssh</code>, <code>ssh -J</code> through a jump host, or a company CLI such as <code>"corp ssh gpu-1 --"</code>.</li>
+        <li>Marmota remembers the machine from then on and keeps one connection to it. With ssh, you log in once for everything.</li>
+      </ol>
+    </div>
+    <div class="case">
+      <h3>Use it as one on this Mac</h3>
+      <ol class="steps">
+        <li>It shows in the Sessions box with a cloud where a session on this Mac has a monitor, named <code>computer · title</code>. <kbd>r</kbd> renames it to something short.</li>
+        <li><kbd>K</kbd> writes to it, answers its questions; the preview shows its conversation; <kbd>enter</kbd> opens it beside Marmota; <kbd>x</kbd> stops it.</li>
+        <li><code>y session list</code>, <code>send</code> and <code>read</code> do the same from a terminal or an agent.</li>
+      </ol>
+    </div>
+    <div class="case">
+      <h3>When it needs you to log in</h3>
+      <ol class="steps">
+        <li>A sign-in expires, or the network drops: its sessions stay in the list as last seen, greyed, saying <em>needs login</em> or <em>can't reach</em>.</li>
+        <li><kbd>enter</kbd> on one opens a pane below Marmota where ssh (or the company CLI's login) asks what it asks. Once it closes, Marmota reaches the machine again.</li>
+      </ol>
+    </div>
+    <div class="case">
+      <h3>Bring in sessions already running there</h3>
+      <ol class="steps">
+        <li><code>y session adopt --on "ssh me@192.168.1.20" --list</code> lists the sessions someone started there outside Marmota.</li>
+        <li><code>y session adopt --on "ssh me@192.168.1.20" <var>name</var></code> moves one in (no name moves them all): it stops where it ran and goes on with the same conversation, permission mode, model and Remote Control in Marmota's tmux.</li>
+      </ol>
+    </div>
   </div>
 </section>
 

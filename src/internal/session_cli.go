@@ -57,13 +57,7 @@ func SessionStart(o SessionStartOptions) (StartedSession, error) {
 	if err != nil {
 		return StartedSession{}, err
 	}
-	cwd := o.Cwd
-	switch {
-	case cwd == "" && host == "":
-		cwd, _ = os.Getwd()
-	case cwd == "":
-		cwd = "~"
-	}
+	cwd := remoteFolder(o.Cwd, host)
 	id := newAskSessionID()
 	args := append(claudeask.PermissionArgs(o.Mode), claudeask.ChoiceArgs(o.Model, o.Effort)...)
 	if host != "" {
@@ -81,6 +75,31 @@ func SessionStart(o SessionStartOptions) (StartedSession, error) {
 		return StartedSession{}, err
 	}
 	return StartedSession{ID: id, Host: host, Cwd: cwd, Window: w.Name}, nil
+}
+
+// remoteFolder is where a session starts: here the current folder when none
+// is given; on another computer its home, and a folder under this
+// computer's home is taken as one under that computer's: a shell expanded
+// --cwd ~/proj into /Users/me/proj before it got here.
+func remoteFolder(cwd, host string) string {
+	if host == "" {
+		if cwd == "" {
+			cwd, _ = os.Getwd()
+		}
+		return cwd
+	}
+	if cwd == "" {
+		return "~"
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		if cwd == home {
+			return "~"
+		}
+		if rest, ok := strings.CutPrefix(cwd, home+"/"); ok {
+			return "~/" + rest
+		}
+	}
+	return cwd
 }
 
 // ListedSession is one line of `y session list`.
