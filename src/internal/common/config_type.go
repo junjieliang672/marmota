@@ -74,6 +74,7 @@ type ConfigType struct {
 	Editor                 string `toml:"editor"                    comment:"\nThe editor files will be opened with (e key). (Leave blank to use the EDITOR environment variable)."`
 	SecondEditor           string `toml:"second_editor"             comment:"\nThe second editor for opening files (E key). Leave blank to use the same as 'editor'."`
 	DirEditor              string `toml:"dir_editor"                comment:"\nThe editor directories will be opened with. (Leave blank to use the default editors)."`
+	ComputerName           string `toml:"computer_name"             comment:"\nThe name the Ask box shows for this computer, where a session runs. (Leave blank for its hostname, without the domain.)"`
 	ShelfApp               string `toml:"shelf_app"                 comment:"\nThe macOS app the send_to_shelf key (Y) hands files to, such as Yoink or Dropover. (Leave blank for Marmota's own shelf, y-shelf, at the right edge of the screen.)"`
 	CodexCommand           string `toml:"codex_command"             comment:"\nThe codex program Codex sessions start with. (Leave blank for the newest one on PATH or in the ChatGPT app. No -c or --config: with one, Codex runs the session out of Marmota's sight.)"`
 	CdOnQuit               bool   `toml:"cd_on_quit"                comment:"\nCd on quit: when you quit, your shell moves to the folder you were in (through the y shell function build.sh writes)"`

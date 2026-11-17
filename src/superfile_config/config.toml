@@ -36,6 +36,11 @@ dir_editor = ""
 # such as "Yoink".
 shelf_app = ""
 
+# The name the Ask box shows for this computer, beside the sessions that run
+# here. Blank: its hostname, without the domain ("kingjj" for kingjj.local).
+# Another computer's name is in remotes.json, in Marmota's state folder.
+computer_name = ""
+
 #-- Codex
 # The codex program Codex sessions start with. Leave blank for the newest
 # one that runs, from PATH or the ChatGPT app. Don't add -c or --config:

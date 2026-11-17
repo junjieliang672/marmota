@@ -309,6 +309,11 @@ func TestAComputerThatCantBeReachedKeepsItsSessionsAsLastSeen(t *testing.T) {
 	require.Len(t, again.claude.snapshot.Live, 1, "its sessions as last seen came from the file")
 	assert.Equal(t, "Sweep", again.claude.snapshot.Live[0].Title)
 	assert.True(t, again.claude.snapshot.Live[0].NeedsLogin)
+
+	// nova is renamed in remotes.json: what was seen under its old name goes.
+	require.NoError(t, os.WriteFile(variable.RemotesFile, []byte(`[{"name":"nova-2","ssh":"me@nova"}]`), 0o600))
+	again.mergeRemoteSessions(remoteListing{})
+	assert.NotContains(t, loadLastRemoteSessions(), "nova")
 }
 
 func TestAFolderUnderThisHomeIsTheOtherComputersHome(t *testing.T) {

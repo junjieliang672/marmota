@@ -593,9 +593,12 @@ var (
 	thisComputer     string    //nolint:gochecknoglobals // read once
 )
 
-// thisComputerName is this computer's name, without its domain: "kingjj"
-// for kingjj.local.
+// thisComputerName is this computer's name: computer_name, or its hostname
+// without the domain, "kingjj" for kingjj.local.
 func thisComputerName() string {
+	if name := strings.TrimSpace(common.Config.ComputerName); name != "" {
+		return name
+	}
 	thisComputerOnce.Do(func() {
 		name, err := os.Hostname()
 		if err != nil {

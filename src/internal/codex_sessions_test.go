@@ -625,4 +625,7 @@ func TestTheFoldedAskBoxSaysTheComputer(t *testing.T) {
 	remote := claudesession.Session{ID: "r1", Title: "sweep", Live: true, Host: "a-long-computer-name"}
 	assert.True(t, strings.HasSuffix(hostLine(remote), "a-long-computer-name"), hostLine(remote))
 	assert.Contains(t, ansi.Strip(m.dockAskIdleLines(remote, 30, 8)[3]), "write", "the keys keep their line")
+
+	setForTest(t, &common.Config.ComputerName, "kingjj-nova")
+	assert.True(t, strings.HasSuffix(hostLine(local), "kingjj-nova"), "computer_name names this computer")
 }

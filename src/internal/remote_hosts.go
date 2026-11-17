@@ -295,7 +295,15 @@ func (m *model) mergeRemoteSessions(r remoteListing) {
 		}
 	}
 	changed := false
-	for _, h := range loadRemoteHosts() {
+	hosts := loadRemoteHosts()
+	for name := range m.remote.last {
+		// A computer renamed, or forgotten, in remotes.json.
+		if !slices.ContainsFunc(hosts, func(h sessionhost.Host) bool { return h.Name == name }) {
+			delete(m.remote.last, name)
+			changed = true
+		}
+	}
+	for _, h := range hosts {
 		if _, failed := r.failed[h.Name]; !failed {
 			if !sameSessions(m.remote.last[h.Name], byHost[h.Name]) {
 				changed = true
