@@ -62,6 +62,7 @@ def main() -> int:
     (project / "assets").mkdir(parents=True)
     (project / "notes.md").write_text("hello\n")
     registry, claude_home, iso = work / "registry", work / "claude-home", work / "iso"
+    (work / "home").mkdir()
     socket = f"marmota-live-{os.getpid()}"
 
     def tmux(*a: str) -> str:
@@ -83,7 +84,10 @@ def main() -> int:
         "XDG_CACHE_HOME": str(iso / "cache"),
         "MARMOTA_TMUX_SOCKET": socket,
         # It never has your focus: it mustn't hold your input method in ASCII.
+        # A home of its own keeps the old Marmota, which knows no
+        # MARMOTA_NO_IME_HOLD, from it too: the hold is a file under ~.
         "MARMOTA_NO_IME_HOLD": "1",
+        "HOME": str(work / "home"),
         "TERM": "xterm-256color",
     }
     env_args = ["env", *[f"{k}={v}" for k, v in env.items()]]
