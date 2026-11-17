@@ -42,11 +42,12 @@ func ownTmux(t *testing.T) string {
 func resetTmuxRegistry() {
 	r := tmuxPanes
 	r.mu.Lock()
-	if r.local != nil {
-		r.local.Close()
-	}
-	r.local, r.ids, r.refs, r.lastID = nil, map[string]int{}, map[int]tmuxRef{}, 0
+	clients := r.clients
 	r.mu.Unlock()
+	for _, c := range clients {
+		c.Close()
+	}
+	tmuxPanes = newTmuxRegistry()
 }
 
 // fakeAgent sets its title as Claude Code does, then answers what it reads.

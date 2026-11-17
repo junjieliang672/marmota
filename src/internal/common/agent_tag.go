@@ -30,3 +30,21 @@ func RemoteControlMark(bg lipgloss.TerminalColor) string {
 	}
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(Theme.Correct)).Background(bg).Render(mark)
 }
+
+// HostMark says which computer a session runs on, on bg: a line-art monitor
+// for this one, a line-art cloud and the computer's name for another. Each
+// icon is followed by a space, so WezTerm draws it two cells wide. Without a
+// Nerd Font only another computer is marked, "@name".
+func HostMark(host string, bg lipgloss.TerminalColor) string {
+	style := lipgloss.NewStyle().Background(bg)
+	if !Config.Nerdfont {
+		if host == "" {
+			return ""
+		}
+		return style.Foreground(lipgloss.Color(Theme.Hint)).Render("@" + host)
+	}
+	if host == "" {
+		return style.Foreground(lipgloss.Color(Theme.FooterBorder)).Render("\U000F0379") // nf-md-monitor
+	}
+	return style.Foreground(lipgloss.Color(Theme.Hint)).Render("\U000F0163 " + host) // nf-md-cloud_outline
+}

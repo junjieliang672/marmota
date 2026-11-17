@@ -77,8 +77,9 @@ def screen(pane_id: int) -> str:
 
 # A row of the dock's Sessions box, at the screen's left edge: the bar that
 # marks the selected session, the number, the state glyph, the agent (cc for
-# Claude Code, which the fake claude stands for), the title.
-DOCK_ROW = re.compile(r"^│([▌ ]) (\d+) \S cc (.+?)(?:\s{2,}|│)")
+# Claude Code, which the fake claude stands for), the computer's mark, the
+# title.
+DOCK_ROW = re.compile(r"^│([▌ ]) (\d+) \S cc (?:\S )?(.+?)(?:\s{2,}|│)")
 
 
 # The mark of a session with Remote Control on, with a Nerd Font (the default).

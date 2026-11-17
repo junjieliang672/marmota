@@ -278,6 +278,10 @@ func listLive(ctx context.Context, o Options) ([]Session, error) {
 	return live, nil
 }
 
+// ApplySummary fills in what a transcript's summary says about a session:
+// its title, last turn, files edited, mode and model.
+func ApplySummary(s *Session, sum Summary) { applySummary(s, sum) }
+
 func applySummary(s *Session, sum Summary) {
 	switch {
 	case sum.CustomTitle != "":

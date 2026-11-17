@@ -42,6 +42,7 @@ func Run(content embed.FS) {
 		Authors:   []any{"Junjie Liang"},
 		ArgsUsage: "[PATH]...",
 		Commands: []*cli.Command{
+			sessionCommand(),
 			{
 				Name:    "path-list",
 				Aliases: []string{"pl"},

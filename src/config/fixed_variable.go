@@ -104,6 +104,12 @@ var (
 	// TmuxSinceFile holds when sessions first ran in tmux: running sessions
 	// Marmota didn't start are listed only when they started before.
 	TmuxSinceFile = filepath.Join(SuperFileStateDir, "tmux_since")
+	// RemotesFile holds the other computers sessions were started on, and
+	// how to reach them.
+	RemotesFile = filepath.Join(SuperFileStateDir, "remotes.json")
+	// RemoteTranscriptsDir holds copies of the transcripts of sessions on
+	// other computers, read a piece at a time.
+	RemoteTranscriptsDir = filepath.Join(SuperFileCacheDir, "remote-transcripts")
 
 	// Trash Directories
 	DarwinTrashDirectory = filepath.Join(HomeDir, ".Trash")

@@ -296,6 +296,11 @@ func (m *model) typeIntoSession(s claudesession.Session, question string) (tea.C
 	}
 	home, _ := os.UserHomeDir()
 	prompt := claudeask.Prompt(question, m.askContext(), home)
+	if s.Host != "" {
+		// The context block tells of this computer's folder and files,
+		// which aren't where the session runs.
+		prompt = question
+	}
 	title, paneID := s.DisplayTitle(), pane.PaneID
 	draft, mentions := m.sessions.composer.Value(), m.sessions.composer.Mentions()
 	m.flashClaude("Sending to " + title + "…")

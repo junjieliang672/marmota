@@ -111,23 +111,25 @@ const remotePath = `$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin`
 // Command.
 type Host struct {
 	// Local is this computer.
-	Local bool `toml:"-"`
+	Local bool `json:"-" toml:"-"`
 	// Name is how Marmota shows it: "nova".
-	Name string `toml:"name"`
+	Name string `json:"name" toml:"name"`
 	// SSH is the ssh destination, user@host or a Host from ~/.ssh/config.
 	// Marmota keeps one shared ssh connection to it (ControlMaster), so you
 	// log in once, and opening a session in a pane doesn't log in again.
-	SSH string `toml:"ssh"`
+	SSH string `json:"ssh,omitempty" toml:"ssh"`
+	// SSHArgs are ssh's options before the destination: ["-p", "2222"].
+	SSHArgs []string `json:"ssh_args,omitempty" toml:"ssh_args"`
 	// Command runs a command over there, its words followed by the command,
 	// for a computer ssh alone doesn't reach: ["corp", "ssh", "gpu-1", "--"].
-	Command []string `toml:"command"`
+	Command []string `json:"command,omitempty" toml:"command"`
 	// TTYCommand is Command with a terminal, for opening a session in a
 	// pane: ["corp", "ssh", "-t", "gpu-1", "--"]. Command when empty.
-	TTYCommand []string `toml:"tty_command"`
+	TTYCommand []string `json:"tty_command,omitempty" toml:"tty_command"`
 	// Login logs in before Command works, in a pane you see, such as
 	// ["corp", "login"]. For SSH it is an ssh that opens the shared
 	// connection, asking whatever ssh asks.
-	Login []string `toml:"login"`
+	Login []string `json:"login,omitempty" toml:"login"`
 }
 
 // Valid reports whether the host says how to reach it.
@@ -136,8 +138,10 @@ func (h Host) Valid() bool {
 }
 
 // Tmux is the tmux command for Marmota's server, for a shell over there.
+// The socket is MARMOTA_TMUX_SOCKET's over there when that is set, which
+// lets a test stand in for another computer with a tmux server of its own.
 func Tmux() string {
-	return `tmux -L ` + Socket + ` -f "` + configPath + `"`
+	return `tmux -L "${MARMOTA_TMUX_SOCKET:-` + Socket + `}" -f "` + configPath + `"`
 }
 
 // sshShared are the options that share one ssh connection per destination.
@@ -156,7 +160,7 @@ func (h Host) Argv(script string) []string {
 	}
 	if h.SSH != "" {
 		args := append([]string{"ssh", "-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10"}, sshShared()...)
-		return append(args, h.SSH, script)
+		return append(append(args, h.SSHArgs...), h.SSH, script)
 	}
 	return append(append([]string(nil), h.Command...), script)
 }
@@ -168,7 +172,7 @@ func (h Host) TTYArgv(script string) []string {
 		return []string{"/bin/sh", "-c", script}
 	}
 	if h.SSH != "" {
-		return append(append([]string{"ssh", "-t"}, sshShared()...), h.SSH, script)
+		return append(append(append([]string{"ssh", "-t"}, sshShared()...), h.SSHArgs...), h.SSH, script)
 	}
 	words := h.TTYCommand
 	if len(words) == 0 {
@@ -230,6 +234,42 @@ func (c *Client) reattachOnNewConfig() {
 	}
 }
 
+// guiServer starts the tmux server on a Mac reached over ssh in the session of
+// the person logged in at its screen, through launchd, when it isn't
+// running. A program started over ssh can't open the login keychain, where
+// Claude Code keeps its sign-in: in a server started from ssh it would say
+// "Not logged in". Started this way, the sessions in it are signed in as
+// one opened at that Mac is. Elsewhere, or with nobody logged in there, the
+// server starts as the control client starts it.
+const guiServer = `sock="${MARMOTA_TMUX_SOCKET:-` + "%SOCKET%" + `}"
+if [ -n "$SSH_CONNECTION" ] && ! tmux -L "$sock" has-session -t ` + TmuxSession + ` 2>/dev/null &&
+	[ "$(uname)" = Darwin ] &&
+	launchctl print "gui/$(id -u)" >/dev/null 2>&1; then
+	label="com.marmota.tmux.$sock"
+	plist="$HOME/.config/marmota/$label.plist"
+	bin=$(command -v tmux)
+	{
+		printf '<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0"><dict>\n'
+		printf '<key>Label</key><string>%s</string>\n' "$label"
+		printf '<key>ProgramArguments</key><array>'
+		for a in "$bin" -L "$sock" -f "$HOME/.config/marmota/tmux.conf" new-session -d -s ` + TmuxSession + ` -n _ 'exec cat'; do
+			printf '<string>%s</string>' "$a"
+		done
+		printf '</array>\n<key>EnvironmentVariables</key><dict>'
+		printf '<key>PATH</key><string>%s</string>' "$PATH"
+		printf '<key>LANG</key><string>%s</string>' "${LANG:-en_US.UTF-8}"
+		printf '</dict>\n<key>RunAtLoad</key><true/>\n</dict></plist>\n'
+	} > "$plist"
+	launchctl bootout "gui/$(id -u)/$label" 2>/dev/null
+	launchctl bootstrap "gui/$(id -u)" "$plist"
+	i=0
+	while ! tmux -L "$sock" has-session -t ` + TmuxSession + ` 2>/dev/null && [ $i -lt 50 ]; do
+		sleep 0.1
+		i=$((i + 1))
+	done
+fi
+`
+
 // ErrClosed is returned once the connection has ended.
 var ErrClosed = errors.New("the connection has ended")
 
@@ -269,8 +309,11 @@ func Dial(ctx context.Context, h Host) (*Client, error) {
 	// The config is written first, so a server that starts reads it; the
 	// first window is a shell that waits, as a session can't be empty.
 	start := `mkdir -p "$HOME/.config/marmota" && cat > "` + configPath + `" <<'MARMOTA_TMUX_CONF'` + "\n" +
-		Config + "MARMOTA_TMUX_CONF\n" +
-		"exec " + Tmux() + " -u -C new-session -A -s " + TmuxSession + " -n _ -x 200 -y 50 'exec cat'"
+		Config + "MARMOTA_TMUX_CONF\n"
+	if !h.Local {
+		start += strings.ReplaceAll(guiServer, "%SOCKET%", Socket)
+	}
+	start += "exec " + Tmux() + " -u -C new-session -A -s " + TmuxSession + " -n _ -x 200 -y 50 'exec cat'"
 	argv := h.Argv(Script(start))
 	cmd := exec.Command(argv[0], argv[1:]...) //nolint:gosec // the command config.toml gives
 	stdin, err := cmd.StdinPipe()

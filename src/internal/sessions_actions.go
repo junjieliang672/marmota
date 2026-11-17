@@ -191,6 +191,10 @@ func (m *model) launchParkedAgent(cwd, command string, provider managedAgentProv
 
 // forkClaudeSession continues a copy of the session in a new git worktree.
 func (m *model) forkClaudeSession(s claudesession.Session) {
+	if s.Host != "" {
+		m.flashClaude("Forking makes a git worktree on this computer; " + s.DisplayTitle() + " runs on " + s.Host)
+		return
+	}
 	dir := m.claudeSessionDir(s)
 	if !insideGitRepository(dir) {
 		m.flashClaude("Forking makes a git worktree, and " + tildePath(dir) + " isn't in a git repository")

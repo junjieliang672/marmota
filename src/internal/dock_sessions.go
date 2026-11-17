@@ -390,6 +390,9 @@ func (m *model) dockRow(n int, s claudesession.Session, selected bool, width int
 	}
 	prefix := mark + dim.Render(strconv.Itoa(n)+" ") + sessionsui.Glyph(state, bg) + base.Render(" ") +
 		common.AgentTag(s.IsCodex(), bg) + base.Render(" ")
+	if host := common.HostMark(s.Host, bg); host != "" {
+		prefix += host + base.Render(" ")
+	}
 	age := dim.Render(shortAge(now, sessionAgeAnchor(s)))
 	if s.RemoteControl { // beside the age, so the titles stay in line
 		age = common.RemoteControlMark(bg) + base.Render(" ") + age

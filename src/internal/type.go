@@ -174,6 +174,8 @@ type model struct {
 	managedWeztermPaneID int
 	// tmux is this Marmota's side of the sessions it runs in tmux.
 	tmux tmuxState
+	// remote is this Marmota's side of the other computers' sessions.
+	remote remoteState
 
 	// Claude Code sessions: the status line, unread markers and the keys
 	// that show sessions beside superfile.

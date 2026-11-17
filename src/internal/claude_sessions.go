@@ -121,6 +121,8 @@ type claudeSessionsSnapshotMsg struct {
 	layoutGen   int
 	// codex are Codex's sessions, merged in once the panes are known.
 	codex []claudesession.Session
+	// remote is what the other computers Marmota remembers run.
+	remote remoteListing
 }
 
 // claudeSessionsRefreshCmd lists sessions in the background. Only one refresh
@@ -143,6 +145,7 @@ func (m *model) claudeSessionsRefreshCmd() tea.Cmd {
 	}
 	tracker := m.claude.tracker
 	layoutGen := m.claude.layoutGen
+	remote := m.tmuxSessionsOn()
 	run := claudeSessionRunner
 	projects := claudeProjectsDir()
 	order := m.claudeSessionsOrder()
@@ -168,6 +171,9 @@ func (m *model) claudeSessionsRefreshCmd() tea.Cmd {
 		msg := claudeSessionsSnapshotMsg{snapshot: snap, folder: folder, layoutGen: layoutGen}
 		msg.codex = collectCodexSessions(codexsession.Options{Home: codexDir, Tracker: codexTracker,
 			Since: opts.Since, Folders: snap.Folders, Include: opts.Include})
+		if remote {
+			msg.remote = listRemoteSessions(tracker)
+		}
 		if os.Getenv("WEZTERM_PANE") != "" {
 			if listed, err := listWeztermPanes(folder); err == nil {
 				msg.panes, msg.panesListed = listed, true
@@ -207,6 +213,7 @@ func (m *model) applyClaudeSessionsSnapshot(msg claudeSessionsSnapshotMsg) tea.C
 		m.claude.panes = msg.panes
 	}
 	m.mergeCodexSessions(msg.codex)
+	m.mergeRemoteSessions(msg.remote)
 	if m.tmuxSessionsOn() {
 		m.settleTmuxShown()
 		m.dropSessionsOutsideMarmota()
@@ -587,6 +594,10 @@ func (m *model) sendSelectionToAgent() {
 			firstKey(common.Hotkeys.JumpToUnreadSession) + " then enter, or start one with >claude or >codex")
 		return
 	}
+	if session.Host != "" {
+		m.flashClaude(session.DisplayTitle() + " runs on " + session.Host + ", where this computer's files aren't")
+		return
+	}
 	// A leading space keeps the first mention apart from what the prompt
 	// already holds: Claude Code reads a mention only as a word of its own.
 	text := " " + formatAgentReferences(paths, session.Cwd)
@@ -638,6 +649,10 @@ func (m *model) moveClaudeSessionHere() tea.Cmd {
 // the session, from its next turn on.
 func (m *model) moveClaudeSessionTo(s claudesession.Session) tea.Cmd {
 	title := s.DisplayTitle()
+	if s.Host != "" {
+		m.flashClaude(title + " runs on " + s.Host + ": the file panel's folders are this computer's")
+		return nil
+	}
 	if !s.Live {
 		m.flashClaude(title + " has ended; resume it to move it")
 		return nil

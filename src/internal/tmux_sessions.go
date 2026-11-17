@@ -55,59 +55,143 @@ const tmuxPaneWorkspace = "tmux"
 // tmuxDialTimeout is how long starting or reaching the tmux server may take.
 const tmuxDialTimeout = 10 * time.Second
 
-// tmuxRef is the tmux pane behind a negative pane id.
+// tmuxRef is the tmux pane behind a negative pane id: on which computer
+// ("" for this one), in which window.
 type tmuxRef struct {
-	window, pane string
+	host, window, pane string
 }
 
 // tmuxPanes numbers Marmota's tmux windows for the rest of Marmota, and holds
-// the connection to this computer's tmux. The pane seams run outside the
+// the connection to each computer's tmux. The pane seams run outside the
 // model, in commands, so it is shared.
-var tmuxPanes = &tmuxRegistry{ids: map[string]int{}, refs: map[int]tmuxRef{}} //nolint:gochecknoglobals // shared with commands
+var tmuxPanes = newTmuxRegistry() //nolint:gochecknoglobals // shared with commands
 
 type tmuxRegistry struct {
-	mu     sync.Mutex
-	local  *sessionhost.Client
-	ids    map[string]int // window id → pane id
-	refs   map[int]tmuxRef
-	lastID int
+	mu      sync.Mutex
+	clients map[string]*sessionhost.Client // by host, "" for this computer
+	// failed is when reaching a host last failed, and why: it isn't tried
+	// again for a while.
+	failed  map[string]hostFailure
+	dialing map[string]*sync.Mutex
+	ids     map[string]int // host and window → pane id
+	refs    map[int]tmuxRef
+	lastID  int
 }
+
+type hostFailure struct {
+	at  time.Time
+	err error
+}
+
+func newTmuxRegistry() *tmuxRegistry {
+	return &tmuxRegistry{clients: map[string]*sessionhost.Client{}, failed: map[string]hostFailure{},
+		dialing: map[string]*sync.Mutex{}, ids: map[string]int{}, refs: map[int]tmuxRef{}}
+}
+
+// redialAfter is how long a host that couldn't be reached is left alone.
+const redialAfter = 15 * time.Second
 
 // localTmux is the connection to this computer's tmux server, which it
 // starts when it isn't running.
 func localTmux() (*sessionhost.Client, error) {
+	return hostClient("")
+}
+
+// hostClient is the connection to a computer's tmux: "" for this one, else
+// one Marmota remembers (see remote_hosts.go). It connects when there is no
+// connection, unless connecting failed a moment ago.
+func hostClient(name string) (*sessionhost.Client, error) {
 	r := tmuxPanes
 	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.local != nil {
+	if c := r.clients[name]; c != nil {
 		select {
-		case <-r.local.Done():
-			r.local = nil
+		case <-c.Done():
+			delete(r.clients, name)
 		default:
-			return r.local, nil
+			r.mu.Unlock()
+			return c, nil
 		}
+	}
+	if f, ok := r.failed[name]; ok && name != "" && time.Since(f.at) < redialAfter {
+		r.mu.Unlock()
+		return nil, f.err
+	}
+	dial := r.dialing[name]
+	if dial == nil {
+		dial = &sync.Mutex{}
+		r.dialing[name] = dial
+	}
+	r.mu.Unlock()
+
+	dial.Lock() // one connection at a time to each host
+	defer dial.Unlock()
+	r.mu.Lock()
+	if c := r.clients[name]; c != nil {
+		r.mu.Unlock()
+		return c, nil
+	}
+	r.mu.Unlock()
+	host := sessionhost.Host{Local: true}
+	if name != "" {
+		h, ok := remoteHostNamed(name)
+		if !ok {
+			return nil, fmt.Errorf("Marmota doesn't know a computer called %s", name)
+		}
+		host = h
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), tmuxDialTimeout)
 	defer cancel()
-	c, err := sessionhost.Dial(ctx, sessionhost.Host{Local: true})
+	c, err := sessionhost.Dial(ctx, host)
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if err != nil {
-		return nil, fmt.Errorf("couldn't start tmux: %w", err)
+		if name == "" {
+			return nil, fmt.Errorf("couldn't start tmux: %w", err)
+		}
+		err = hostError(name, err)
+		r.failed[name] = hostFailure{at: time.Now(), err: err}
+		return nil, err
 	}
-	r.local = c
+	delete(r.failed, name)
+	r.clients[name] = c
 	return c, nil
 }
 
+// hostError says why a computer couldn't be reached, and what to do when
+// logging in would help.
+func hostError(name string, err error) error {
+	if sessionhost.NeedsLogin(err) {
+		return fmt.Errorf("%s needs you to log in (%w): log in once in a terminal, then try again", name, err)
+	}
+	return fmt.Errorf("couldn't reach %s: %w", name, err)
+}
+
+// hostReachError is why a host couldn't be reached lately, if it couldn't.
+func hostReachError(name string) error {
+	tmuxPanes.mu.Lock()
+	defer tmuxPanes.mu.Unlock()
+	if _, ok := tmuxPanes.clients[name]; ok {
+		return nil
+	}
+	if f, ok := tmuxPanes.failed[name]; ok {
+		return f.err
+	}
+	return nil
+}
+
 // paneIDOf is the pane id of a window, the same each time it is asked.
-func (r *tmuxRegistry) paneIDOf(w sessionhost.Window) int {
+func (r *tmuxRegistry) paneIDOf(host string, w sessionhost.Window) int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if id, ok := r.ids[w.ID]; ok {
-		r.refs[id] = tmuxRef{window: w.ID, pane: w.PaneID}
+	key := host + "\x00" + w.ID
+	ref := tmuxRef{host: host, window: w.ID, pane: w.PaneID}
+	if id, ok := r.ids[key]; ok {
+		r.refs[id] = ref
 		return id
 	}
 	r.lastID--
-	r.ids[w.ID] = r.lastID
-	r.refs[r.lastID] = tmuxRef{window: w.ID, pane: w.PaneID}
+	r.ids[key] = r.lastID
+	r.refs[r.lastID] = ref
 	return r.lastID
 }
 
@@ -120,10 +204,18 @@ func (r *tmuxRegistry) ref(id int) (tmuxRef, bool) {
 
 func isTmuxPane(id int) bool { return id < 0 }
 
+// remoteTTY stands for the terminal of a pane on another computer: a
+// session there is matched to its pane by it, as one here is by its tty.
+func remoteTTY(host, paneID string) string { return "remote:" + host + ":" + paneID }
+
 // tmuxPaneOf is a window as the rest of Marmota sees a pane.
-func tmuxPaneOf(w sessionhost.Window) weztermPane {
+func tmuxPaneOf(host string, w sessionhost.Window) weztermPane {
+	tty := w.TTY
+	if host != "" {
+		tty = remoteTTY(host, w.PaneID)
+	}
 	return weztermPane{
-		PaneID: tmuxPanes.paneIDOf(w), TabID: -1, WindowID: -1, Title: w.Title, Cwd: w.Cwd, TTYName: w.TTY,
+		PaneID: tmuxPanes.paneIDOf(host, w), TabID: -1, WindowID: -1, Title: w.Title, Cwd: w.Cwd, TTYName: tty,
 		Workspace: tmuxPaneWorkspace, Size: weztermPaneSize{Rows: w.Height, Cols: w.Width},
 	}
 }
@@ -144,7 +236,7 @@ func listTmuxPanes() ([]weztermPane, error) {
 	}
 	panes := make([]weztermPane, 0, len(windows))
 	for _, w := range windows {
-		panes = append(panes, tmuxPaneOf(w))
+		panes = append(panes, tmuxPaneOf("", w))
 	}
 	if ttys, err := c.ClientTTYs(); err == nil {
 		viewerTTYs.Store(ttys)
@@ -156,7 +248,7 @@ func listTmuxPanes() ([]weztermPane, error) {
 // starting it.
 func tmuxServerRunning() bool {
 	tmuxPanes.mu.Lock()
-	connected := tmuxPanes.local != nil
+	connected := tmuxPanes.clients[""] != nil
 	tmuxPanes.mu.Unlock()
 	if connected {
 		return true
@@ -170,7 +262,7 @@ func tmuxTarget(id int) (*sessionhost.Client, tmuxRef, error) {
 	if !ok {
 		return nil, tmuxRef{}, fmt.Errorf("no tmux pane %d", id)
 	}
-	c, err := localTmux()
+	c, err := hostClient(ref.host)
 	return c, ref, err
 }
 
@@ -240,7 +332,7 @@ func (m *model) startTmuxAgent(cwd, command string, provider managedAgentProvide
 	if err != nil {
 		return 0, fmt.Errorf("couldn't start the session in tmux: %w", err)
 	}
-	pane := tmuxPaneOf(w)
+	pane := tmuxPaneOf("", w)
 	// Listed at once, so the session is found in it before the next refresh.
 	m.claude.panes = append(m.claude.panes, pane)
 	m.tmux.lastLaunched = pane.PaneID
@@ -341,6 +433,13 @@ func (m *model) showTmuxPane(id int, title string, focus bool) (string, error) {
 	cwd := m.getFocusedFilePanel().location
 	view := tmuxView(self)
 	viewer, shown := m.tmuxViewerPane()
+	if shown && m.tmux.viewerHost != ref.host {
+		// It attaches to another computer's tmux: a new one takes its place.
+		if err := killWeztermPane(cwd, viewer.PaneID); err != nil {
+			return "", err
+		}
+		m.tmux.viewer, m.tmux.viewWindow, shown = 0, "", false
+	}
 	switch {
 	case shown && m.tmux.viewWindow == ref.window:
 		if err := activateWeztermPane(cwd, viewer.PaneID); err != nil {
@@ -353,11 +452,11 @@ func (m *model) showTmuxPane(id int, title string, focus bool) (string, error) {
 		}
 	default:
 		m.parkLegacyAgentPane(cwd, self)
-		paneID, err := m.splitTmuxViewer(cwd, self, sessionhost.AttachCommand(view, ref.window))
+		paneID, err := m.splitTmuxViewer(cwd, self, attachCommand(ref.host, view, ref.window))
 		if err != nil {
 			return "", err
 		}
-		m.tmux.viewer = paneID
+		m.tmux.viewer, m.tmux.viewerHost = paneID, ref.host
 	}
 	m.tmux.viewWindow = ref.window
 	m.markTmuxShown(id)
@@ -373,6 +472,25 @@ func (m *model) showTmuxPane(id int, title string, focus bool) (string, error) {
 		return "Switched to " + title, nil
 	}
 	return "Showing " + title, nil
+}
+
+// attachCommand is the shell command, for a pane here, that shows a window
+// of a computer's tmux: through its terminal connection for another one.
+func attachCommand(host, view, window string) string {
+	attach := sessionhost.AttachCommand(view, window)
+	if host == "" {
+		return attach
+	}
+	h, ok := remoteHostNamed(host)
+	if !ok {
+		return attach
+	}
+	argv := h.TTYArgv(sessionhost.Script(attach))
+	words := make([]string, len(argv))
+	for i, a := range argv {
+		words[i] = shellQuote(a)
+	}
+	return strings.Join(words, " ")
 }
 
 // splitTmuxViewer opens the pane beside Marmota that shows tmux windows.
@@ -437,13 +555,14 @@ func (m *model) settleTmuxShown() {
 	if err != nil {
 		return
 	}
-	c, err := localTmux()
+	c, err := hostClient(m.tmux.viewerHost)
 	if err != nil {
 		return
 	}
 	m.tmux.viewWindow = c.ViewWindow(tmuxView(self))
 	for _, p := range m.claude.panes {
-		if ref, ok := tmuxPanes.ref(p.PaneID); ok && isTmuxPane(p.PaneID) && ref.window == m.tmux.viewWindow {
+		if ref, ok := tmuxPanes.ref(p.PaneID); ok && isTmuxPane(p.PaneID) && ref.host == m.tmux.viewerHost &&
+			ref.window == m.tmux.viewWindow {
 			m.markTmuxShown(p.PaneID)
 			return
 		}
@@ -479,9 +598,10 @@ func isViewerPane(p weztermPane) bool {
 // tmuxState is this Marmota's side of the sessions in tmux.
 type tmuxState struct {
 	// viewer is the WezTerm pane beside Marmota that shows a window, and
-	// viewWindow the window it shows.
+	// viewWindow the window it shows, on viewerHost ("" for this computer).
 	viewer     int
 	viewWindow string
+	viewerHost string
 	// lastLaunched is the pane of the session started last.
 	lastLaunched int
 	// migrated holds the old WezTerm panes whose sessions moved to tmux.

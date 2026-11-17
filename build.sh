@@ -260,6 +260,18 @@ build_shelf
 remove_old_binaries
 setup_shell
 
+# The skill that tells Claude Code (and Codex, when it is set up) about
+# `y session`: starting and following sessions here or on other computers
+install_session_skill() {
+    local src="$REPO/scripts/skills/marmota-sessions/SKILL.md" dir
+    for dir in "$HOME/.claude/skills" "$HOME/.codex/skills"; do
+        [[ -d $(dirname "$dir") ]] || continue
+        mkdir -p "$dir/marmota-sessions"
+        cp "$src" "$dir/marmota-sessions/SKILL.md"
+    done
+}
+install_session_skill
+
 # Marmota's WezTerm look: the active pane bright, blue lines between panes, a
 # blue edge beside the active pane (a block in ~/.wezterm.lua, kept current)
 if [[ $(uname -s) == "Darwin" && -f "$HOME/.wezterm.lua" ]]; then

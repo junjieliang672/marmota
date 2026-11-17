@@ -19,6 +19,10 @@ on PATH and a tmux server of its own (MARMOTA_TMUX_SOCKET). Checks:
   5. x stops it: its window closes and it leaves the Sessions box.
   6. WezTerm loses Marmota and the pane beside it: a new Marmota lists every
      session still running, and enter shows a tmux one beside it again.
+  7. `y session start --on` starts a session on "another computer" (this
+     one, through a command, with a tmux server of its own): it shows in the
+     Sessions box with that computer's name, `y session send` and `read`
+     reach it, enter shows it beside Marmota, and x stops it.
 
 It never focuses a pane, so your active workspace and window don't change.
 Everything it starts is killed at the end, its tmux server too.
@@ -29,7 +33,9 @@ Usage: python3 testsuite/live/tmux_sessions_test.py --binary /tmp/marmota-new/y 
 from __future__ import annotations
 
 import argparse
+import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -239,6 +245,65 @@ def main() -> int:
         type_keys(spf, "\x1b")
         print(f"ok   after WezTerm lost Marmota and the pane beside it, a new Marmota listed {sorted(again)} "
               "and showed the tmux session beside it")
+
+        # 7. a session on another computer
+        remote_socket = socket + "-remote"
+        on = f"env MARMOTA_TMUX_SOCKET={remote_socket} /bin/sh -c"
+
+        def y(*a: str) -> str:
+            return subprocess.run(["env", *[f"{k}={v}" for k, v in env.items()], new, "session", *a],
+                                  check=True, capture_output=True, text=True, cwd=project).stdout
+
+        started_out = y("start", "--on", on, "--cwd", str(project), "--", "from far away")
+        remote_id = started_out.split()[1]
+        host = started_out.split(" on ")[1].split(" in ")[0]
+        listed_json = json.loads(y("list", "--json"))
+        assert any(s["id"] == remote_id and s["host"] == host for s in listed_json["sessions"]), listed_json
+        y("send", remote_id[:8], "and one more")
+        wait_for("the message in the remote session", lambda: "and one more" in subprocess.run(
+            ["tmux", "-L", remote_socket, "capture-pane", "-p", "-t", "cc-" + remote_id],
+            capture_output=True, text=True).stdout)
+        assert "from far away" in y("read", remote_id[:8])
+        type_keys(spf, "!")
+        wait_for("the Sessions box", lambda: in_sessions_box(spf))
+        row = wait_for("the remote session's row", lambda: next(
+            (line for line in screen(spf).splitlines() if host in line), None))
+        remote_title = row.split(host, 1)[1].split()[0]
+
+        def pick_remote() -> None:
+            """Puts the Sessions box on the remote row by its number: the Ask box
+            says whom it writes to."""
+            number = re.search(r"│\S?\s*(\d+) ", row_of(remote_title)).group(1)
+            for key in number + "g":
+                type_keys(spf, key)
+                time.sleep(0.1)
+            wait_for("the remote session picked", lambda: f"→ {remote_title}" in screen(spf))
+
+        def row_of(title: str) -> str:
+            return wait_for(f"{title}'s row", lambda: next(
+                (line for line in screen(spf).splitlines() if host in line and title in line), None))
+
+        pick_remote()
+        type_keys(spf, "\r")
+        remote_viewer = wait_for("it beside Marmota", lambda: next(
+            (p for p in panes() if p["tab_id"] == spf_tab and p["pane_id"] != spf
+             and "and one more" in screen(p["pane_id"])), None))
+        type_keys(spf, "\x1b")
+        wait_for("the files", lambda: not in_sessions_box(spf))
+        type_keys(spf, "!")
+        wait_for("the Sessions box", lambda: in_sessions_box(spf))
+        pick_remote()
+        type_keys(spf, "x")
+        wait_for("the stop question", lambda: "Stop" in screen(spf))
+        type_keys(spf, "\r")
+        wait_for("its window to close over there", lambda: "cc-" + remote_id not in subprocess.run(
+            ["tmux", "-L", remote_socket, "list-windows", "-a", "-F", "#{window_name}"],
+            capture_output=True, text=True).stdout)
+        wait_for("the pane beside Marmota to close", lambda: pane_by_id(remote_viewer["pane_id"]) is None)
+        type_keys(spf, "\x1b")
+        subprocess.run(["tmux", "-L", remote_socket, "kill-server"], capture_output=True)
+        print(f"ok   y session start --on started a session on {host}; it showed in the Sessions box with its "
+              "computer's name; send and read reached it; enter showed it beside Marmota; x stopped it")
 
         after = client_state()
         assert after == (before_workspace, before_focus), f"the test changed your window: {after}"
