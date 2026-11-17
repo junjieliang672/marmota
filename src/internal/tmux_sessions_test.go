@@ -204,3 +204,12 @@ func TestSessionsThatRanBeforeTmuxStayListed(t *testing.T) {
 		"one you started before keeps its place; a new one you started yourself isn't Marmota's")
 	assert.True(t, since.Equal(tmuxSince()), "the moment is noted once")
 }
+
+func TestAMovedSessionResumesAsItRan(t *testing.T) {
+	assert.Equal(t, "claude --resume a1 --permission-mode plan --model claude-opus-5-5 --effort high --remote-control", movedSessionCommand(claudesession.Session{ID: "a1", PermissionMode: "plan",
+		Model: "claude-opus-5-5", Effort: "high", RemoteControl: true}))
+	assert.Equal(t, "claude --resume b2 --dangerously-skip-permissions",
+		movedSessionCommand(claudesession.Session{ID: "b2", PermissionMode: "bypassPermissions"}))
+	assert.Equal(t, "claude --resume c3 --permission-mode default",
+		movedSessionCommand(claudesession.Session{ID: "c3", PermissionMode: "default"}))
+}

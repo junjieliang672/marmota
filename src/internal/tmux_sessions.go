@@ -27,6 +27,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	variable "github.com/junjieliang672/marmota/src/config"
+	"github.com/junjieliang672/marmota/src/pkg/claudeask"
 	"github.com/junjieliang672/marmota/src/pkg/claudesession"
 	"github.com/junjieliang672/marmota/src/pkg/sessionhost"
 )
@@ -514,7 +515,7 @@ func (m *model) migrateToTmux() tea.Cmd {
 		if s.IsCodex() {
 			provider = managedAgentProviderCodex
 		}
-		paneID, err := m.startTmuxAgent(m.claudeSessionDir(s), resumeCommand(s), provider, s.ID)
+		paneID, err := m.startTmuxAgent(m.claudeSessionDir(s), movedSessionCommand(s), provider, s.ID)
 		if err != nil {
 			slog.Error("Could not resume a session in tmux", "session", s.ID, "error", err)
 			m.flashClaude("Couldn't move " + s.DisplayTitle() + " into tmux: " + err.Error())
@@ -539,6 +540,24 @@ func (m *model) migrateToTmux() tea.Cmd {
 	}
 	m.flashClaude("Moved into tmux, where they outlive WezTerm: " + strings.Join(moved, ", "))
 	return nil
+}
+
+// movedSessionCommand resumes a session that moves into tmux as it ran: in
+// its permission mode, with its model and effort, and with Remote Control
+// when it had it. A Codex session resumes with its own settings.
+func movedSessionCommand(s claudesession.Session) string {
+	if s.IsCodex() {
+		return resumeCommand(s)
+	}
+	args := append(claudeask.PermissionArgs(s.PermissionMode), claudeask.ChoiceArgs(s.Model, s.Effort)...)
+	if s.RemoteControl {
+		args = append(args, "--remote-control")
+	}
+	parts := []string{"claude", "--resume", shellQuote(s.ID)}
+	for _, arg := range args {
+		parts = append(parts, shellQuote(arg))
+	}
+	return strings.Join(parts, " ")
 }
 
 // promptEmpty reports a Claude Code session whose prompt shows and holds
