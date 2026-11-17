@@ -64,7 +64,8 @@ type Session struct {
 	Cwd   string
 
 	Live       bool
-	Background bool // started with `claude --bg`; has no terminal of its own
+	Background bool   // started with `claude --bg`; has no terminal of its own
+	JobID      string // a background session's id in `claude agents`, the one `claude stop` takes
 	Status     Status
 	RawStatus  string
 	PID        int

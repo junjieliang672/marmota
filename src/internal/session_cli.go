@@ -447,7 +447,8 @@ func sessionsOutsideMarmota(c *sessionhost.Client, host string) ([]claudesession
 func adoptSession(c *sessionhost.Client, s claudesession.Session) error {
 	switch {
 	case s.Background:
-		target := s.Name
+		// `claude stop` takes the job's id, not its name.
+		target := s.JobID
 		if target == "" {
 			target = s.ID
 		}

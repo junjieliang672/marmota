@@ -638,3 +638,12 @@ func TestCollectListsOnlyRecentFinishedSessions(t *testing.T) {
 	}
 	assert.ElementsMatch(t, []string{"today", "old-ask"}, ids)
 }
+
+func TestABackgroundSessionKeepsTheIDClaudeStopTakes(t *testing.T) {
+	sessions, err := ParseLive([]byte(`[{"id":"09c7aed8","kind":"background",` +
+		`"sessionId":"09c7aed8-5b90-4a03-8664-0d16942fb743","name":"marmota-nova","status":"idle"}]`))
+	require.NoError(t, err)
+	require.Len(t, sessions, 1)
+	assert.Equal(t, "09c7aed8", sessions[0].JobID, "`claude stop` takes the job's id, not its name")
+	assert.True(t, sessions[0].Background)
+}

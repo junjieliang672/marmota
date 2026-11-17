@@ -44,6 +44,7 @@ func (f *flexInt) UnmarshalJSON(b []byte) error {
 
 type liveEntry struct {
 	PID        flexInt `json:"pid"`
+	JobID      string  `json:"id"`
 	Cwd        string  `json:"cwd"`
 	Kind       string  `json:"kind"`
 	StartedAt  flexInt `json:"startedAt"`
@@ -74,6 +75,7 @@ func ParseLive(data []byte) ([]Session, error) {
 			Cwd:        e.Cwd,
 			Live:       true,
 			Background: strings.EqualFold(e.Kind, "background"),
+			JobID:      e.JobID,
 			RawStatus:  e.Status,
 			Status:     mapStatus(e.Status),
 			WaitingFor: e.WaitingFor,

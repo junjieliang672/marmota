@@ -410,7 +410,8 @@ func (m *model) stopPendingClaudeSession() {
 			}
 		}
 	case s.Background:
-		target := s.Name
+		// `claude stop` takes the job's id, not its name.
+		target := s.JobID
 		if target == "" {
 			target = s.ID
 		}
