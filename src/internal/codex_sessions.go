@@ -243,7 +243,7 @@ func codexPaneTitle(title string) (string, string, bool) {
 // recordCodexPane notes the pane superfile started a Codex session in, also
 // in the agent panes' state, for the next superfile.
 func (m *model) recordCodexPane(id string, paneID int) {
-	if id == "" || paneID <= 0 {
+	if id == "" || paneID == 0 {
 		return
 	}
 	if m.codex.panes == nil {
@@ -297,6 +297,9 @@ func (m *model) restoreCodexPanes() {
 
 // lastLaunchedPaneID is the agent pane superfile started last.
 func (m *model) lastLaunchedPaneID() int {
+	if m.tmuxSessionsOn() && m.tmux.lastLaunched != 0 {
+		return m.tmux.lastLaunched
+	}
 	sessions := m.managedWeztermState.Sessions
 	if len(sessions) == 0 {
 		return 0
@@ -318,7 +321,7 @@ func (m *model) jumpToCodexSession(s claudesession.Session, focus bool) (string,
 	}
 	args := append([]string{"resume", s.ID}, codexsession.LaunchArgs()...)
 	message, err := m.launchVisibleAgent(m.claudeSessionDir(s), codexLaunch(args...), managedAgentProviderCodex,
-		verb+title, focus)
+		verb+title, focus, s.ID)
 	if err == nil {
 		m.recordCodexPane(s.ID, m.lastLaunchedPaneID())
 	}
@@ -506,7 +509,7 @@ func (m *model) startCodexSession(folder, id, question string) (tea.Cmd, error) 
 	}}
 	args := append(codexsession.PermissionArgs(c.PermissionMode()), codexsession.ModelArgs(model)...)
 	st.began = time.Now()
-	paneID, err := m.launchParkedAgent(folder, codexLaunch(args...), managedAgentProviderCodex)
+	paneID, err := m.launchParkedAgent(folder, codexLaunch(args...), managedAgentProviderCodex, "")
 	if err != nil {
 		return nil, err
 	}

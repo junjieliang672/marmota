@@ -195,7 +195,7 @@ func (m *model) resumeHidden(s claudesession.Session, command string) (tea.Cmd, 
 	if s.IsCodex() {
 		provider = managedAgentProviderCodex
 	}
-	paneID, err := m.launchParkedAgent(folder, command, provider)
+	paneID, err := m.launchParkedAgent(folder, command, provider, s.ID)
 	if err != nil {
 		return nil, err
 	}

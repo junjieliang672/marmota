@@ -54,6 +54,11 @@ slug=$(printf "%s" "$cwd" | sed "s/[^A-Za-z0-9]/-/g")
 dir="$CLAUDE_CONFIG_DIR/projects/$slug"
 mkdir -p "$dir"
 transcript="$dir/$id.jsonl"
+# A resumed session keeps its title, as Claude Code's does.
+if [ -s "$transcript" ]; then
+	kept=$(sed -n 's/.*"aiTitle":"\([^"]*\)".*/\1/p' "$transcript" | head -n 1)
+	[ -z "$kept" ] || title="$kept"
+fi
 now=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
 {
 	printf '{"type":"ai-title","aiTitle":"%s","sessionId":"%s"}\n' "$title" "$id"

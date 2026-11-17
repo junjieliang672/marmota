@@ -201,6 +201,9 @@ def main() -> int:
         f"XDG_STATE_HOME={iso / 'state'}",
         f"XDG_CACHE_HOME={iso / 'cache'}",
         "TERM=xterm-256color",
+        # Sessions in WezTerm panes, as Marmota runs them without tmux; the
+        # tmux ones are tmux_sessions_test.py's.
+        "MARMOTA_NO_TMUX=1",
     ]
     before_workspace, before_focus = client_state()
     started: list[int] = []
@@ -221,13 +224,13 @@ def main() -> int:
         # Hide the dock: the steps below bring it back when they need it.
         type_keys(spf, "F")
         print("ok   superfile is running in the test workspace")
-        # s opens the go to popup over the panels.
+        # s lists in the file panel's place.
         type_keys(spf, "s")
-        wait_for("the go to popup", lambda: "Pinned" in screen(spf) and "Folders" in screen(spf)
-                 and "↓ pick" in screen(spf))
+        wait_for("the go to list", lambda: "↓:pick" in screen(spf) and "Pinned" in screen(spf)
+                 and "Folders" in screen(spf))
         type_keys(spf, "\x1b")
-        wait_for("the popup to close", lambda: "↓ pick" not in screen(spf))
-        print("ok   s opens the go to popup with its sections; esc closes it")
+        wait_for("the list to close", lambda: "↓:pick" not in screen(spf))
+        print("ok   s opens the go to list with its sections in the file panel; esc closes it")
 
         # 1. first agent opens beside Marmota
         type_keys(spf, ">")

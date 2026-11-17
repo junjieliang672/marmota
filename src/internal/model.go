@@ -943,7 +943,7 @@ func (m *model) launchAgentBesideSuperfile(command string, provider managedAgent
 	message string,
 ) (string, error) {
 	return m.launchVisibleAgent(m.fileModel.filePanels[m.filePanelFocusIndex].location, command, provider, message,
-		true)
+		true, "")
 }
 
 func (m *model) launchClaudeInWezterm(remoteControl bool) (string, error) {

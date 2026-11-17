@@ -365,6 +365,29 @@ install_git() {
     fi
 }
 
+install_tmux() {
+    # Marmota runs agent sessions in tmux, so they outlive WezTerm.
+    if command -v tmux &> /dev/null; then
+        log_success "tmux already installed ($(tmux -V | awk '{print $2}'))"
+        return
+    fi
+
+    log_info "Installing tmux..."
+
+    if [[ $DRY_RUN == true ]]; then
+        log_info "[DRY RUN] Would install tmux"
+        return
+    fi
+
+    if brew install tmux; then
+        log_success "tmux installed successfully"
+        INSTALLED_CORE+=("tmux")
+    else
+        log_warning "Failed to install tmux: sessions run in WezTerm panes and end with WezTerm"
+        FAILED+=("tmux")
+    fi
+}
+
 install_optional_deps() {
     if [[ $INSTALL_MODE == "minimal" ]] || [[ $SKIP_OPTIONAL == true ]]; then
         log_warning "Skipping optional dependencies (mode: $INSTALL_MODE)"
@@ -1173,6 +1196,7 @@ main() {
     install_homebrew
     install_go
     install_git
+    install_tmux
 
     # Optional dependencies
     if [[ $INSTALL_MODE == "full" ]] || [[ $INSTALL_MODE == "dev" ]]; then

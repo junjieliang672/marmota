@@ -32,7 +32,7 @@ func (m *model) sessionPlace(s claudesession.Session) string {
 	switch {
 	case ok && m.isClaudeSessionVisible(s):
 		return "beside Marmota"
-	case ok && pane.Workspace == managedAgentHiddenWorkspace:
+	case ok && pane.Workspace == managedAgentHiddenWorkspace, ok && isTmuxPane(pane.PaneID):
 		return "hidden"
 	case ok:
 		return "in another WezTerm tab"
@@ -74,15 +74,26 @@ func (m *model) focusClaudeSession(s claudesession.Session) {
 
 // launchVisibleSession runs command in a new agent pane and shows it beside
 // superfile; with focus the keyboard moves into it.
-func (m *model) launchVisibleSession(cwd, command, message string, focus bool) (string, error) {
-	return m.launchVisibleAgent(cwd, command, managedAgentProviderClaude, message, focus)
+func (m *model) launchVisibleSession(cwd, command, message string, focus bool, id string) (string, error) {
+	return m.launchVisibleAgent(cwd, command, managedAgentProviderClaude, message, focus, id)
 }
 
 // launchVisibleAgent starts an agent beside superfile. When another agent
-// is shown there, the new one takes its place and the other is parked.
+// is shown there, the new one takes its place and the other is parked. id
+// is the session's, when known, to name its tmux window.
 func (m *model) launchVisibleAgent(cwd, command string, provider managedAgentProvider, message string,
-	focus bool,
+	focus bool, id string,
 ) (string, error) {
+	if m.tmuxSessionsOn() {
+		paneID, err := m.startTmuxAgent(cwd, command, provider, id)
+		if err != nil {
+			return "", err
+		}
+		if _, err := m.showTmuxPane(paneID, "", focus); err != nil {
+			return message, err
+		}
+		return message, nil
+	}
 	message, err := m.launchManagedSessionInWeztermAt(cwd, command, provider, message)
 	if err != nil {
 		return "", err
@@ -118,6 +129,10 @@ func (m *model) launchVisibleAgent(cwd, command string, provider managedAgentPro
 // foregroundManagedPane shows a managed agent pane beside superfile,
 // parking the one shown there.
 func (m *model) foregroundManagedPane(superfilePaneID, paneID int) error {
+	if isTmuxPane(paneID) {
+		_, err := m.showTmuxPane(paneID, "", false)
+		return err
+	}
 	state, err := m.foregroundManagedAgentSessionByPaneID(superfilePaneID, m.managedWeztermState, paneID)
 	if err != nil {
 		return err
@@ -132,7 +147,10 @@ func (m *model) foregroundManagedPane(superfilePaneID, paneID int) error {
 // launchParkedAgent starts an agent in a new pane in the hidden workspace,
 // where it works without taking the place of the agent beside superfile;
 // the keyboard stays with superfile. It returns the new pane.
-func (m *model) launchParkedAgent(cwd, command string, provider managedAgentProvider) (int, error) {
+func (m *model) launchParkedAgent(cwd, command string, provider managedAgentProvider, id string) (int, error) {
+	if m.tmuxSessionsOn() {
+		return m.startTmuxAgent(cwd, command, provider, id)
+	}
 	superfilePaneID, err := currentWeztermPaneID()
 	if err != nil {
 		return 0, err
@@ -187,7 +205,7 @@ func (m *model) forkClaudeSession(s claudesession.Session) {
 		command, provider = forkCodexCommand(s), managedAgentProviderCodex
 	}
 	message, err := m.launchVisibleAgent(dir, command, provider, "Forked "+s.DisplayTitle()+" into a new worktree",
-		true)
+		true, "")
 	if err != nil {
 		slog.Error("Could not fork Claude session", "session", s.ID, "error", err)
 		m.flashClaude(err.Error())
@@ -356,6 +374,14 @@ func (m *model) stopPendingClaudeSession() {
 	switch {
 	case s.IsCodex() && !inPane:
 		// Its turn is stopped; with no window there is nothing else.
+	case inPane && isTmuxPane(pane.PaneID):
+		if m.isClaudeSessionVisible(s) {
+			// Its window would give its place to another session's.
+			if hideErr := m.hideTmuxViewer(); hideErr != nil {
+				slog.Debug("Could not close the pane beside Marmota", "error", hideErr)
+			}
+		}
+		err = tmuxCloseWindow(pane.PaneID)
 	case inPane:
 		cwd := m.getFocusedFilePanel().location
 		if err = killWeztermPane(cwd, pane.PaneID); err == nil {

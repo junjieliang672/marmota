@@ -172,6 +172,8 @@ type model struct {
 
 	managedWeztermState  weztermPaneLayoutState
 	managedWeztermPaneID int
+	// tmux is this Marmota's side of the sessions it runs in tmux.
+	tmux tmuxState
 
 	// Claude Code sessions: the status line, unread markers and the keys
 	// that show sessions beside superfile.

@@ -339,7 +339,7 @@ func (m *model) startSession(folder, id, question string) (tea.Cmd, error) {
 		parts = append(parts, shellQuote(arg))
 	}
 	command := strings.Join(append(parts, "--", shellQuote(prompt)), " ")
-	paneID, err := m.launchParkedAgent(folder, command, managedAgentProviderClaude)
+	paneID, err := m.launchParkedAgent(folder, command, managedAgentProviderClaude, id)
 	if err != nil {
 		return nil, err
 	}
@@ -459,12 +459,18 @@ func (m *model) endAskStart(st *askStart) {
 // showStartingSession brings a session the bar started in beside superfile,
 // with the keyboard: enter on its row, to see all it shows.
 func (m *model) showStartingSession(started *askStart) {
-	superfilePaneID, err := currentWeztermPaneID()
-	if err == nil {
-		err = m.foregroundManagedPane(superfilePaneID, started.paneID)
-	}
-	if err == nil {
-		err = activateWeztermPane(started.folder, started.paneID)
+	var err error
+	if isTmuxPane(started.paneID) {
+		_, err = m.showTmuxPane(started.paneID, "", true)
+	} else {
+		var superfilePaneID int
+		superfilePaneID, err = currentWeztermPaneID()
+		if err == nil {
+			err = m.foregroundManagedPane(superfilePaneID, started.paneID)
+		}
+		if err == nil {
+			err = activateWeztermPane(started.folder, started.paneID)
+		}
 	}
 	if err != nil {
 		slog.Error("Could not show the new session", "pane", started.paneID, "error", err)

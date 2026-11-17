@@ -76,6 +76,10 @@ func TestMain(m *testing.M) {
 	variable.AskHistoryFile = filepath.Join(testDir, "ask_history.json") //nolint:reassign // test isolation
 	//nolint:reassign // test isolation
 	variable.ClaudeSessionsOrderFile = filepath.Join(testDir, "claude_sessions_order.json")
+	variable.TmuxSinceFile = filepath.Join(testDir, "tmux_since") //nolint:reassign // test isolation
+	// Sessions start in WezTerm panes, unless a test starts them in a tmux
+	// of its own.
+	useTmuxSessions = func() bool { return false }
 	writeClipboard = func(string) error { return errors.New("tests must not write the clipboard") }
 	runShelfCommand = func(string, ...string) ([]byte, error) { return nil, errors.New("tests must not open apps") }
 	weztermSendText = func(int, string) error { return errors.New("tests must not type into WezTerm") }

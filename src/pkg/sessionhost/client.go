@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -32,7 +33,16 @@ import (
 
 // Socket names Marmota's tmux server, kept apart from your own tmux. Tests
 // use one of their own.
-var Socket = "marmota" //nolint:gochecknoglobals // test seam
+var Socket = socketName() //nolint:gochecknoglobals // test seam
+
+// socketName is "marmota", or MARMOTA_TMUX_SOCKET when set: a Marmota under
+// test keeps its sessions apart from yours.
+func socketName() string {
+	if name := os.Getenv("MARMOTA_TMUX_SOCKET"); name != "" {
+		return name
+	}
+	return "marmota"
+}
 
 const (
 	// TmuxSession is the tmux session that holds Marmota's windows.
@@ -68,6 +78,8 @@ set -as terminal-features ",*:RGB:hyperlinks:clipboard:extkeys:usstyle:strikethr
 set -g extended-keys always
 set -g extended-keys-format csi-u
 set -g allow-passthrough on
+# Programs in it draw in true color, as they do in WezTerm.
+set-environment -g COLORTERM truecolor
 set -g allow-rename off
 set -g set-clipboard on
 set -g window-size latest
@@ -78,9 +90,9 @@ set -g visual-bell off
 set -g bell-action none
 `
 
-// remotePath is put before PATH over there: a command ssh runs gets no login
-// profile, so Homebrew's tmux and Claude Code's installer folder are missing
-// from it.
+// remotePath is put after PATH over there: a command ssh runs gets no login
+// profile, so Homebrew's tmux and Claude Code's installer folder may be
+// missing from it. What PATH has comes first.
 const remotePath = `$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin`
 
 // Host is one computer: this one (Local), or another one reached by SSH or
@@ -166,11 +178,11 @@ func (h Host) LoginArgv() []string {
 }
 
 // Script wraps a shell command so it survives every layer of quoting on the
-// way: it travels base64-encoded and runs in the login shell over there,
-// with Homebrew and Claude Code's folders on PATH.
+// way: it travels base64-encoded and runs in the shell over there, with
+// Homebrew's and Claude Code's folders on PATH after what PATH has.
 func Script(command string) string {
 	encoded := base64.StdEncoding.EncodeToString([]byte(
-		"export PATH=\"" + remotePath + ":$PATH\"\n" + command))
+		"export PATH=\"$PATH:" + remotePath + "\"\n" + command))
 	return `eval "$(printf %s ` + encoded + ` | base64 --decode)"`
 }
 

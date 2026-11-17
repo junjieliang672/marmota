@@ -101,6 +101,9 @@ var (
 	AskHistoryFile = filepath.Join(SuperFileStateDir, "ask_history.json")
 	// The order of the Sessions list for the day, so a restart keeps it.
 	ClaudeSessionsOrderFile = filepath.Join(SuperFileStateDir, "claude_sessions_order.json")
+	// TmuxSinceFile holds when sessions first ran in tmux: running sessions
+	// Marmota didn't start are listed only when they started before.
+	TmuxSinceFile = filepath.Join(SuperFileStateDir, "tmux_since")
 
 	// Trash Directories
 	DarwinTrashDirectory = filepath.Join(HomeDir, ".Trash")

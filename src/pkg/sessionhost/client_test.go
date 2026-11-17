@@ -95,6 +95,8 @@ func TestAWindowIsStartedReadAndTypedInto(t *testing.T) {
 	require.Len(t, windows, 1, "the first window holds no session")
 	assert.Equal(t, "cc-abc", windows[0].Name)
 	assert.Equal(t, "✳ eval sweep", windows[0].Title)
+	assert.True(t, strings.HasPrefix(windows[0].TTY, "/dev/"), windows[0].TTY)
+	assert.Equal(t, w.TTY, windows[0].TTY)
 	prefix, id, ok := SessionOf(windows[0].Name)
 	assert.True(t, ok)
 	assert.Equal(t, ClaudePrefix, prefix)
@@ -147,6 +149,24 @@ func TestAFolderUnderHomeIsThatComputersHome(t *testing.T) {
 		screen, _ := c.Capture(w.PaneID)
 		return strings.Contains(screen, "/proj")
 	})
+}
+
+func TestBytesReachTheProgramAsTheyAre(t *testing.T) {
+	c := localClient(t)
+	out := t.TempDir() + "/got"
+	// raw mode, so the terminal hands over every byte unchanged
+	w, err := c.Start(NameFor(ClaudePrefix, "raw"), t.TempDir(),
+		"stty raw -echo; head -c 32 > "+out+"; sleep 30")
+	require.NoError(t, err)
+	time.Sleep(300 * time.Millisecond)
+	sent := "a\nb \"$HOME\" '~' \\ \x1b[A\x01中\r#{x}!!"
+	require.NoError(t, c.SendBytes(w.PaneID, []byte(sent)))
+	waitFor(t, "the bytes", func() bool {
+		got, _ := os.ReadFile(out)
+		return len(got) >= 32
+	})
+	got, _ := os.ReadFile(out)
+	assert.Equal(t, sent[:32], string(got))
 }
 
 func TestQuoteKeepsSingleQuotesForTmux(t *testing.T) {

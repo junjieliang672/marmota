@@ -37,6 +37,9 @@ var (
 var (
 	// weztermGetText returns what a pane's screen shows, colors included.
 	weztermGetText = func(paneID int) (string, error) { //nolint:gochecknoglobals // test seam
+		if isTmuxPane(paneID) {
+			return tmuxGetText(paneID)
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), claudeSendTextTimeout)
 		defer cancel()
 		//nolint:gosec // fixed binary and numeric pane id
@@ -46,6 +49,9 @@ var (
 	}
 	// weztermSendKeys sends keys to a pane as keystrokes, not as a paste.
 	weztermSendKeys = func(paneID int, keys string) error { //nolint:gochecknoglobals // test seam
+		if isTmuxPane(paneID) {
+			return tmuxSendKeys(paneID, keys)
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), claudeSendTextTimeout)
 		defer cancel()
 		//nolint:gosec // fixed binary and numeric pane id; keys are an argument, never run by a shell

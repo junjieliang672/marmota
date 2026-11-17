@@ -45,6 +45,9 @@ var (
 	// weztermSendText types text into a pane. It runs wezterm directly, not
 	// through a shell, so paths with quotes or spaces arrive unchanged.
 	weztermSendText = func(paneID int, text string) error { //nolint:gochecknoglobals // test seam
+		if isTmuxPane(paneID) {
+			return tmuxSendText(paneID, text)
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), claudeSendTextTimeout)
 		defer cancel()
 		//nolint:gosec // fixed binary and numeric pane id; text is an argument, never run by a shell
@@ -168,6 +171,11 @@ func (m *model) claudeSessionsRefreshCmd() tea.Cmd {
 		if os.Getenv("WEZTERM_PANE") != "" {
 			if listed, err := listWeztermPanes(folder); err == nil {
 				msg.panes, msg.panesListed = listed, true
+				if inTmux, err := listTmuxPanes(); err == nil {
+					msg.panes = append(msg.panes, inTmux...)
+				} else {
+					slog.Debug("Could not list the sessions in tmux", "error", err)
+				}
 			}
 		}
 		return msg
@@ -199,6 +207,10 @@ func (m *model) applyClaudeSessionsSnapshot(msg claudeSessionsSnapshotMsg) tea.C
 		m.claude.panes = msg.panes
 	}
 	m.mergeCodexSessions(msg.codex)
+	if m.tmuxSessionsOn() {
+		m.settleTmuxShown()
+		m.dropSessionsOutsideMarmota()
+	}
 	askBarTarget, started := m.settleCodexStarts(askBarTarget)
 	all := append(append([]claudesession.Session(nil), m.claude.snapshot.Live...), m.claude.snapshot.Past...)
 	order := m.claudeSessionsOrder()
@@ -215,7 +227,7 @@ func (m *model) applyClaudeSessionsSnapshot(msg claudeSessionsSnapshotMsg) tea.C
 	m.refreshJump()
 	m.keepAskBarTarget(askBarTarget)
 	m.keepViewerPin()
-	cmds := []tea.Cmd{m.scheduleClaudeSessionsRefresh(), m.updateClaudeInbox(), started}
+	cmds := []tea.Cmd{m.scheduleClaudeSessionsRefresh(), m.updateClaudeInbox(), started, m.migrateToTmux()}
 	if m.sessionsShown() {
 		m.loadSessionsConversation()
 		cmds = append(cmds, m.watchClaudeQuestion())
@@ -404,12 +416,12 @@ func (m *model) jumpToClaudeSession(s claudesession.Session, focus bool) (string
 				target = s.ID
 			}
 			return m.launchVisibleSession(m.claudeSessionDir(s), "claude attach "+shellQuote(target),
-				"Attached to "+title, focus)
+				"Attached to "+title, focus, s.ID)
 		}
 		return "", fmt.Errorf("%s isn't running in WezTerm (pid %d)", title, s.PID)
 	}
 
-	return m.launchVisibleSession(m.claudeSessionDir(s), resumeCommand(s), "Resumed "+title, focus)
+	return m.launchVisibleSession(m.claudeSessionDir(s), resumeCommand(s), "Resumed "+title, focus, s.ID)
 }
 
 // claudeSessionDir is where to start a session's pane: its own folder when it
@@ -428,6 +440,9 @@ func (m *model) claudeSessionDir(s claudesession.Session) string {
 // another Marmota or on its own. With focus, or when it is already beside
 // superfile, the keyboard moves into it.
 func (m *model) showWeztermPaneForSession(pane weztermPane, title string, focus bool) (string, error) {
+	if isTmuxPane(pane.PaneID) {
+		return m.showTmuxPane(pane.PaneID, title, focus)
+	}
 	cwd := m.getFocusedFilePanel().location
 	superfilePaneID, err := currentWeztermPaneID()
 	if err != nil {
@@ -578,7 +593,7 @@ func (m *model) sendSelectionToAgent() {
 		m.flashClaude("Couldn't type into its pane: " + err.Error())
 		return
 	}
-	if err := activateWeztermPane(m.getFocusedFilePanel().location, pane.PaneID); err != nil {
+	if err := m.focusAgentPane(pane.PaneID, session.DisplayTitle()); err != nil {
 		slog.Warn("Could not focus the Claude pane after sending paths", "error", err)
 	}
 	noun := "items"
@@ -680,7 +695,7 @@ func (m *model) applyClaudeMoved(msg claudeMovedMsg) {
 		m.flashClaude("Couldn't move " + msg.title + ": " + msg.err.Error())
 	case msg.asks:
 		// Only you can say whether Claude may work there.
-		if err := activateWeztermPane(m.getFocusedFilePanel().location, msg.paneID); err != nil {
+		if err := m.focusAgentPane(msg.paneID, msg.title); err != nil {
 			slog.Warn("Could not focus the Claude pane", "error", err)
 		}
 		m.flashClaude(msg.title + " asks whether to work in " + where + ": answer it there")

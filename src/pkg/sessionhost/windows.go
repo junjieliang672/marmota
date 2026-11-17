@@ -1,7 +1,6 @@
 package sessionhost
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"strconv"
@@ -15,6 +14,7 @@ type Window struct {
 	PaneID string // its pane, "%5"
 	PID    int    // the pane's process
 	Cwd    string // where the pane's process is now
+	TTY    string // the pane's terminal, "/dev/ttys012": its program's tty
 	Title  string // the title the program set, "✳ Fix the login bug"
 	Width  int
 	Height int
@@ -43,7 +43,7 @@ func SessionOf(name string) (prefix, id string, ok bool) {
 }
 
 const windowFormat = "#{window_id}\t#{window_name}\t#{pane_id}\t#{pane_pid}\t#{pane_current_path}\t" +
-	"#{window_width}\t#{window_height}\t#{window_active_clients}\t#{pane_title}"
+	"#{window_width}\t#{window_height}\t#{window_active_clients}\t#{pane_tty}\t#{pane_title}"
 
 // Windows lists Marmota's windows that hold a session.
 func (c *Client) Windows() ([]Window, error) {
@@ -53,8 +53,8 @@ func (c *Client) Windows() ([]Window, error) {
 	}
 	out := make([]Window, 0, len(lines))
 	for _, line := range lines {
-		f := strings.SplitN(line, "\t", 9)
-		if len(f) < 9 {
+		f := strings.SplitN(line, "\t", 10)
+		if len(f) < 10 {
 			continue
 		}
 		if _, _, ok := SessionOf(f[1]); !ok {
@@ -65,19 +65,19 @@ func (c *Client) Windows() ([]Window, error) {
 		h, _ := strconv.Atoi(f[6])
 		active, _ := strconv.Atoi(f[7])
 		out = append(out, Window{ID: f[0], Name: f[1], PaneID: f[2], PID: pid, Cwd: f[4],
-			Width: w, Height: h, Active: active > 0, Title: f[8]})
+			Width: w, Height: h, Active: active > 0, TTY: f[8], Title: f[9]})
 	}
 	return out, nil
 }
 
-// Start opens a window named name in folder cwd, running command in the
-// login shell with Homebrew's and Claude Code's folders on PATH, and returns
-// it. The window opens in the background: no pane switches to it.
+// Start opens a window named name in folder cwd, running command with sh,
+// with Homebrew's and Claude Code's folders on PATH after what PATH has,
+// and returns it. The window opens in the background: no pane switches to it.
 func (c *Client) Start(name, cwd, command string) (Window, error) {
 	if strings.ContainsAny(name, " \t\n'\"") || name == "" {
 		return Window{}, fmt.Errorf("bad window name %q", name)
 	}
-	script := `cd ` + dirWord(cwd) + ` 2>/dev/null || cd "$HOME"` + "\n" + `exec "$SHELL" -lc ` + shellQuote(command)
+	script := `cd ` + dirWord(cwd) + ` 2>/dev/null || cd "$HOME"` + "\n" + `exec /bin/sh -c ` + shellQuote(command)
 	lines, err := c.Command("new-window -d -P -F " + Quote(windowFormat) + " -t " + Quote(TmuxSession+":") +
 		" -n " + Quote(name) + " " + Quote(Script(script)))
 	if err != nil {
@@ -86,12 +86,14 @@ func (c *Client) Start(name, cwd, command string) (Window, error) {
 	if len(lines) == 0 {
 		return Window{}, errors.New("tmux didn't say which window it opened")
 	}
-	f := strings.SplitN(lines[0], "\t", 9)
-	if len(f) < 3 {
+	f := strings.SplitN(lines[0], "\t", 10)
+	if len(f) < 10 {
 		return Window{}, fmt.Errorf("tmux answered %q", lines[0])
 	}
 	pid, _ := strconv.Atoi(f[3])
-	return Window{ID: f[0], Name: name, PaneID: f[2], PID: pid, Cwd: cwd}, nil
+	w, _ := strconv.Atoi(f[5])
+	h, _ := strconv.Atoi(f[6])
+	return Window{ID: f[0], Name: name, PaneID: f[2], PID: pid, Cwd: cwd, Width: w, Height: h, TTY: f[8]}, nil
 }
 
 // Rename names a window, as when a started Codex session's id is known.
@@ -116,38 +118,75 @@ func (c *Client) Capture(paneID string) (string, error) {
 	return strings.Join(lines, "\n"), nil
 }
 
-// sendChunk keeps each send-keys line a reasonable length.
-const sendChunk = 512
+// bufferChunk keeps each set-buffer line a reasonable length.
+const bufferChunk = 2048
 
 // SendBytes types bytes into a pane as if they came from the keyboard: keys
-// are their escape sequences ("\r" for enter, "\x1b" for esc).
+// are their escape sequences ("\r" for enter, "\x1b" for esc). They reach
+// the program as they are, the way `wezterm cli send-text --no-paste` sends
+// them: send-keys would take them for keys and encode them anew.
 func (c *Client) SendBytes(paneID string, b []byte) error {
-	for len(b) > 0 {
-		n := min(len(b), sendChunk)
-		hexes := make([]string, n)
-		for i := range n {
-			hexes[i] = hex.EncodeToString(b[i : i+1])
-		}
-		if _, err := c.Command("send-keys -t " + Quote(paneID) + " -H " + strings.Join(hexes, " ")); err != nil {
-			return err
-		}
-		b = b[n:]
-	}
-	return nil
+	return c.pasteBuffer(paneID, b, false)
 }
 
 // Paste puts text into a pane as a paste, the way `wezterm cli send-text`
 // does: bracketed, when the program asked for that.
 func (c *Client) Paste(paneID, text string) error {
-	lines, err := c.Command("display-message -p -t " + Quote(paneID) + " " + Quote("#{bracketed_paste}"))
-	if err != nil {
-		return err
+	return c.pasteBuffer(paneID, []byte(text), true)
+}
+
+// pasteBuffer writes b into a pane through a tmux buffer of its own, filled
+// in chunks and pasted at once. -r keeps newlines as they are.
+func (c *Client) pasteBuffer(paneID string, b []byte, bracketed bool) error {
+	if len(b) == 0 {
+		return nil
 	}
-	b := []byte(text)
-	if len(lines) > 0 && strings.TrimSpace(lines[0]) == "1" {
-		b = append(append([]byte("\x1b[200~"), b...), []byte("\x1b[201~")...)
+	c.mu.Lock()
+	c.shellN++
+	buffer := "marmota-send-" + strconv.Itoa(c.shellN)
+	c.mu.Unlock()
+	for first := true; len(b) > 0; first = false {
+		n := min(len(b), bufferChunk)
+		// Keep a UTF-8 character whole.
+		for n < len(b) && n > 0 && b[n]&0xC0 == 0x80 {
+			n--
+		}
+		command := "set-buffer -b " + buffer + " "
+		if !first {
+			command = "set-buffer -a -b " + buffer + " "
+		}
+		if _, err := c.Command(command + bufferWord(b[:n])); err != nil {
+			_, _ = c.Command("delete-buffer -b " + buffer)
+			return err
+		}
+		b = b[n:]
 	}
-	return c.SendBytes(paneID, b)
+	flags := "-d -r"
+	if bracketed {
+		flags += " -p"
+	}
+	_, err := c.Command("paste-buffer " + flags + " -b " + buffer + " -t " + Quote(paneID))
+	return err
+}
+
+// bufferWord writes bytes as a tmux double-quoted string: \, \" and \$
+// escaped, control bytes as octal escapes, the rest as they are.
+func bufferWord(b []byte) string {
+	var sb strings.Builder
+	sb.WriteByte('"')
+	for _, c := range b {
+		switch {
+		case c == '"' || c == '\\' || c == '$':
+			sb.WriteByte('\\')
+			sb.WriteByte(c)
+		case c < 0x20 || c == 0x7f:
+			fmt.Fprintf(&sb, "\\%03o", c)
+		default:
+			sb.WriteByte(c)
+		}
+	}
+	sb.WriteByte('"')
+	return sb.String()
 }
 
 // AttachCommand is the shell command, for this computer's pane, that shows a
