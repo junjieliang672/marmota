@@ -176,6 +176,9 @@ type model struct {
 	tmux tmuxState
 	// remote is this Marmota's side of the other computers' sessions.
 	remote remoteState
+	// editorPane is the WezTerm pane beside Marmota that the editor runs
+	// in (editor_beside), 0 when it has opened none.
+	editorPane int
 
 	// Claude Code sessions: the status line, unread markers and the keys
 	// that show sessions beside superfile.

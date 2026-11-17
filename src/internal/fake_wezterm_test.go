@@ -48,6 +48,8 @@ var (
 	fakeSplitNew  = regexp.MustCompile(`^wezterm cli split-pane --pane-id (\d+) --right --cells (\d+) --cwd .* -- `)
 	fakeSplitMove = regexp.MustCompile(`^wezterm cli split-pane --pane-id (\d+) (?:--right|--top|--bottom) ` +
 		`--cells (\d+) --move-pane-id (\d+)$`)
+	fakeSplitPercent = regexp.MustCompile(`^wezterm cli split-pane --pane-id (\d+) (--right|--top|--bottom) ` +
+		`--percent (\d+) --cwd .* -- `)
 	fakeSpawn = regexp.MustCompile(`^wezterm cli spawn --new-window --workspace (\S+) --cwd `)
 	fakePark  = regexp.MustCompile(`^wezterm cli move-pane-to-new-tab --pane-id (\d+) --new-window ` +
 		`--workspace (\S+)$`)
@@ -94,6 +96,25 @@ func (f *fakeWezterm) run(cmd string) (string, error) {
 		p := &weztermPane{PaneID: f.nextPane, TabID: anchor.TabID, WindowID: anchor.WindowID,
 			Workspace: anchor.Workspace, Size: weztermPaneSize{Rows: anchor.Size.Rows, Cols: cells}}
 		anchor.Size.Cols -= cells + 1
+		f.panes[p.PaneID] = p
+		f.active = p.PaneID
+		return fmt.Sprintf("%d\n", p.PaneID), nil
+	case fakeSplitPercent.MatchString(cmd):
+		m := fakeSplitPercent.FindStringSubmatch(cmd)
+		anchor := f.panes[atoi(m[1])]
+		if anchor == nil {
+			return "", errors.New("split refused")
+		}
+		f.nextPane++
+		p := &weztermPane{PaneID: f.nextPane, TabID: anchor.TabID, WindowID: anchor.WindowID,
+			Workspace: anchor.Workspace, Size: anchor.Size}
+		if m[2] == "--right" {
+			p.Size.Cols = anchor.Size.Cols * atoi(m[3]) / 100
+			anchor.Size.Cols -= p.Size.Cols + 1
+		} else {
+			p.Size.Rows = anchor.Size.Rows * atoi(m[3]) / 100
+			anchor.Size.Rows -= p.Size.Rows + 1
+		}
 		f.panes[p.PaneID] = p
 		f.active = p.PaneID
 		return fmt.Sprintf("%d\n", p.PaneID), nil

@@ -18,6 +18,12 @@
 #   - Linux: "nano"
 editor = "nvim"
 
+#-- Editor beside Marmota
+# Open the editor (e key) in a pane on Marmota's right in WezTerm, so Marmota
+# and its sessions stay in view, instead of in Marmota's place. With micro as
+# the editor, files opened later go to the same pane, each in a tab.
+editor_beside = false
+
 #-- Second Editor (E key)
 # Leave blank to use the same as 'editor'
 second_editor = "neovide"

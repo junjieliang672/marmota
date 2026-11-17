@@ -88,6 +88,7 @@ y
 | `shift+enter` | In the Ask box: a new line (the WezTerm setup sends it as `ctrl+j`, which works as well) |
 | `ctrl+g` | In the Ask box: write the question in your editor, as in Claude Code; closing it brings what you wrote back, unsent. A long question shows folded, `[first words… +11 lines]` |
 | drag | In the session preview: select text; letting go copies it |
+| `e` | Open the file in your editor; with `editor_beside = true`, in a pane on Marmota's right. On a Mac `./build.sh` sets up micro for it, an editor without modes where the Mac's keys (cmd+S, cmd+Z, cmd+←, shift+option+→ …) work as in a text field; `E` opens it in a new tab |
 | `>` | Agent mode: `claude`, `claude rc`, `codex` |
 | `:` | Run a shell command in the current folder |
 | `@` | Send the selected files to the session beside Marmota |

@@ -1,0 +1,17 @@
+{
+    "clipboard": "external",
+    "diffgutter": true,
+    "hlsearch": true,
+    "keymenu": false,
+    "mkparents": true,
+    "mouse": true,
+    "pluginrepos": [
+        "https://raw.githubusercontent.com/Neko-Box-Coder/MicroOmni/master/repo.json"
+    ],
+    "reload": "auto",
+    "savecursor": true,
+    "saveundo": true,
+    "scrollbar": true,
+    "softwrap": true,
+    "wordwrap": true
+}

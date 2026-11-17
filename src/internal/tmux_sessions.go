@@ -604,6 +604,11 @@ func (m *model) splitTmuxViewer(cwd string, self int, attach string) (int, error
 	if err != nil {
 		return 0, err
 	}
+	if editor, open := m.editorPaneIn(tabPanes); open {
+		// The editor has Marmota's right: the session goes under it.
+		return splitWeztermPane(cwd, fmt.Sprintf("wezterm cli split-pane --pane-id %d --bottom --percent %d --cwd %q -- "+
+			"/bin/sh -c %s", editor, viewerUnderEditorPercent, cwd, shellQuote(attach)))
+	}
 	_, agentCols, err := initialManagedWeztermSplitWidths(pane.Size.Cols)
 	if err != nil {
 		return 0, err

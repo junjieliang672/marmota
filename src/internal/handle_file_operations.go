@@ -979,6 +979,14 @@ func (m *model) openPathsWithEditor(paths []string, recordRecent bool) tea.Cmd {
 		}
 	}
 
+	if common.Config.EditorBeside {
+		err := m.openEditorBeside(paths)
+		if err == nil {
+			return nil
+		}
+		slog.Warn("Could not open the editor beside Marmota: opening it in Marmota's place", "error", err)
+	}
+
 	cmd, args := editorCommand(common.Config.Editor, os.Getenv("EDITOR"), runtime.GOOS, paths)
 	c := exec.Command(cmd, args...) //nolint:gosec // the editor you configured, on the files you chose
 

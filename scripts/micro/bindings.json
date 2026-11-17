@@ -1,0 +1,17 @@
+{
+    "Ctrl-a": "StartOfTextToggle",
+    "Ctrl-e": "EndOfLine",
+    "Ctrl-w": "DeleteWordLeft",
+    "Ctrl-u": "lua:marmota.deleteToLineStart",
+    "Alt-a": "SelectAll",
+    "Alt-x": "CommandMode",
+    "Alt-w": "NextSplit|FirstSplit",
+    "Alt-p": "command:OmniGotoFile",
+    "Alt-F": "command:OmniGlobalSearch",
+    "Alt-r": "command:OmniLocalSearch",
+    "Alt-o": "command:jumptag",
+    "Alt-h": "command:OmniPreviousHistory",
+    "Alt-H": "command:OmniNextHistory",
+    "AltShiftUp": "lua:marmota.selectParagraphUp",
+    "AltShiftDown": "lua:marmota.selectParagraphDown"
+}

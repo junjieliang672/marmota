@@ -73,6 +73,7 @@ type ConfigType struct {
 
 	Editor                 string `toml:"editor"                    comment:"\nThe editor files will be opened with (e key). (Leave blank to use the EDITOR environment variable)."`
 	SecondEditor           string `toml:"second_editor"             comment:"\nThe second editor for opening files (E key). Leave blank to use the same as 'editor'."`
+	EditorBeside           bool   `toml:"editor_beside"             comment:"\nOpen the editor (e key) in a pane on Marmota's right in WezTerm, so Marmota and its sessions stay in view, instead of in Marmota's place. With micro as the editor, files opened later go to the same pane, each in a tab."`
 	DirEditor              string `toml:"dir_editor"                comment:"\nThe editor directories will be opened with. (Leave blank to use the default editors)."`
 	ComputerName           string `toml:"computer_name"             comment:"\nThe name the Ask box shows for this computer, where a session runs. (Leave blank for its hostname, without the domain.)"`
 	ShelfApp               string `toml:"shelf_app"                 comment:"\nThe macOS app the send_to_shelf key (Y) hands files to, such as Yoink or Dropover. (Leave blank for Marmota's own shelf, y-shelf, at the right edge of the screen.)"`

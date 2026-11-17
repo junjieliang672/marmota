@@ -103,6 +103,8 @@ Features:
   • Installs WezTerm (recommended terminal emulator)
   • Installs JetBrains Mono Nerd Font for icon support
   • Configures macOS-style hotkeys via setup-macos-hotkeys.sh
+  • Installs micro as Marmota's editor, with its settings, keys and plugins,
+    and the Mac keys WezTerm sends it (cmd+S, cmd+Z, cmd+arrows …)
   • Builds Marmota as y, and sets up your shell to run it (cd on quit too)
   • Initializes zoxide for smart directory navigation ('z' command)
   • Moves an install from before y (spf, with y an alias) over to y
@@ -756,7 +758,7 @@ run_hotkey_setup() {
     local hotkey_args=()
     if [[ -f "$HOME/.wezterm.lua" ]]; then
         log_info "Keeping your ~/.wezterm.lua (./setup-macos-hotkeys.sh --wezterm replaces it)"
-        hotkey_args=(--neovim --marmota --cmd-k)
+        hotkey_args=(--neovim --marmota --cmd-k --micro)
     fi
 
     # Run the hotkey setup script

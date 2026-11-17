@@ -272,16 +272,19 @@ install_session_skill() {
 }
 install_session_skill
 
-# Marmota's WezTerm look: the active pane bright, blue lines between panes, a
-# blue edge beside the active pane (a block in ~/.wezterm.lua, kept current)
-if [[ $(uname -s) == "Darwin" && -f "$HOME/.wezterm.lua" ]]; then
-    ./setup-macos-hotkeys.sh --wezterm-look --no-color 2>&1 | grep "Marmota's" || true
-fi
-
 # Update user config with missing fields
 echo "Updating user config with missing fields..."
 "$TARGET" --fix-config-file --fix-hotkeys --fix-only >/dev/null 2>&1 || true
 echo "User config updated"
+
+# On a Mac, micro as Marmota's editor (its tools, settings, keys and plugins,
+# and editor = "micro" in Marmota's config) and Marmota's block in
+# ~/.wezterm.lua: its look, and the Mac keys it sends micro. Brought up to
+# date on each build, so a computer is ready once Marmota is built on it.
+if [[ $(uname -s) == "Darwin" ]]; then
+    ./setup-macos-hotkeys.sh --micro --no-color 2>&1 | grep -i -E "micro|Marmota's|opens files" || true
+fi
+
 if [[ -n "$SHELL_CHANGED" ]]; then
     echo "Open a new terminal (or source your shell config) to run y"
 fi

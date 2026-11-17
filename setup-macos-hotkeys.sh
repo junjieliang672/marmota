@@ -28,6 +28,7 @@ CONFIGURE_NEOVIM=true
 CONFIGURE_SUPERFILE=true
 PATCH_CMD_K=false
 WEZTERM_LOOK=false
+CONFIGURE_MICRO=true
 NO_COLOR=false
 
 # =============================================================================
@@ -65,6 +66,11 @@ Options:
   --wezterm-look    Only add or update Marmota's block in ~/.wezterm.lua: the
                     active pane bright, blue lines between panes (./build.sh
                     runs this)
+  --micro           Only make micro Marmota's editor: installs micro and the
+                    tools its searches use, Marmota's settings, keys and plugin
+                    for it in ~/.config/micro (yours are backed up), the keys
+                    block in ~/.wezterm.lua, and sets editor = "micro",
+                    editor_beside = true in Marmota's config
   --all             Configure everything (default)
   --no-color        Disable colored output
   -h, --help        Show this help message
@@ -138,6 +144,7 @@ parse_args() {
                     CONFIGURE_WEZTERM=false
                     CONFIGURE_NEOVIM=false
                     CONFIGURE_SUPERFILE=false
+                    CONFIGURE_MICRO=false
                     specific_requested=true
                 fi
                 CONFIGURE_WEZTERM=true
@@ -148,6 +155,7 @@ parse_args() {
                     CONFIGURE_WEZTERM=false
                     CONFIGURE_NEOVIM=false
                     CONFIGURE_SUPERFILE=false
+                    CONFIGURE_MICRO=false
                     specific_requested=true
                 fi
                 CONFIGURE_NEOVIM=true
@@ -158,6 +166,7 @@ parse_args() {
                     CONFIGURE_WEZTERM=false
                     CONFIGURE_NEOVIM=false
                     CONFIGURE_SUPERFILE=false
+                    CONFIGURE_MICRO=false
                     specific_requested=true
                 fi
                 CONFIGURE_SUPERFILE=true
@@ -168,9 +177,22 @@ parse_args() {
                     CONFIGURE_WEZTERM=false
                     CONFIGURE_NEOVIM=false
                     CONFIGURE_SUPERFILE=false
+                    CONFIGURE_MICRO=false
                     specific_requested=true
                 fi
                 PATCH_CMD_K=true
+                shift
+                ;;
+            --micro)
+                if [[ $specific_requested == false ]]; then
+                    CONFIGURE_WEZTERM=false
+                    CONFIGURE_NEOVIM=false
+                    CONFIGURE_SUPERFILE=false
+                    CONFIGURE_MICRO=false
+                    specific_requested=true
+                fi
+                CONFIGURE_MICRO=true
+                WEZTERM_LOOK=true
                 shift
                 ;;
             --wezterm-look)
@@ -178,6 +200,7 @@ parse_args() {
                     CONFIGURE_WEZTERM=false
                     CONFIGURE_NEOVIM=false
                     CONFIGURE_SUPERFILE=false
+                    CONFIGURE_MICRO=false
                     specific_requested=true
                 fi
                 WEZTERM_LOOK=true
@@ -187,6 +210,7 @@ parse_args() {
                 CONFIGURE_WEZTERM=true
                 CONFIGURE_NEOVIM=true
                 CONFIGURE_SUPERFILE=true
+                CONFIGURE_MICRO=true
                 shift
                 ;;
             --no-color)
@@ -757,10 +781,10 @@ MINIMAL_CONFIG
         else
             # Update editor lines - e opens nvim, E opens nvim in new WezTerm tab
             if [[ "$(uname)" == "Darwin" ]]; then
-                sed -i '' 's/^editor.*=.*/editor = "nvim"/' "$spf_config_file"
+                sed -i '' 's/^editor[[:space:]]*=.*/editor = "nvim"/' "$spf_config_file"
                 # Add second_editor if it doesn't exist
                 if ! grep -q "^second_editor" "$spf_config_file"; then
-                    sed -i '' '/^editor.*=/a\
+                    sed -i '' '/^editor[[:space:]]*=/a\
 second_editor = "wezterm cli spawn -- nvim"
 ' "$spf_config_file"
                 else
@@ -768,10 +792,10 @@ second_editor = "wezterm cli spawn -- nvim"
                 fi
                 sed -i '' 's/^zoxide_support.*=.*/zoxide_support = true/' "$spf_config_file"
             else
-                sed -i 's/^editor.*=.*/editor = "nvim"/' "$spf_config_file"
+                sed -i 's/^editor[[:space:]]*=.*/editor = "nvim"/' "$spf_config_file"
                 # Add second_editor if it doesn't exist
                 if ! grep -q "^second_editor" "$spf_config_file"; then
-                    sed -i '/^editor.*=/a second_editor = "wezterm cli spawn -- nvim"' "$spf_config_file"
+                    sed -i '/^editor[[:space:]]*=/a second_editor = "wezterm cli spawn -- nvim"' "$spf_config_file"
                 else
                     sed -i 's/^second_editor.*=.*/second_editor = "wezterm cli spawn -- nvim"/' "$spf_config_file"
                 fi
@@ -838,8 +862,9 @@ print_summary() {
 wezterm_look_block() {
     cat << 'LOOK_EOF'
 -- >>> marmota >>>
--- Marmota's look (setup-macos-hotkeys.sh writes this block, ./build.sh keeps
--- it up to date; your settings above it are left as they are)
+-- Marmota's look, and its editor's keys (setup-macos-hotkeys.sh writes this
+-- block, ./build.sh keeps it up to date; your settings above it are left as
+-- they are)
 do
   local wezterm = require 'wezterm'
   local split_blue = '#7aa2f7'
@@ -863,6 +888,68 @@ do
 
   -- The pane you type in is the bright one
   config.inactive_pane_hsb = { saturation = 1.0, brightness = 0.7 }
+
+  -- In micro, the editor Marmota opens files in, the Mac keys do what they
+  -- do in a text field: each sends micro the key it knows for that. In any
+  -- other program a key does what it did before: your own binding above,
+  -- or nothing.
+  local editor_keys = {
+    { 's', 'CMD', '\x13' }, -- save
+    { 'z', 'CMD', '\x1a' }, -- undo
+    { 'z', 'CMD|SHIFT', '\x19' }, -- redo
+    { 'c', 'CMD', '\x03' }, -- copy
+    { 'x', 'CMD', '\x18' }, -- cut
+    { 'a', 'CMD', '\x1ba' }, -- select all
+    { 'f', 'CMD', '\x06' }, -- find
+    { 'g', 'CMD', '\x0e' }, -- find next
+    { 'g', 'CMD|SHIFT', '\x10' }, -- find previous
+    { 'UpArrow', 'CMD', '\x1b[1;5A' }, -- start of the file
+    { 'DownArrow', 'CMD', '\x1b[1;5B' }, -- end of the file
+    { 'LeftArrow', 'CMD|SHIFT', '\x1b[1;6D' }, -- select to the start of the line
+    { 'RightArrow', 'CMD|SHIFT', '\x1b[1;6C' }, -- select to the end of the line
+    { 'UpArrow', 'CMD|SHIFT', '\x1b[1;6A' }, -- select to the start of the file
+    { 'DownArrow', 'CMD|SHIFT', '\x1b[1;6B' }, -- select to the end of the file
+    { 'p', 'CMD', '\x1bp' }, -- open a file by name
+    { 'f', 'CMD|SHIFT', '\x1bF' }, -- search every file
+    { 'f', 'CMD|OPT', '\x1br' }, -- fuzzy search in this file
+    { 'o', 'CMD|SHIFT', '\x1bo' }, -- go to a heading or function
+    { '-', 'CTRL', '\x1bh' }, -- back to where the cursor was
+    { '-', 'CTRL|SHIFT', '\x1bH' }, -- and forward again
+  }
+  local function mods_of(mods)
+    local set = {}
+    for m in (mods or ''):gmatch('[^|]+') do
+      m = m:upper():gsub('^SUPER$', 'CMD'):gsub('^ALT$', 'OPT'):gsub('^META$', 'OPT')
+      set[#set + 1] = m
+    end
+    table.sort(set)
+    return table.concat(set, '|')
+  end
+  local function in_editor(pane)
+    return (pane:get_foreground_process_name() or ''):match('[^/\\]+$') == 'micro'
+  end
+  config.keys = config.keys or {}
+  for _, k in ipairs(editor_keys) do
+    local otherwise
+    for i, bound in ipairs(config.keys) do
+      if bound.key == k[1] and mods_of(bound.mods) == mods_of(k[2]) then
+        otherwise = bound.action
+        table.remove(config.keys, i)
+        break
+      end
+    end
+    table.insert(config.keys, {
+      key = k[1],
+      mods = k[2],
+      action = wezterm.action_callback(function(window, pane)
+        if in_editor(pane) then
+          window:perform_action(wezterm.action.SendString(k[3]), pane)
+        elseif otherwise then
+          window:perform_action(otherwise, pane)
+        end
+      end),
+    })
+  end
 end
 -- <<< marmota <<<
 LOOK_EOF
@@ -917,6 +1004,195 @@ ensure_wezterm_look() {
 }
 
 # =============================================================================
+# micro, as Marmota's editor
+# =============================================================================
+
+# configure_micro makes micro the editor Marmota opens files in: a terminal
+# editor without modes, where the Mac's keys do what they do in a text field
+# (the block in ~/.wezterm.lua sends them, see wezterm_look_block). ./build.sh
+# runs this each time, so a computer is set up once Marmota is built on it.
+#
+# Marmota's settings and keys for micro come from scripts/micro and are
+# merged into yours: a setting or key of your own that Marmota doesn't set
+# stays; one it does set is Marmota's, the file backed up first when that
+# changes it. Marmota's config gets editor = "micro" and editor_beside = true
+# while its editor is still the nvim it started with, and E micro in a new
+# tab while it is still nvim in one; an editor you chose yourself is left
+# alone.
+configure_micro() {
+    if [[ $CONFIGURE_MICRO == false ]]; then
+        return
+    fi
+    echo ""
+    log_info "Making micro Marmota's editor..."
+
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local source_dir="$script_dir/scripts/micro"
+    local micro_dir="${MICRO_CONFIG_HOME:-$HOME/.config/micro}"
+
+    # micro, and what its searches run: fzf, ripgrep and bat for MicroOmni,
+    # universal-ctags for the jump to a heading or function
+    local tool
+    for tool in micro:micro fzf:fzf rg:ripgrep bat:bat; do
+        if command -v "${tool%%:*}" &> /dev/null; then
+            continue
+        fi
+        if [[ $DRY_RUN == true ]]; then
+            log_info "[DRY RUN] Would install ${tool##*:}"
+        elif command -v brew &> /dev/null; then
+            log_info "Installing ${tool##*:} for micro..."
+            brew install "${tool##*:}" > /dev/null 2>&1 || log_warning "Could not install ${tool##*:}"
+        else
+            log_warning "micro: ${tool##*:} is missing and there is no Homebrew to install it with"
+        fi
+    done
+    if ! ctags --version 2> /dev/null | grep -q "Universal Ctags"; then
+        if [[ $DRY_RUN == true ]]; then
+            log_info "[DRY RUN] Would install universal-ctags"
+        elif command -v brew &> /dev/null; then
+            log_info "Installing universal-ctags for micro..."
+            brew install universal-ctags > /dev/null 2>&1 || log_warning "Could not install universal-ctags"
+        fi
+    fi
+
+    if [[ $DRY_RUN == true ]]; then
+        log_info "[DRY RUN] Would merge Marmota's settings, keys and plugin for micro into $micro_dir"
+        return
+    fi
+    mkdir -p "$micro_dir/plug"
+    local file changed=false
+    for file in settings.json bindings.json; do
+        case "$(merge_micro_json "$source_dir/$file" "$micro_dir/$file")" in
+            same) ;;
+            added) changed=true ;;
+            replaced)
+                changed=true
+                log_info "micro: $file had other values for keys Marmota sets; yours are in the backup beside it"
+                ;;
+            *) log_warning "micro: could not write $micro_dir/$file" ;;
+        esac
+    done
+    if ! diff -rq "$source_dir/marmota" "$micro_dir/plug/marmota" > /dev/null 2>&1; then
+        rm -rf "$micro_dir/plug/marmota"
+        cp -R "$source_dir/marmota" "$micro_dir/plug/marmota"
+        changed=true
+    fi
+    if command -v micro &> /dev/null; then
+        local plugin
+        for plugin in jump MicroOmni; do
+            if [[ ! -d "$micro_dir/plug/$plugin" ]]; then
+                if MICRO_CONFIG_HOME="$micro_dir" micro -plugin install "$plugin" > /dev/null 2>&1; then
+                    changed=true
+                else
+                    log_warning "Could not install micro's $plugin plugin"
+                fi
+            fi
+        done
+    fi
+    if [[ $changed == true ]]; then
+        log_success "micro has Marmota's settings, keys and plugins in $micro_dir"
+    else
+        log_success "micro's settings, keys and plugins are up to date"
+    fi
+
+    local spf_config_file="$HOME/.config/marmota/config.toml"
+    if [[ ! -f "$spf_config_file" && -f "$script_dir/src/superfile_config/config.toml" ]]; then
+        mkdir -p "$(dirname "$spf_config_file")"
+        cp "$script_dir/src/superfile_config/config.toml" "$spf_config_file"
+    fi
+    if [[ ! -f "$spf_config_file" ]]; then
+        log_warning "No $spf_config_file: Marmota's editor isn't set"
+        return
+    fi
+    local editor
+    editor="$(sed -n "s/^editor[[:space:]]*=[[:space:]]*[\"']\\{0,1\\}\\([^\"']*\\)[\"']\\{0,1\\}[[:space:]]*$/\\1/p" "$spf_config_file" | head -n 1)"
+    case "$editor" in
+        micro)
+            log_success "Marmota's editor is micro"
+            ;;
+        "" | nvim)
+            backup_file "$spf_config_file"
+            sed -i.tmp -e 's/^editor[[:space:]]*=.*/editor = "micro"/' \
+                -e 's/^editor_beside[[:space:]]*=.*/editor_beside = true/' "$spf_config_file"
+            rm -f "$spf_config_file.tmp"
+            grep -q '^editor[[:space:]]*=' "$spf_config_file" || printf '\neditor = "micro"\n' >> "$spf_config_file"
+            grep -q '^editor_beside' "$spf_config_file" || printf '\neditor_beside = true\n' >> "$spf_config_file"
+            log_success "Marmota opens files in micro, in a pane on its right (e)"
+            ;;
+        *)
+            log_info "Marmota's editor is $editor, as you set it: micro is ready when you want it (editor = \"micro\")"
+            ;;
+    esac
+    # E opened nvim in a new tab (or neovide, the first default): micro there
+    # too, unless you set another
+    if grep -q -E "^second_editor[[:space:]]*=[[:space:]]*[\"'](wezterm cli spawn -- nvim|neovide)[\"']" "$spf_config_file"; then
+        sed -i.tmp -e 's/^second_editor[[:space:]]*=.*/second_editor = "wezterm cli spawn -- micro"/' "$spf_config_file"
+        rm -f "$spf_config_file.tmp"
+        log_success "E opens files in micro in a new tab"
+    fi
+}
+
+# merge_micro_json merges Marmota's file for micro, $1, into yours, $2, and
+# prints what it did: same, added (keys of Marmota's that weren't there) or
+# replaced (a key of yours had another value: the file is backed up first).
+merge_micro_json() {
+    local source="$1" target="$2"
+    if [[ ! -s "$target" ]]; then
+        cp "$source" "$target" && echo added
+        return
+    fi
+    if ! command -v python3 &> /dev/null; then
+        cmp -s "$source" "$target" && { echo same; return; }
+        backup_file "$target" > /dev/null
+        cp "$source" "$target" && echo replaced
+        return
+    fi
+    local verdict
+    verdict="$(python3 - "$source" "$target" << 'MERGE_EOF'
+import json, sys
+ours = json.load(open(sys.argv[1]))
+try:
+    theirs = json.load(open(sys.argv[2]))
+except ValueError:
+    theirs = None
+if not isinstance(theirs, dict):
+    print("replaced")
+    sys.exit()
+merged = dict(theirs)
+verdict = "same"
+for key, value in ours.items():
+    if key not in theirs:
+        verdict = "added" if verdict == "same" else verdict
+    elif theirs[key] != value:
+        verdict = "replaced"
+    merged[key] = value
+if verdict != "same":
+    json.dump(merged, open(sys.argv[2] + ".marmota-new", "w"), indent=4, ensure_ascii=False)
+    open(sys.argv[2] + ".marmota-new", "a").write("\n")
+print(verdict)
+MERGE_EOF
+)"
+    case "$verdict" in
+        same)
+            echo same
+            ;;
+        added)
+            mv "$target.marmota-new" "$target" && echo added
+            ;;
+        replaced)
+            backup_file "$target" > /dev/null
+            if [[ -f "$target.marmota-new" ]]; then
+                mv "$target.marmota-new" "$target"
+            else
+                cp "$source" "$target"
+            fi
+            echo replaced
+            ;;
+    esac
+}
+
+# =============================================================================
 # Main
 # =============================================================================
 
@@ -937,6 +1213,7 @@ main() {
     fi
     configure_neovim
     configure_superfile
+    configure_micro
 
     if [[ $DRY_RUN == false ]]; then
         print_summary
