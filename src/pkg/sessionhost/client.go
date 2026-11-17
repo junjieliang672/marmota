@@ -544,7 +544,8 @@ func lastLine(s string) string {
 }
 
 // Quote quotes a word for a tmux command line: in single quotes, which tmux
-// takes literally, with a single quote written as '\''.
+// takes literally; a single quote in s closes the quotes, is escaped with
+// a backslash, and opens them again.
 func Quote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
