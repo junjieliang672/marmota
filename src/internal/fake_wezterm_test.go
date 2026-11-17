@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"testing"
 	"time"
@@ -62,6 +63,9 @@ func (f *fakeWezterm) run(cmd string) (string, error) {
 		for _, p := range f.panes {
 			list = append(list, *p)
 		}
+		// WezTerm lists panes in a fixed order; a map's order would make
+		// "the first pane" differ from run to run.
+		slices.SortFunc(list, func(a, b weztermPane) int { return a.PaneID - b.PaneID })
 		return marshalWeztermPanesForTest(list...), nil
 	case fakeSplitMove.MatchString(cmd):
 		m := fakeSplitMove.FindStringSubmatch(cmd)
