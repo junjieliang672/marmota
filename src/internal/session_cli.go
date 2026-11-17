@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -302,6 +303,155 @@ func WriteSessionList(w io.Writer, sessions []ListedSession, failed map[string]e
 	}
 	for host, err := range failed {
 		fmt.Fprintf(w, "%s: %v\n", host, err)
+	}
+	return nil
+}
+
+// AdoptedSession is a session `y session adopt` found, or moved.
+type AdoptedSession struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Title  string `json:"title"`
+	Status string `json:"status"`
+	Cwd    string `json:"cwd"`
+	// Moved is set once it runs in Marmota's tmux.
+	Moved bool `json:"moved"`
+	// Error is why it couldn't be moved.
+	Error string `json:"error,omitempty"`
+}
+
+// adoptStopWait is how long a session's old process is given to exit.
+const adoptStopWait = 10 * time.Second
+
+// SessionAdopt moves the Claude Code sessions running on the computer on
+// reaches, outside Marmota's tmux, into it: each one's process is stopped,
+// leaving its terminal at the shell, and it is resumed with the same id in
+// a window of Marmota's tmux there, in its own permission mode, model,
+// effort and Remote Control. It is listed in Marmota from then on. names
+// picks some by name or id, or the start of an id; none picks all. With
+// listOnly nothing is moved.
+func SessionAdopt(on string, names []string, listOnly bool) ([]AdoptedSession, error) {
+	if strings.TrimSpace(on) == "" {
+		return nil, errors.New("give --on: the sessions on this computer aren't moved")
+	}
+	h, err := rememberRemoteHost(on)
+	if err != nil {
+		return nil, err
+	}
+	c, err := hostClient(h.Name)
+	if err != nil {
+		return nil, err
+	}
+	candidates, err := sessionsOutsideMarmota(c, h.Name)
+	if err != nil {
+		return nil, err
+	}
+	picked := candidates
+	if len(names) > 0 {
+		picked = nil
+		for _, name := range names {
+			found := false
+			for _, s := range candidates {
+				if s.Name == name || s.ID == name || (len(name) >= 4 && strings.HasPrefix(s.ID, name)) {
+					picked, found = append(picked, s), true
+				}
+			}
+			if !found {
+				return nil, fmt.Errorf("no session %q runs on %s outside Marmota", name, h.Name)
+			}
+		}
+	}
+	out := make([]AdoptedSession, 0, len(picked))
+	for _, s := range picked {
+		a := AdoptedSession{ID: s.ID, Name: s.Name, Title: s.DisplayTitle(), Status: string(s.Status), Cwd: s.Cwd}
+		if !listOnly {
+			if err := adoptSession(c, s); err != nil {
+				a.Error = err.Error()
+			} else {
+				a.Moved = true
+			}
+		}
+		out = append(out, a)
+	}
+	return out, nil
+}
+
+// sessionsOutsideMarmota are the Claude Code sessions a computer runs that
+// aren't in a window of Marmota's tmux there, with what their transcripts
+// and command lines say of how they run.
+func sessionsOutsideMarmota(c *sessionhost.Client, host string) ([]claudesession.Session, error) {
+	agents, err := c.Agents()
+	if err != nil {
+		return nil, err
+	}
+	live, err := claudesession.ParseLive(agents)
+	if err != nil {
+		return nil, err
+	}
+	windows, err := c.Windows()
+	if err != nil {
+		return nil, err
+	}
+	inMarmota := map[string]bool{}
+	for _, w := range windows {
+		if _, id, ok := sessionhost.SessionOf(w.Name); ok {
+			inMarmota[id] = true
+		}
+	}
+	tracker := claudesession.NewTracker()
+	var out []claudesession.Session
+	for _, s := range live {
+		if inMarmota[s.ID] {
+			continue
+		}
+		s.Host = host
+		if path, err := mirrorTranscript(c, host, s.ID); err == nil && path != "" {
+			if sum, err := tracker.Summary(path); err == nil {
+				claudesession.ApplySummary(&s, sum)
+			}
+		}
+		if s.PID > 0 {
+			if command, err := c.Shell("ps -o command= -p "+strconv.Itoa(s.PID), sessionhost.ShellTimeout); err == nil {
+				s.RemoteControl = s.RemoteControl || strings.Contains(command, "--remote-control") ||
+					strings.Contains(command, "--rc")
+			}
+		}
+		out = append(out, s)
+	}
+	return out, nil
+}
+
+// adoptSession stops a session where it runs and resumes it in Marmota's
+// tmux. A session Claude Code runs in the background is stopped with
+// `claude stop`; one in a terminal by its process, which leaves the
+// terminal at its shell.
+func adoptSession(c *sessionhost.Client, s claudesession.Session) error {
+	switch {
+	case s.Background:
+		target := s.Name
+		if target == "" {
+			target = s.ID
+		}
+		if _, err := c.Shell("claude stop "+shellQuote(target), sessionhost.ShellTimeout); err != nil {
+			return fmt.Errorf("couldn't stop it: %w", err)
+		}
+	case s.PID > 0:
+		pid := strconv.Itoa(s.PID)
+		wait := strconv.Itoa(int(adoptStopWait / (100 * time.Millisecond)))
+		if _, err := c.Shell(`kill -TERM `+pid+` 2>/dev/null; i=0; while kill -0 `+pid+` 2>/dev/null && [ $i -lt `+
+			wait+` ]; do sleep 0.1; i=$((i + 1)); done; kill -KILL `+pid+` 2>/dev/null; true`,
+			adoptStopWait+sessionhost.ShellTimeout); err != nil {
+			return fmt.Errorf("couldn't stop it: %w", err)
+		}
+	default:
+		return errors.New("it has no process to stop")
+	}
+	cwd := s.Cwd
+	if cwd == "" {
+		cwd = "~"
+	}
+	if _, err := c.Start(sessionhost.NameFor(sessionhost.ClaudePrefix, s.ID), cwd, movedSessionCommand(s)); err != nil {
+		return fmt.Errorf("stopped, but couldn't resume it in Marmota's tmux: %w", err)
 	}
 	return nil
 }

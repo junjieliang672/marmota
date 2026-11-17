@@ -106,7 +106,10 @@ func splitWords(s string) ([]string, error) {
 }
 
 // shellTimeout is how long a shell command over there may take.
-const shellTimeout = 30 * time.Second
+const shellTimeout = ShellTimeout
+
+// ShellTimeout is how long a shell command over there may take.
+const ShellTimeout = 30 * time.Second
 
 // Hostname is the computer's short name, "nova".
 func (c *Client) Hostname() (string, error) {

@@ -54,6 +54,47 @@ func sessionCommand() *cli.Command {
 				},
 			},
 			{
+				Name: "adopt",
+				Usage: "Move sessions running on another computer outside Marmota into its tmux there: each " +
+					"stops where it runs, leaving its terminal at the shell, and goes on with the same " +
+					"conversation in Marmota",
+				ArgsUsage: "[NAME or ID]...",
+				Flags: []cli.Flag{
+					&cli.StringFlag{Name: "on", Usage: `how to reach the computer, such as "ssh me@host"`},
+					&cli.BoolFlag{Name: "list", Usage: "only list the sessions that could be moved"},
+					&cli.BoolFlag{Name: "json", Usage: "print JSON"},
+				},
+				Action: func(_ context.Context, c *cli.Command) error {
+					adopted, err := internal.SessionAdopt(c.String("on"), c.Args().Slice(), c.Bool("list"))
+					if err != nil {
+						return cli.Exit("y session adopt: "+err.Error(), 1)
+					}
+					if c.Bool("json") {
+						return json.NewEncoder(os.Stdout).Encode(adopted)
+					}
+					if len(adopted) == 0 {
+						fmt.Println("no session runs there outside Marmota")
+						return nil
+					}
+					failed := false
+					for _, a := range adopted {
+						switch {
+						case c.Bool("list"):
+							fmt.Printf("%s  %-12s %-8s %s  (%s)\n", a.ID, a.Name, a.Status, a.Title, a.Cwd)
+						case a.Moved:
+							fmt.Printf("moved %s (%s) into Marmota\n", a.Name, a.ID)
+						default:
+							failed = true
+							fmt.Printf("couldn't move %s (%s): %s\n", a.Name, a.ID, a.Error)
+						}
+					}
+					if failed {
+						return cli.Exit("", 1)
+					}
+					return nil
+				},
+			},
+			{
 				Name:  "list",
 				Usage: "List the sessions in Marmota's tmux and what each is doing",
 				Flags: []cli.Flag{&cli.BoolFlag{Name: "json", Usage: "print JSON"}},

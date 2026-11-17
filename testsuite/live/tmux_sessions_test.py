@@ -416,6 +416,31 @@ def main() -> int:
         print("ok   restarted in its pane, Marmota took back the pane beside it that shows the other computer's "
               "session; enter didn't open a second one")
 
+        # 10. a session someone started on the other computer, outside
+        # Marmota: y session adopt moves it in, with the same id
+        outside = socket + "-outside"
+        subprocess.run(["env", *[f"{k}={v}" for k, v in env.items()], "tmux", "-L", outside, "new-session", "-d",
+                        "-c", str(project), "/bin/sh", "-c", "claude -- 'started by hand there'; exec sh"],
+                       check=True)
+        on3 = f"env MARMOTA_TMUX_SOCKET={socket}-remote3 /bin/sh -c"
+        listing = wait_for("it among those adopt can move", lambda: next(
+            (line for line in y("adopt", "--on", on3, "--list").splitlines() if "started by hand" in line
+             or "local" in line), None))
+        outside_id = listing.split()[0]
+        assert "moved" in y("adopt", "--on", on3, outside_id)
+        wait_for("its terminal back at its shell", lambda: "claude" not in subprocess.run(
+            ["tmux", "-L", outside, "list-panes", "-F", "#{pane_current_command}"],
+            capture_output=True, text=True).stdout)
+        wait_for("it in Marmota's tmux there", lambda: "cc-" + outside_id in subprocess.run(
+            ["tmux", "-L", socket + "-remote3", "list-windows", "-a", "-F", "#{window_name}"],
+            capture_output=True, text=True).stdout)
+        assert any(s["id"] == outside_id for s in json.loads(y("list", "--json"))["sessions"])
+        assert not any(l.startswith(outside_id) for l in y("adopt", "--on", on3, "--list").splitlines())
+        for name in (outside, socket + "-remote3"):
+            subprocess.run(["tmux", "-L", name, "kill-server"], capture_output=True)
+        print("ok   y session adopt moved a session started by hand on the other computer into Marmota's tmux "
+              "there, with the same id; its terminal went back to its shell")
+
         after = client_state()
         assert after == (before_workspace, before_focus), f"the test changed your window: {after}"
         print("ok   your active workspace and focused pane are unchanged")
@@ -438,7 +463,9 @@ def main() -> int:
             # A killed server leaves its socket file behind.
             sockets = Path(os.environ.get("TMUX_TMPDIR", "/tmp")) / f"tmux-{os.getuid()}"
             subprocess.run(["tmux", "-L", socket + "-remote2", "kill-server"], capture_output=True)
-            for name in (socket, socket + "-remote", socket + "-remote2"):
+            for name in ("-outside", "-remote3"):
+                subprocess.run(["tmux", "-L", socket + name, "kill-server"], capture_output=True)
+            for name in (socket, socket + "-remote", socket + "-remote2", socket + "-outside", socket + "-remote3"):
                 (sockets / name).unlink(missing_ok=True)
             shutil.rmtree(work, ignore_errors=True)
 

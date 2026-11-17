@@ -34,6 +34,20 @@ MFA or browser sign-in), the command fails and says so: tell the user to log
 in there once in a terminal, then try again. Never ask for or type their
 password or codes.
 
+## Bring in sessions already running there
+
+```
+y session adopt --on "<how to reach the computer>" --list   # the sessions there outside Marmota
+y session adopt --on "<how to reach the computer>" [<name or id>...]
+```
+
+Moves Claude Code sessions someone started on that computer outside Marmota
+into it: each one's process stops where it runs (its terminal goes back to
+its shell, or closes when the session was all it ran) and it goes on with the
+same id and conversation, permission mode, model, effort and Remote Control
+in Marmota's tmux there. Without names it moves all of them, whatever they are
+doing, so run `--list` first and tell the user what will move.
+
 ## Follow it
 
 ```
