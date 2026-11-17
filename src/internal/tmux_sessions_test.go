@@ -277,7 +277,8 @@ func TestAComputerThatCantBeReachedKeepsItsSessionsAsLastSeen(t *testing.T) {
 
 	seen := claudesession.Session{ID: "r1", Host: "nova", Title: "Sweep", Live: true,
 		Status: claudesession.StatusIdle, TTY: remoteTTY("nova", "%1")}
-	m.mergeRemoteSessions(remoteListing{sessions: []claudesession.Session{seen}, failed: map[string]error{}})
+	m.mergeRemoteSessions(remoteListing{sessions: []claudesession.Session{seen}, failed: map[string]error{},
+		listed: map[string]bool{"nova": true}})
 	require.Len(t, m.claude.snapshot.Live, 1)
 
 	m.claude.snapshot.Live = nil // the next refresh
@@ -324,4 +325,53 @@ func TestAFolderUnderThisHomeIsTheOtherComputersHome(t *testing.T) {
 	assert.Equal(t, "~", remoteFolder("", "nova"))
 	assert.Equal(t, "/srv/app", remoteFolder("/srv/app", "nova"))
 	assert.Equal(t, home+"/proj", remoteFolder(home+"/proj", ""), "here a folder stays as it is")
+}
+
+// Each computer's sessions come in on their own: this computer's show
+// before another computer has answered, and a computer's listing takes the
+// place of its last one without waiting for the next of this computer's.
+func TestEachComputersSessionsComeInOnTheirOwn(t *testing.T) {
+	m := newClaudeTestModel(t)
+	file, last := variable.RemotesFile, variable.RemoteSessionsFile
+	variable.RemotesFile = filepath.Join(t.TempDir(), "remotes.json")                //nolint:reassign // its own
+	variable.RemoteSessionsFile = filepath.Join(t.TempDir(), "remote_sessions.json") //nolint:reassign // its own
+	t.Cleanup(func() { variable.RemotesFile, variable.RemoteSessionsFile = file, last })
+	require.NoError(t, saveRemoteHosts([]sessionhost.Host{{Name: "nova", SSH: "me@nova"},
+		{Name: "air", SSH: "me@air"}}))
+	ids := func() []string {
+		var out []string
+		for _, s := range m.claude.snapshot.Live {
+			out = append(out, s.ID)
+		}
+		return out
+	}
+	remote := func(host, id string) claudesession.Session {
+		return claudesession.Session{ID: id, Host: host, Title: id, Live: true, Status: claudesession.StatusIdle,
+			TTY: remoteTTY(host, "%1")}
+	}
+	here := claudesession.Snapshot{Live: []claudesession.Session{{ID: "here", Title: "here", Live: true}}}
+
+	// air answers before this computer's sessions are listed: it waits for them.
+	m.applyRemoteHostListed(remoteHostListedMsg{host: "air",
+		listing: hostListing{sessions: []claudesession.Session{remote("air", "a1")}}})
+	assert.Empty(t, ids())
+	m.applyClaudeSessionsSnapshot(claudeSessionsSnapshotMsg{snapshot: here, layoutGen: m.claude.layoutGen})
+	assert.ElementsMatch(t, []string{"here", "a1"}, ids(), "nova hasn't answered yet: the others show")
+
+	m.applyRemoteHostListed(remoteHostListedMsg{host: "nova",
+		listing: hostListing{sessions: []claudesession.Session{remote("nova", "n1")}}})
+	assert.ElementsMatch(t, []string{"here", "a1", "n1"}, ids(), "nova's show as soon as it answers")
+
+	m.applyRemoteHostListed(remoteHostListedMsg{host: "nova",
+		listing: hostListing{sessions: []claudesession.Session{remote("nova", "n2")}}})
+	assert.ElementsMatch(t, []string{"here", "a1", "n2"}, ids(), "its new listing takes the old one's place")
+
+	m.applyClaudeSessionsSnapshot(claudeSessionsSnapshotMsg{snapshot: here, layoutGen: m.claude.layoutGen})
+	assert.ElementsMatch(t, []string{"here", "a1", "n2"}, ids(), "this computer's next listing keeps theirs")
+
+	m.applyRemoteHostListed(remoteHostListedMsg{host: "nova", listing: hostListing{err: errors.New("timed out")}})
+	assert.ElementsMatch(t, []string{"here", "a1", "n2"}, ids())
+	s, ok := m.claude.snapshot.Find("n2")
+	require.True(t, ok)
+	assert.Contains(t, s.Unreachable, "timed out", "kept as last seen")
 }

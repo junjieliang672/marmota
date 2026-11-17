@@ -18,7 +18,9 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	variable "github.com/junjieliang672/marmota/src/config"
 	"github.com/junjieliang672/marmota/src/pkg/claudesession"
 	"github.com/junjieliang672/marmota/src/pkg/sessionhost"
@@ -127,33 +129,156 @@ func uniqueHostName(name string, hosts []sessionhost.Host) string {
 
 // remoteListing is what the computers Marmota remembers run: their
 // sessions, the panes of their windows, and the computers it couldn't reach
-// with why.
+// with why. listed are the computers it could.
 type remoteListing struct {
 	sessions []claudesession.Session
 	panes    []weztermPane
 	failed   map[string]error
+	listed   map[string]bool
 }
 
 // listRemoteSessions lists the sessions in Marmota's windows on each
 // computer it remembers, copying the new part of each one's transcript.
-// Computers are asked one after another; one that can't be reached is left
-// out, and tried again later.
+// Computers are asked all at once; one that can't be reached is left out,
+// and tried again later.
 func listRemoteSessions(tracker *claudesession.Tracker, skip map[string]bool) remoteListing {
-	out := remoteListing{failed: map[string]error{}}
-	for _, h := range loadRemoteHosts() {
+	hosts := loadRemoteHosts()
+	each := make([]hostListing, len(hosts))
+	var wg sync.WaitGroup
+	for i, h := range hosts {
 		if skip[h.Name] {
-			out.failed[h.Name] = errLoggingIn
+			each[i] = hostListing{err: errLoggingIn}
 			continue
 		}
-		sessions, panes, err := listHostSessions(h.Name, tracker)
-		if err != nil {
-			out.failed[h.Name] = err
-			continue
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			each[i] = listHost(h.Name, tracker, "")
+		}()
+	}
+	wg.Wait()
+	listed := map[string]hostListing{}
+	for i, h := range hosts {
+		listed[h.Name] = each[i]
+	}
+	return joinListings(hosts, listed)
+}
+
+// hostListing is what one computer runs, as one listing found it: its
+// sessions, the panes of its windows, and the window this Marmota's view
+// there shows; or why it couldn't be asked.
+type hostListing struct {
+	sessions []claudesession.Session
+	panes    []weztermPane
+	view     string
+	err      error
+	// at is when the listing began.
+	at time.Time
+}
+
+// listHost lists one computer's sessions, and which window view shows
+// there when view is given.
+func listHost(name string, tracker *claudesession.Tracker, view string) hostListing {
+	l := hostListing{at: time.Now()}
+	l.sessions, l.panes, l.err = listHostSessions(name, tracker)
+	if l.err == nil && view != "" {
+		if c, err := hostClient(name); err == nil {
+			l.view = c.ViewWindow(view)
 		}
-		out.sessions = append(out.sessions, sessions...)
-		out.panes = append(out.panes, panes...)
+	}
+	return l
+}
+
+// joinListings puts the listings of the computers in hosts together. One
+// not listed yet is left out.
+func joinListings(hosts []sessionhost.Host, listed map[string]hostListing) remoteListing {
+	out := remoteListing{failed: map[string]error{}, listed: map[string]bool{}}
+	for _, h := range hosts {
+		l, ok := listed[h.Name]
+		switch {
+		case !ok:
+		case l.err != nil:
+			out.failed[h.Name] = l.err
+		default:
+			out.listed[h.Name] = true
+			out.sessions = append(out.sessions, l.sessions...)
+			out.panes = append(out.panes, l.panes...)
+		}
 	}
 	return out
+}
+
+// remoteHostListedMsg is one computer's listing, done.
+type remoteHostListedMsg struct {
+	host    string
+	listing hostListing
+}
+
+// remoteSessionsRefreshCmd lists each computer's sessions in a command of
+// its own, so a computer that is slow to answer holds up only its own
+// sessions: this computer's, and the other computers', show as soon as they
+// are listed. A computer still being listed isn't asked again.
+func (m *model) remoteSessionsRefreshCmd() tea.Cmd {
+	if !m.tmuxSessionsOn() {
+		return nil
+	}
+	loggingIn := m.settleLoginPanes()
+	view := ""
+	if self, err := currentWeztermPaneID(); err == nil {
+		view = tmuxView(self)
+	}
+	if m.remote.inflight == nil {
+		m.remote.inflight = map[string]bool{}
+	}
+	if m.remote.listed == nil {
+		m.remote.listed = map[string]hostListing{}
+	}
+	tracker := m.claude.tracker
+	var cmds []tea.Cmd
+	for _, h := range loadRemoteHosts() {
+		name := h.Name
+		if loggingIn[name] {
+			m.remote.listed[name] = hostListing{err: errLoggingIn, at: time.Now()}
+			continue
+		}
+		if m.remote.inflight[name] {
+			continue
+		}
+		m.remote.inflight[name] = true
+		cmds = append(cmds, func() tea.Msg {
+			return remoteHostListedMsg{host: name, listing: listHost(name, tracker, view)}
+		})
+	}
+	return tea.Batch(cmds...)
+}
+
+// applyRemoteHostListed puts one computer's sessions in the list in place
+// of those it listed before.
+func (m *model) applyRemoteHostListed(msg remoteHostListedMsg) tea.Cmd {
+	delete(m.remote.inflight, msg.host)
+	if m.remote.listed == nil {
+		m.remote.listed = map[string]hostListing{}
+	}
+	m.remote.listed[msg.host] = msg.listing
+	if !m.claude.loaded {
+		return nil // this computer's sessions bring them in
+	}
+	askBarTarget := m.askBarTarget()
+	m.claude.snapshot.Live = slices.DeleteFunc(m.claude.snapshot.Live, func(s claudesession.Session) bool {
+		return s.Host != ""
+	})
+	m.mergeRemoteSessions(m.remoteListing())
+	if m.tmuxSessionsOn() {
+		m.settleTmuxShown()
+	}
+	m.settleStoppedClaudeSessions(false)
+	return tea.Batch(m.sessionsChanged(askBarTarget)...)
+}
+
+// remoteListing is every computer's sessions as last listed, of the
+// computers Marmota still remembers.
+func (m *model) remoteListing() remoteListing {
+	return joinListings(loadRemoteHosts(), m.remote.listed)
 }
 
 func listHostSessions(name string, tracker *claudesession.Tracker) ([]claudesession.Session, []weztermPane, error) {
@@ -304,7 +429,7 @@ func (m *model) mergeRemoteSessions(r remoteListing) {
 		}
 	}
 	for _, h := range hosts {
-		if _, failed := r.failed[h.Name]; !failed {
+		if r.listed[h.Name] {
 			if !sameSessions(m.remote.last[h.Name], byHost[h.Name]) {
 				changed = true
 			}
@@ -353,6 +478,10 @@ type remoteState struct {
 	// loginPanes are the panes where you log in to a computer, by its name:
 	// it isn't asked while one is open, and is asked at once after.
 	loginPanes map[string]int
+	// listed is each computer's last listing, and inflight the computers
+	// being listed.
+	listed   map[string]hostListing
+	inflight map[string]bool
 }
 
 // reachHost is enter on a session whose computer can't be reached: a pane

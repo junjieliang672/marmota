@@ -122,17 +122,28 @@ type claudeSessionsSnapshotMsg struct {
 	layoutGen   int
 	// codex are Codex's sessions, merged in once the panes are known.
 	codex []claudesession.Session
-	// remote is what the other computers Marmota remembers run.
-	remote remoteListing
 	// starting are the sessions in this computer's Marmota windows that
 	// Claude Code doesn't list yet.
 	starting []claudesession.Session
 }
 
-// claudeSessionsRefreshCmd lists sessions in the background. Only one refresh
-// runs at a time; the next one is scheduled when its result arrives.
+// claudeSessionsRefreshCmd lists sessions in the background: this
+// computer's, and each other computer's apart (see remoteSessionsRefreshCmd).
+// Only one refresh of this computer's runs at a time; the next one is
+// scheduled when its result arrives.
 func (m *model) claudeSessionsRefreshCmd() tea.Cmd {
-	if m.claude.inflight || !claudeSessionsAutoRefresh {
+	if !claudeSessionsAutoRefresh {
+		return nil
+	}
+	local := m.localSessionsRefreshCmd()
+	if remote := m.remoteSessionsRefreshCmd(); remote != nil {
+		return tea.Batch(local, remote)
+	}
+	return local
+}
+
+func (m *model) localSessionsRefreshCmd() tea.Cmd {
+	if m.claude.inflight {
 		return nil
 	}
 	m.claude.inflight = true
@@ -150,7 +161,6 @@ func (m *model) claudeSessionsRefreshCmd() tea.Cmd {
 	tracker := m.claude.tracker
 	layoutGen := m.claude.layoutGen
 	remote := m.tmuxSessionsOn()
-	loggingIn := m.settleLoginPanes()
 	run := claudeSessionRunner
 	projects := claudeProjectsDir()
 	order := m.claudeSessionsOrder()
@@ -177,7 +187,6 @@ func (m *model) claudeSessionsRefreshCmd() tea.Cmd {
 		msg.codex = collectCodexSessions(codexsession.Options{Home: codexDir, Tracker: codexTracker,
 			Since: opts.Since, Folders: snap.Folders, Include: opts.Include})
 		if remote {
-			msg.remote = listRemoteSessions(tracker, loggingIn)
 			msg.starting = localStartingSessions(snap.Live)
 		}
 		if os.Getenv("WEZTERM_PANE") != "" {
@@ -219,7 +228,7 @@ func (m *model) applyClaudeSessionsSnapshot(msg claudeSessionsSnapshotMsg) tea.C
 		m.claude.panes = msg.panes
 	}
 	m.mergeCodexSessions(msg.codex)
-	m.mergeRemoteSessions(msg.remote)
+	m.mergeRemoteSessions(m.remoteListing())
 	for _, s := range msg.starting {
 		if _, askStarted := m.ask.starts[s.ID]; !askStarted { // the Ask box shows its own
 			m.claude.snapshot.Live = append(m.claude.snapshot.Live, s)
@@ -230,31 +239,41 @@ func (m *model) applyClaudeSessionsSnapshot(msg claudeSessionsSnapshotMsg) tea.C
 		m.dropSessionsOutsideMarmota()
 	}
 	askBarTarget, started := m.settleCodexStarts(askBarTarget)
-	all := append(append([]claudesession.Session(nil), m.claude.snapshot.Live...), m.claude.snapshot.Past...)
-	order := m.claudeSessionsOrder()
-	if order.update(all, m.claudeSessionsDay()) {
-		order.save()
-	}
 	m.settleStoppedClaudeSessions(true)
 	m.titleNewClaudeSessions()
 	if msg.snapshot.LiveErr != nil {
 		slog.Debug("Claude sessions: live list unavailable", "error", msg.snapshot.LiveErr)
+	}
+	cmds := append(m.sessionsChanged(askBarTarget),
+		m.scheduleClaudeSessionsRefresh(), started, m.migrateToTmux())
+	if touched := m.claudeTouchedSummary(); touched != m.claude.touched {
+		m.claude.touched = touched
+		cmds = append(cmds, scheduleGitRefresh(m))
+	}
+	return tea.Batch(cmds...)
+}
+
+// sessionsChanged brings what follows the list up to date once sessions
+// were listed: their order, unread marks, the Sessions box and the s list,
+// whom the Ask box writes to (askBarTarget, as before), and the session in
+// the preview.
+func (m *model) sessionsChanged(askBarTarget string) []tea.Cmd {
+	all := append(append([]claudesession.Session(nil), m.claude.snapshot.Live...), m.claude.snapshot.Past...)
+	order := m.claudeSessionsOrder()
+	if order.update(all, m.claudeSessionsDay()) {
+		order.save()
 	}
 	m.recomputeClaudeUnread()
 	m.refreshSessionsList()
 	m.refreshJump()
 	m.keepAskBarTarget(askBarTarget)
 	m.keepViewerPin()
-	cmds := []tea.Cmd{m.scheduleClaudeSessionsRefresh(), m.updateClaudeInbox(), started, m.migrateToTmux()}
+	cmds := []tea.Cmd{m.updateClaudeInbox()}
 	if m.sessionsShown() {
 		m.loadSessionsConversation()
 		cmds = append(cmds, m.watchClaudeQuestion())
 	}
-	if touched := m.claudeTouchedSummary(); touched != m.claude.touched {
-		m.claude.touched = touched
-		cmds = append(cmds, scheduleGitRefresh(m))
-	}
-	return tea.Batch(cmds...)
+	return cmds
 }
 
 // claudeTouchedSummary sums up the files running sessions edited: it changes

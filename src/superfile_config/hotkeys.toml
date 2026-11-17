@@ -38,7 +38,7 @@ toggle_reverse_sort = ['R', '']
 
 #-- Focus Manipulation
 focus_on_metadata = ['M', '']
-go_to = ['s', '']
+go_to = ['s', 'z']
 jump_to_unread_session = ['!', '']
 next_session = [']', '']
 previous_session = ['[', '']

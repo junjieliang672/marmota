@@ -91,7 +91,7 @@ y
 | `W` | The files the selected session changed |
 | `V` | Pin the preview to a session while you browse |
 | `w` · `r` · `x` · `m` | In the Sessions box: fork, rename, stop, mention a session |
-| `s` | Go to: pinned, sessions (running or ended, to resume), folders zoxide knows, recent files; `enter` on a running session puts the Sessions box on it and leaves the pane beside Marmota as it is |
+| `s` or `z` | Go to: pinned, sessions (running or ended, to resume), folders zoxide knows, recent files; `enter` on a running session puts the Sessions box on it and leaves the pane beside Marmota as it is |
 | `ctrl+r` | In the Ask box, writing to a new session: resume an ended one instead |
 | `M` · `F` | Focus the Details box · hide or show the boxes at the foot |
 | `?` | All keys |

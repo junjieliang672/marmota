@@ -234,6 +234,9 @@ func (m *model) handleOwnMsg(msg tea.Msg) (tea.Cmd, bool) {
 	case claudeSessionsSnapshotMsg:
 		return m.applyClaudeSessionsSnapshot(msg), true
 
+	case remoteHostListedMsg:
+		return m.applyRemoteHostListed(msg), true
+
 	case askDelegatedMsg:
 		m.applyAskDelegated(msg)
 		return nil, true

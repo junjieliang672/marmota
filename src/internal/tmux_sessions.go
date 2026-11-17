@@ -290,8 +290,21 @@ func tmuxSendKeys(id int, keys string) error {
 	return c.SendBytes(ref.pane, []byte(keys))
 }
 
-// tmuxCloseWindow ends a window and the session in it.
+// tmuxCloseWindow ends a window and the session in it. Another computer's
+// is closed in the background, so the screen doesn't wait for it to answer.
 func tmuxCloseWindow(id int) error {
+	if ref, ok := tmuxPanes.ref(id); ok && ref.host != "" {
+		go func() {
+			c, err := hostClient(ref.host)
+			if err == nil {
+				err = c.CloseWindow(ref.window)
+			}
+			if err != nil {
+				slog.Warn("Could not close a session's window", "host", ref.host, "error", err)
+			}
+		}()
+		return nil
+	}
 	c, ref, err := tmuxTarget(id)
 	if err != nil {
 		return err
@@ -383,7 +396,7 @@ func (m *model) adoptTmuxViewer(self int, panes []weztermPane) {
 				m.keepOneViewer(self, panes, lines)
 			}
 			if m.tmux.viewer != 0 {
-				m.attachViewerAnew(c, view)
+				attachViewerAnew(c, view)
 				return
 			}
 		}
@@ -394,26 +407,19 @@ func (m *model) adoptTmuxViewer(self int, panes []weztermPane) {
 // adoptRemoteViewer takes back a pane beside Marmota that shows another
 // computer's tmux. Its tmux client runs over there, so its terminal can't
 // say which pane it is: the window that computer's view of this Marmota
-// shows does, by its title, which the pane carries.
+// shows does, by its title, which the pane carries. Each computer's last
+// listing says which window that is: asking it here would hold up the
+// screen as long as the computer takes to answer.
 func (m *model) adoptRemoteViewer(self int, panes []weztermPane, view string) {
-	tmuxPanes.mu.Lock()
-	hosts := make([]string, 0, len(tmuxPanes.clients))
-	for name := range tmuxPanes.clients {
-		if name != "" {
+	hosts := make([]string, 0, len(m.remote.listed))
+	for name, l := range m.remote.listed {
+		if l.err == nil && l.view != "" {
 			hosts = append(hosts, name)
 		}
 	}
-	tmuxPanes.mu.Unlock()
 	slices.Sort(hosts)
 	for _, host := range hosts {
-		c, err := hostClient(host)
-		if err != nil {
-			continue
-		}
-		window := c.ViewWindow(view)
-		if window == "" {
-			continue
-		}
+		window := m.remote.listed[host].view
 		title := ""
 		for _, p := range m.claude.panes {
 			if ref, ok := tmuxPanes.ref(p.PaneID); ok && ref.host == host && ref.window == window {
@@ -426,7 +432,11 @@ func (m *model) adoptRemoteViewer(self int, panes []weztermPane, view string) {
 		for _, p := range panes {
 			if p.PaneID != self && p.Title == title && !isViewerPane(p) {
 				m.tmux.viewer, m.tmux.viewerHost = p.PaneID, host
-				m.attachViewerAnew(c, view)
+				go func() {
+					if c, err := hostClient(host); err == nil {
+						attachViewerAnew(c, view)
+					}
+				}()
 				return
 			}
 		}
@@ -435,7 +445,7 @@ func (m *model) adoptRemoteViewer(self int, panes []weztermPane, view string) {
 
 // attachViewerAnew attaches the pane beside Marmota it took back anew, to
 // the window it shows: its scrollback may hold another session's history.
-func (m *model) attachViewerAnew(c *sessionhost.Client, view string) {
+func attachViewerAnew(c *sessionhost.Client, view string) {
 	if window := c.ViewWindow(view); window != "" {
 		if err := c.Show(view, window); err != nil {
 			slog.Debug("Could not attach the pane beside Marmota anew", "error", err)
@@ -463,14 +473,39 @@ func (m *model) keepOneViewer(self int, panes []weztermPane, ttys []string) {
 
 // showTmuxPane shows a tmux window beside Marmota: in the pane already there
 // that shows one, else in a new pane. With focus the keyboard goes there.
+//
+// Another computer's tmux is told in the background: it may be slow to
+// answer, and the screen mustn't wait for it.
 func (m *model) showTmuxPane(id int, title string, focus bool) (string, error) {
-	c, ref, err := tmuxTarget(id)
-	if err != nil {
-		return "", err
+	ref, ok := tmuxPanes.ref(id)
+	if !ok {
+		return "", fmt.Errorf("no tmux pane %d", id)
 	}
-	// Scrolled back, it would show an old screen and take no keys.
-	if err := c.LeaveCopyMode(ref.pane); err != nil {
-		slog.Debug("Could not leave copy mode", "pane", ref.pane, "error", err)
+	show := ""
+	var c *sessionhost.Client
+	if ref.host == "" {
+		var err error
+		if c, err = localTmux(); err != nil {
+			return "", err
+		}
+		leaveCopyMode(c, ref.pane)
+	} else {
+		defer func() {
+			go func() {
+				c, err := hostClient(ref.host)
+				if err != nil {
+					slog.Debug("Could not reach the computer of a session shown", "host", ref.host, "error", err)
+					return
+				}
+				leaveCopyMode(c, ref.pane)
+				if show == "" {
+					return
+				}
+				if err := c.Show(show, ref.window); err != nil {
+					slog.Warn("Could not show a session beside Marmota", "host", ref.host, "error", err)
+				}
+			}()
+		}()
 	}
 	self, err := currentWeztermPaneID()
 	if err != nil {
@@ -492,6 +527,8 @@ func (m *model) showTmuxPane(id int, title string, focus bool) (string, error) {
 			return "", err
 		}
 		return "Focused " + title, nil
+	case shown && c == nil:
+		show = view
 	case shown:
 		if err := c.Show(view, ref.window); err != nil {
 			return "", err
@@ -504,7 +541,7 @@ func (m *model) showTmuxPane(id int, title string, focus bool) (string, error) {
 		}
 		m.tmux.viewer, m.tmux.viewerHost = paneID, ref.host
 	}
-	m.tmux.viewWindow = ref.window
+	m.tmux.viewWindow, m.tmux.shownAt = ref.window, time.Now()
 	m.markTmuxShown(id)
 	target := self
 	if focus {
@@ -518,6 +555,14 @@ func (m *model) showTmuxPane(id int, title string, focus bool) (string, error) {
 		return "Switched to " + title, nil
 	}
 	return "Showing " + title, nil
+}
+
+// leaveCopyMode takes a pane out of copy mode: scrolled back, it would show
+// an old screen and take no keys.
+func leaveCopyMode(c *sessionhost.Client, pane string) {
+	if err := c.LeaveCopyMode(pane); err != nil {
+		slog.Debug("Could not leave copy mode", "pane", pane, "error", err)
+	}
 }
 
 // attachCommand is the shell command, for a pane here, that shows a window
@@ -597,15 +642,24 @@ func (m *model) settleTmuxShown() {
 		m.markTmuxShown(0)
 		return
 	}
-	self, err := currentWeztermPaneID()
-	if err != nil {
-		return
+	if host := m.tmux.viewerHost; host != "" {
+		// Another computer's last listing says: asking it here would hold
+		// up the screen as long as it takes to answer. One that began
+		// before the pane last changed windows is older than what it shows.
+		if l, ok := m.remote.listed[host]; ok && l.err == nil && l.view != "" && !l.at.Before(m.tmux.shownAt) {
+			m.tmux.viewWindow = l.view
+		}
+	} else {
+		self, err := currentWeztermPaneID()
+		if err != nil {
+			return
+		}
+		c, err := localTmux()
+		if err != nil {
+			return
+		}
+		m.tmux.viewWindow = c.ViewWindow(tmuxView(self))
 	}
-	c, err := hostClient(m.tmux.viewerHost)
-	if err != nil {
-		return
-	}
-	m.tmux.viewWindow = c.ViewWindow(tmuxView(self))
 	for _, p := range m.claude.panes {
 		if ref, ok := tmuxPanes.ref(p.PaneID); ok && isTmuxPane(p.PaneID) && ref.host == m.tmux.viewerHost &&
 			ref.window == m.tmux.viewWindow {
@@ -648,6 +702,8 @@ type tmuxState struct {
 	viewer     int
 	viewWindow string
 	viewerHost string
+	// shownAt is when the pane beside Marmota last changed windows.
+	shownAt time.Time
 	// lastLaunched is the pane of the session started last.
 	lastLaunched int
 	// migrated holds the old WezTerm panes whose sessions moved to tmux.
