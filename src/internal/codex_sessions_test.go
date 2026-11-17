@@ -603,20 +603,20 @@ func TestEqualsMovesACodexSessionHere(t *testing.T) {
 	assert.Equal(t, "Couldn't move fix the login: no server", m.claude.flash)
 }
 
-// The folded Ask box says which computer the session at the cursor runs on.
+// The folded Ask box says, on a line of its own, which computer the session
+// at the cursor runs on.
 func TestTheFoldedAskBoxSaysTheComputer(t *testing.T) {
 	ownAskHistory(t)
 	m := newClaudeTestModel(t)
-	keyLine := func(s claudesession.Session) string {
-		return ansi.Strip(m.dockAskIdleLines(s, 40, 8)[2])
+	hostLine := func(s claudesession.Session) string {
+		return strings.TrimSpace(ansi.Strip(m.dockAskIdleLines(s, 30, 8)[2]))
 	}
 	here := thisComputerName()
 	require.NotEmpty(t, here)
-	assert.Contains(t, keyLine(claudesession.Session{}), "write · ", "a new session starts here")
-	assert.True(t, strings.HasSuffix(keyLine(claudesession.Session{}), here), keyLine(claudesession.Session{}))
+	assert.True(t, strings.HasSuffix(hostLine(claudesession.Session{}), here), "a new session starts here")
 	local := claudesession.Session{ID: "a1", Title: "fix", Live: true}
-	assert.True(t, strings.HasSuffix(keyLine(local), " "+here), keyLine(local))
-	remote := claudesession.Session{ID: "r1", Title: "sweep", Live: true, Host: "mac-mini"}
-	assert.True(t, strings.HasSuffix(keyLine(remote), " mac-mini"), keyLine(remote))
-	assert.NotContains(t, keyLine(remote), here)
+	assert.True(t, strings.HasSuffix(hostLine(local), here), hostLine(local))
+	remote := claudesession.Session{ID: "r1", Title: "sweep", Live: true, Host: "a-long-computer-name"}
+	assert.True(t, strings.HasSuffix(hostLine(remote), "a-long-computer-name"), hostLine(remote))
+	assert.Contains(t, ansi.Strip(m.dockAskIdleLines(remote, 30, 8)[3]), "write", "the keys keep their line")
 }

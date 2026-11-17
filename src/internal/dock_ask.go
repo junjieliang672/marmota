@@ -341,7 +341,7 @@ func (m *model) dockAskIdleLines(s claudesession.Session, width, rows int) []str
 	key := firstKey(common.Hotkeys.OpenAskBar)
 	if s.ID == "" {
 		lines := []string{st.val.Render(ansi.Truncate("→ "+m.newSessionName(), width, "…")),
-			m.dockAgentLine(s, width), dockKeyLine(key+" write", "", width)}
+			m.dockAgentLine(s, width), dockHostLine("", width), st.dim.Render(key + " write")}
 		lines = append(lines, m.dockDraftLine(width)...)
 		mode := "⏵⏵ " + claudeask.PermissionModeLabel(m.sessions.composer.PermissionMode())
 		return fillRows(lines, dimLines(wrapLines("starts in the background, "+mode, width, rows)), rows)
@@ -352,7 +352,7 @@ func (m *model) dockAskIdleLines(s claudesession.Session, width, rows int) []str
 		verb = " answer its question"
 	}
 	head := []string{st.val.Render(ansi.Truncate("→ "+s.DisplayTitle(), width, "…")),
-		m.dockAgentLine(s, width), dockKeyLine(key+verb, s.Host, width)}
+		m.dockAgentLine(s, width), dockHostLine(s.Host, width), st.dim.Render(key + verb)}
 	head = append(head, m.dockDraftLine(width)...)
 	turn, ok := m.dock.lastTurn(s)
 	now := time.Now()
@@ -392,6 +392,11 @@ func (m *model) dockAskIdleLines(s claudesession.Session, width, rows int) []str
 	}
 	if more == "working" {
 		more = ""
+	}
+	if len(head)+len(body) > rows && len(body) > 2 {
+		// Short of rows, "you, 3m ago:" goes first: the message and how it
+		// stands say more.
+		body = body[1:]
 	}
 	lines := fillRows(head, body, rows)
 	room := rows - len(lines)
@@ -572,24 +577,19 @@ func (m *model) dockAskStatusLine() string {
 	return m.statusLineModel.RenderModeHotkeys("Ask", keys)
 }
 
-// dockKeyLine is the Ask box's key line, then the computer the session runs
-// on (host, or "" for this one): "K write · 󰍹 kingjj".
-func dockKeyLine(keys, host string, width int) string {
+// dockHostLine is the Ask box's line for the computer the session runs on
+// (host, or "" for this one): "󰍹 kingjj", "󰅣 mac-mini".
+func dockHostLine(host string, width int) string {
 	st := dockStyles()
 	name := host
 	if name == "" {
 		name = thisComputerName()
 	}
-	line := st.dim.Render(keys)
-	if name == "" {
-		return line
-	}
 	mark := common.HostMark(host, common.FooterBGColor)
 	if mark != "" {
 		mark += st.dim.Render(" ")
 	}
-	sep := st.dim.Render(" · ")
-	return ansi.Truncate(line+sep+mark+st.val.Render(name), width, "…")
+	return ansi.Truncate(mark+st.val.Render(name), width, "…")
 }
 
 var (
