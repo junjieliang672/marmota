@@ -310,8 +310,9 @@ func (m *model) jumpAct(act jump.Action) tea.Cmd {
 }
 
 // jumpGo is enter on an item: a folder is opened in the panel, a file's
-// folder is with the cursor on it, a session is shown beside Marmota, an
-// ended one is resumed in a hidden pane; the Sessions box goes on its row.
+// folder is with the cursor on it; for a session the Sessions box takes the
+// keyboard, on its row, and the preview shows it, while the pane beside
+// Marmota stays as it is; an ended one is resumed in a hidden pane first.
 func (m *model) jumpGo(it jump.Item) tea.Cmd {
 	if m.jump.forResume {
 		m.jumpUI.Close()
@@ -342,18 +343,13 @@ func (m *model) jumpGo(it jump.Item) tea.Cmd {
 			m.flashClaude(it.Title + " is no longer listed")
 			return nil
 		}
-		message, err := m.jumpToClaudeSession(s, false)
-		if err != nil {
-			m.flashClaude(err.Error())
+		// The pane beside Marmota stays as it is: enter in the Sessions box
+		// brings this one there.
+		m.sessions.pendingSelect, m.dock.lastID = s.ID, s.ID
+		if len(m.dockSessions()) == 0 {
 			return nil
 		}
-		m.sessions.pendingSelect, m.dock.lastID = s.ID, s.ID
-		var cmd tea.Cmd
-		if len(m.dockSessions()) > 0 {
-			cmd = m.focusDockSessionsOn(s.ID)
-		}
-		m.flashClaude(message)
-		return cmd
+		return m.focusDockSessionsOn(s.ID)
 	case jump.Pinned, jump.Folder, jump.File:
 		m.jumpGoToPath(it.Key)
 	}

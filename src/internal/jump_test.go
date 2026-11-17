@@ -422,3 +422,22 @@ func TestAnEndedSessionIsPreviewedFromItsTranscript(t *testing.T) {
 	top := strings.Split(viewText(m), "\n")[0]
 	assert.Contains(t, top[strings.Index(top, "╮"):], "logo sizes for the deck", "the preview's title")
 }
+
+func TestEnterOnASessionPicksItInTheSessionsBoxAndLeavesThePaneBesideAlone(t *testing.T) {
+	f := jumpTestModel(t)
+	m := f.m
+	wez := newFakeWezterm(t, superfileTab())
+	pressKey(m, common.Hotkeys.GoTo[0])
+	typeInto(m, "provider")
+
+	pressKey(m, "enter")
+
+	assert.False(t, m.jumpUI.IsOpen())
+	assert.Equal(t, dockSessionsFocus, m.focusPanel, "the Sessions box has the keyboard")
+	assert.Equal(t, "s20", m.sessions.list.SelectedID(), "on the session's row")
+	for _, cmd := range wez.commands {
+		assert.NotContains(t, cmd, "split-pane", "nothing comes in beside Marmota")
+		assert.NotContains(t, cmd, "move-pane", "nothing comes in beside Marmota")
+		assert.NotContains(t, cmd, "activate-pane", "the keyboard stays in Marmota")
+	}
+}
