@@ -75,36 +75,21 @@ func (m *model) dockSessions() []claudesession.Session {
 	return out
 }
 
-// dockPick is where ! lands: the session a toast is about, the newest news;
-// else the session that most recently started needing you, else the one the
-// box was last on, else the first.
-func (m *model) dockPick(sessions []claudesession.Session) string {
-	if t := m.claude.toast; t != nil && m.claudeToastDue(*t) &&
-		slices.ContainsFunc(sessions, func(s claudesession.Session) bool { return s.ID == t.id }) {
-		return t.id
+// dockPick is where ! lands: the first session below from that needs you,
+// round at the end, so ! again goes on to the next one; with from "" the
+// first that needs you. With none, the first session.
+func (m *model) dockPick(sessions []claudesession.Session, from string) string {
+	if len(sessions) == 0 {
+		return ""
 	}
-	var newest string
-	var newestAt time.Time
-	for _, s := range sessions {
-		if m.sessionState(s) != sessionsui.NeedsYou {
-			continue
-		}
-		if at := m.needsYouSince(s.ID); newest == "" || at.After(newestAt) {
-			newest, newestAt = s.ID, at
-		}
-	}
-	if newest != "" {
-		return newest
-	}
-	for _, s := range sessions {
-		if s.ID == m.dock.lastID {
+	at := slices.IndexFunc(sessions, func(s claudesession.Session) bool { return s.ID == from }) // -1: the top
+	for i := 1; i <= len(sessions); i++ {
+		s := sessions[(at+i)%len(sessions)]
+		if m.sessionState(s) == sessionsui.NeedsYou {
 			return s.ID
 		}
 	}
-	if len(sessions) > 0 {
-		return sessions[0].ID
-	}
-	return ""
+	return sessions[0].ID
 }
 
 // focusDockSessions gives the Sessions box the keyboard, showing the dock
@@ -122,7 +107,11 @@ func (m *model) focusDockSessionsOn(id string) tea.Cmd {
 	}
 	m.refreshSessionsList()
 	if id == "" || !slices.ContainsFunc(m.dockSessions(), func(s claudesession.Session) bool { return s.ID == id }) {
-		id = m.dockPick(m.dockSessions())
+		from := ""
+		if m.focusPanel == dockSessionsFocus {
+			from = m.sessions.list.SelectedID()
+		}
+		id = m.dockPick(m.dockSessions(), from)
 	}
 	if id == "" {
 		m.flashClaude("No live sessions. Start one with " + firstKey(common.Hotkeys.OpenAgentPrompt) + "claude or " +
@@ -130,7 +119,9 @@ func (m *model) focusDockSessionsOn(id string) tea.Cmd {
 		return tea.Batch(cmds...)
 	}
 	m.sessions.list.Select(id)
-	m.claude.toast = nil // ! answers it
+	if t := m.claude.toast; t != nil && t.id == id {
+		m.claude.toast = nil // seen
+	}
 	if m.focusPanel != dockSessionsFocus {
 		m.dock.prevFocus = m.focusPanel
 	}
@@ -216,7 +207,9 @@ func (m *model) dockSessionsKey(msg tea.KeyMsg) tea.Cmd {
 		}
 	}
 	switch {
-	case slices.Contains(common.Hotkeys.JumpToUnreadSession, key), isLeaveKey(key):
+	case slices.Contains(common.Hotkeys.JumpToUnreadSession, key):
+		return m.focusDockSessions()
+	case isLeaveKey(key):
 		m.leaveDockSessions()
 		return nil
 	case slices.Contains(common.Hotkeys.NextSession, key):
@@ -337,7 +330,7 @@ func (m *model) dockSessionsRender() string {
 	r.SetBorderTitle("Sessions")
 	hint := firstKey(common.Hotkeys.JumpToUnreadSession) + " go"
 	if focused {
-		hint = firstKey(common.Hotkeys.JumpToUnreadSession) + " back"
+		hint = "esc back"
 	}
 	r.SetBorderInfoItems(hint)
 
@@ -488,7 +481,7 @@ func (m *model) dockStatusLine() string {
 	ask := firstKey(common.Hotkeys.OpenAskBar)
 	keys := []statusline.Hotkey{
 		{Key: ask, Description: "answer/write"},
-		{Key: firstKey(common.Hotkeys.JumpToUnreadSession) + "/esc", Description: "files"},
+		{Key: "esc", Description: "files"},
 		{Key: firstKey(common.Hotkeys.Confirm), Description: "open beside"},
 		{Key: firstKey(common.Hotkeys.SessionMention), Description: "mention"},
 		{Key: firstKey(common.Hotkeys.SessionNew), Description: "new"},

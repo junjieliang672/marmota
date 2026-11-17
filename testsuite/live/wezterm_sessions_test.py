@@ -14,8 +14,8 @@ started. Checks:
   4. `!` gives the dock's Sessions box the keyboard without switching;
      enter on the other session brings it in beside Marmota with the
      keyboard, and the one that was shown is parked in the hidden workspace.
-  5. A new finished turn in the hidden session shows as unread, and `!`
-     brings it in.
+  5. A new finished turn in the hidden session shows as unread, and enter
+     on it in the Sessions box brings it in.
   6. `!` and enter on the other session switch back.
   7. In the Sessions box `x` asks, then stops the selected session and
      closes its pane; the session leaves the box; Esc gives the keyboard
@@ -104,7 +104,7 @@ def in_sessions_box(pane_id: int) -> bool:
     """Whether the Sessions box has the keyboard: the status line says how
     to leave it."""
     lines = screen(pane_id).splitlines()
-    return bool(lines) and "!/esc:files" in lines[-1]
+    return bool(lines) and "esc:files" in lines[-1]
 
 
 def selected_session(pane_id: int) -> str:
@@ -294,7 +294,7 @@ def main() -> int:
               "enter on the other switched to it, focused "
               "it and parked the rc one in the hidden workspace")
 
-        # 5. a new turn in the now-hidden rc session is unread, and ! jumps to it
+        # 5. a new turn in the now-hidden rc session is unread, and enter shows it
         second_id = next(json.loads(f.read_text())["sessionId"] for f in registry.glob("*.json")
                          if json.loads(f.read_text())["name"] == "remote2")
         transcript = Path((registry / f"{second_id}.transcript").read_text().strip())
@@ -307,17 +307,18 @@ def main() -> int:
         wait_for("unread marker", lambda: "1 unread" in screen(spf))
         print("ok   the hidden session's new reply shows as unread in the status line")
 
-        # ! puts the keyboard in the dock's Sessions box, on the session the
-        # toast is about; enter brings it in beside Marmota.
+        # ! puts the keyboard in the dock's Sessions box (on a session that
+        # needs you, else the first); enter on the unread one brings it in
+        # beside Marmota.
         type_keys(spf, "!")
-        wait_for("! to select the unread session in the dock",
-                 lambda: "!/esc:files" in screen(spf).splitlines()[-1])
+        wait_for("the Sessions box", lambda: in_sessions_box(spf))
+        select_session(spf, "remote2")
         type_keys(spf, "\r")
         wait_for("enter to bring the unread session in",
                  lambda: (pane_by_id(second["pane_id"]) or {}).get("tab_id") == spf_tab)
         # "!:unread" is a key hint; the count reads "● 1 unread (!)".
         wait_for("unread cleared", lambda: "unread (!)" not in screen(spf).splitlines()[-1])
-        print("ok   ! selected the unread session, enter showed it, and the marker cleared")
+        print("ok   ! went to the Sessions box, enter on the unread session showed it, and the marker cleared")
 
         # 6. ! and enter on the other session switch back
         type_keys(spf, "\x1b")  # the box still has the keyboard after enter
@@ -351,7 +352,7 @@ def main() -> int:
         type_keys(spf, "m")
         time.sleep(0.3)
         type_keys(spf, "!")
-        wait_for("the Sessions box", lambda: "!/esc:files" in screen(spf).splitlines()[-1])
+        wait_for("the Sessions box", lambda: in_sessions_box(spf))
         type_keys(spf, "n")
         wait_for("the Ask box on a new session", lambda: "Ask → new Claude Code session in project" in screen(spf))
         wait_for("the item under the cursor in the question", lambda: "@assets/" in screen(spf))

@@ -136,6 +136,7 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case clearAfterResizeMsg:
 		updateCmd = tea.ClearScreen
 	case tea.KeyMsg:
+		m.sessions.selection = previewSelection{} // a key puts the selection away
 		inputCmd = m.handleKeyInput(msg)
 
 	// Focus reporting exists for the IME ascii-hold. superfile stays in hotkey
@@ -1062,8 +1063,8 @@ func (m *model) View() string {
 		// The preview shows the session the Sessions box is on. An image
 		// the file preview drew, such as a PDF's page, stays on the screen
 		// over it until cleared; back in the files, it is drawn again.
-		filePreview = m.dockSessionPreview(m.fileModel.filePreview.GetWidth(),
-			m.fileModel.filePreview.GetHeight()) + filepreview.ClearKittyImages()
+		filePreview = highlightSelection(m.dockSessionPreview(m.fileModel.filePreview.GetWidth(),
+			m.fileModel.filePreview.GetHeight()), m.sessions.selection) + filepreview.ClearKittyImages()
 	}
 
 	mainPanel := lipgloss.JoinHorizontal(0, sidebar, filePanel, filePreview)

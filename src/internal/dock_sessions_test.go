@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/assert"
@@ -32,37 +31,58 @@ func dockTestModel(t *testing.T) *model {
 
 func bang(m *model) { pressKey(m, common.Hotkeys.JumpToUnreadSession[0]) }
 
-func TestBangLandsOnTheNewestSessionThatNeedsYou(t *testing.T) {
+// ! goes to a session that needs you, and again to the next one, round at
+// the end; it never takes you back to the files.
+func TestBangGoesToEachSessionThatNeedsYou(t *testing.T) {
 	m := dockTestModel(t)
-	now := time.Now()
 	for i := range m.claude.snapshot.Live {
 		m.claude.snapshot.Live[i].Status = claudesession.StatusWaiting
 	}
-	m.claude.waitingSince = map[string]time.Time{"s20": now.Add(-10 * time.Minute), "s50": now.Add(-time.Minute)}
+	m.refreshSessionsList()
+	ids := m.dockSessions()
 
 	bang(m)
-
 	assert.Equal(t, dockSessionsFocus, m.focusPanel)
-	assert.Equal(t, "s50", m.sessions.list.SelectedID(), "s50 started needing you most recently")
+	assert.Equal(t, ids[0].ID, m.sessions.list.SelectedID(), "the first that needs you")
+	bang(m)
+	assert.Equal(t, ids[1].ID, m.sessions.list.SelectedID(), "again: the next")
+	bang(m)
+	assert.Equal(t, ids[0].ID, m.sessions.list.SelectedID(), "round at the end")
+	assert.Equal(t, dockSessionsFocus, m.focusPanel, "still in the Sessions box")
+
+	pressKey(m, "esc")
+	assert.Equal(t, nonePanelFocus, m.focusPanel, "esc goes back to the files")
+	bang(m)
+	assert.Equal(t, ids[0].ID, m.sessions.list.SelectedID(), "from the files, the first that needs you again")
 }
 
-func TestBangElseTheLastSessionElseTheFirst(t *testing.T) {
+// With nothing that needs you, ! goes to the first session, wherever the
+// box was.
+func TestBangElseTheFirstSession(t *testing.T) {
 	m := dockTestModel(t)
 	first := m.dockSessions()[0].ID
 
 	bang(m)
-	assert.Equal(t, first, m.sessions.list.SelectedID(), "nothing waits and none was visited: the first")
-
+	assert.Equal(t, first, m.sessions.list.SelectedID())
 	pressKey(m, common.Hotkeys.ListDown[0])
-	second := m.sessions.list.SelectedID()
-	require.NotEqual(t, first, second)
+	require.NotEqual(t, first, m.sessions.list.SelectedID())
 
 	bang(m)
-	assert.Equal(t, nonePanelFocus, m.focusPanel, "! again goes back to the files")
-	assert.True(t, m.getFocusedFilePanel().isFocused)
+	assert.Equal(t, first, m.sessions.list.SelectedID(), "in the box too")
+	assert.Equal(t, dockSessionsFocus, m.focusPanel)
 
+	// One needs you: ! goes there, and stays there.
+	waiting := m.dockSessions()[1].ID
+	for i := range m.claude.snapshot.Live {
+		if m.claude.snapshot.Live[i].ID == waiting {
+			m.claude.snapshot.Live[i].Status = claudesession.StatusWaiting
+		}
+	}
+	m.refreshSessionsList()
 	bang(m)
-	assert.Equal(t, second, m.sessions.list.SelectedID(), "the session you were last on")
+	assert.Equal(t, waiting, m.sessions.list.SelectedID())
+	bang(m)
+	assert.Equal(t, waiting, m.sessions.list.SelectedID())
 }
 
 func TestDockJumpsByNumber(t *testing.T) {
@@ -101,7 +121,7 @@ func TestDockShowsSessionsAndThePreviewTheSelectedOne(t *testing.T) {
 		m.fileModel.filePreview.GetHeight()))
 	assert.Contains(t, preview, sel.DisplayTitle(), "the preview shows the session")
 
-	bang(m)
+	pressKey(m, "esc")
 	assert.NotContains(t, ansi.Strip(m.filePreviewPanelRender()), "Ask bar",
 		"back in the files, the preview is the file's again")
 }

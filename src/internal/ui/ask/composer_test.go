@@ -430,3 +430,42 @@ func TestUpAndDownMoveARowThenRecall(t *testing.T) {
 	c.HandleKey(up)
 	assert.Equal(t, "an earlier question", c.Value(), "while stepping through them, up goes on back")
 }
+
+// shift+enter, which a terminal set up for Claude Code sends as ctrl+j,
+// starts a new line; so does a line break pasted or recalled.
+func TestShiftEnterStartsANewLine(t *testing.T) {
+	c := NewComposer()
+	c.Focus()
+	typeText(&c, "first")
+	c.HandleKey(tea.KeyMsg{Type: tea.KeyCtrlJ})
+	typeText(&c, "second")
+	assert.Equal(t, "first\nsecond", c.Value())
+	var rows []string
+	for _, l := range strings.Split(ansi.Strip(c.Render(60, Sending{})), "\n") {
+		if strings.Contains(l, "first") || strings.Contains(l, "second") {
+			rows = append(rows, l)
+		}
+	}
+	require.Len(t, rows, 2, "each line on a row of its own")
+	assert.NotContains(t, rows[0], "second")
+
+	c.HandleKey(tea.KeyMsg{Type: tea.KeyUp})
+	typeText(&c, "!")
+	assert.Equal(t, "first!\nsecond", c.Value(), "up goes to the line above, not to an earlier question")
+
+	c.SetValue("one\n")
+	_, cursorRow := c.rows([]rune(c.input.Value()), 40)
+	assert.Equal(t, 1, cursorRow, "after a line break the cursor starts the next row")
+
+	c.Clear()
+	c.HandleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a\r\nb"), Paste: true})
+	assert.Equal(t, "a\nb", c.Value(), "a pasted line break stays one")
+
+	c.SetValue(strings.Repeat("x", 20) + "\nnext")
+	assert.Equal(t, [][2]int{{0, 21}, {21, 25}}, wrapRanges([]rune(c.input.Value()), 20),
+		"a full row ends with its line, no empty row after it")
+
+	c.SetValue("line\n")
+	c.AddMention("@a.go", "/r/a.go")
+	assert.Equal(t, "line\n@a.go ", c.Value(), "a mention on a new line starts it")
+}

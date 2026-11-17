@@ -118,7 +118,7 @@ func (m *model) closeDockAsk() {
 	if m.dock.askFrom == dockSessionsFocus && len(m.dockSessions()) > 0 {
 		// Back to the Sessions box, on the session it was on.
 		if m.sessions.list.NewSelected() || !m.sessions.list.Select(m.sessions.list.SelectedID()) {
-			m.sessions.list.Select(m.dockPick(m.dockSessions()))
+			m.sessions.list.Select(m.dockPick(m.dockSessions(), ""))
 		}
 		m.focusPanel = dockSessionsFocus
 		return
@@ -559,6 +559,7 @@ func oneLine(s string) string {
 func (m *model) dockAskStatusLine() string {
 	keys := []statusline.Hotkey{
 		{Key: "enter", Description: "send"},
+		{Key: "shift+enter", Description: "new line"},
 		{Key: "↑↓", Description: "history"},
 		{Key: firstKey(common.Hotkeys.AskClear), Description: "clear"},
 	}

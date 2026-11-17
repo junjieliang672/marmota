@@ -50,6 +50,8 @@ type sessionsState struct {
 	pendingSelect string
 	convo         sessionsConversation
 	question      claudeQuestion
+	// selection is the text the mouse selected in the session preview.
+	selection previewSelection
 }
 
 // sessionsConversation is the selected session's conversation, read from

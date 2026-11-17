@@ -578,3 +578,15 @@ func batchMsgs(t *testing.T, cmd tea.Cmd) []tea.Msg {
 	}
 	return msgs
 }
+
+// shift+enter, which reaches Marmota as ctrl+j, starts a new line in the Ask
+// box instead of sending.
+func TestShiftEnterInTheAskBoxStartsANewLine(t *testing.T) {
+	m := defaultTestModel(t.TempDir())
+	m.openDockAsk("")
+	for _, k := range []string{"a", "ctrl+j", "b"} {
+		TeaUpdate(m, utils.TeaKeyMsg(k))
+	}
+	assert.Equal(t, "a\nb", m.sessions.composer.Value())
+	assert.Equal(t, dockAskFocus, m.focusPanel, "nothing was sent")
+}

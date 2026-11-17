@@ -93,13 +93,29 @@ func (c *Composer) Blur() { c.input.Blur() }
 // Focused reports whether the bar has the keyboard.
 func (c *Composer) Focused() bool { return c.input.Focused() }
 
+// lineBreak stands for a line break in the input, which turns "\n" into a
+// space.
+const lineBreak = '\u2028'
+
 // Value is the question.
-func (c *Composer) Value() string { return c.input.Value() }
+func (c *Composer) Value() string {
+	return strings.ReplaceAll(c.input.Value(), string(lineBreak), "\n")
+}
 
 // SetValue replaces the question, such as one kept from before.
 func (c *Composer) SetValue(text string) {
-	c.input.SetValue(text)
+	c.setInput(text)
 	c.input.CursorEnd()
+}
+
+// setInput puts text in the input, its line breaks kept.
+func (c *Composer) setInput(text string) {
+	c.input.SetValue(withLineBreaks(text))
+}
+
+func withLineBreaks(text string) string {
+	text = strings.ReplaceAll(text, "\r\n", "\n")
+	return strings.ReplaceAll(text, "\n", string(lineBreak))
 }
 
 // Clear empties the question.
@@ -119,7 +135,7 @@ func (c *Composer) AddMention(text, path string) bool {
 	if hasMention(value, text) {
 		return false
 	}
-	if value != "" && !strings.HasSuffix(value, " ") {
+	if value != "" && !strings.HasSuffix(value, " ") && !strings.HasSuffix(value, string(lineBreak)) {
 		value += " "
 	}
 	c.input.SetValue(value + text + " ")
@@ -358,11 +374,18 @@ func (c *Composer) HandleKey(msg tea.KeyMsg) tea.Cmd {
 		c.recall(1)
 	case slices.Contains(common.Hotkeys.AskNext, key):
 		c.recall(-1)
+	case key == "ctrl+j", key == "shift+enter":
+		// shift+enter, as a terminal set up for Claude Code sends it
+		c.input, _ = c.input.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{lineBreak}})
+		c.histPos = -1
 	case key == "up":
 		c.up()
 	case key == "down":
 		c.down()
 	default:
+		if msg.Paste {
+			msg.Runes = []rune(withLineBreaks(string(msg.Runes)))
+		}
 		var cmd tea.Cmd
 		c.input, cmd = c.input.Update(msg)
 		c.histPos = -1
@@ -427,16 +450,16 @@ func (c *Composer) recall(step int) {
 		return
 	}
 	if c.histPos < 0 {
-		c.saved = c.input.Value()
+		c.saved = c.Value()
 	}
 	pos := c.histPos + step
 	switch {
 	case pos < 0:
 		c.histPos = -1
-		c.input.SetValue(c.saved)
+		c.setInput(c.saved)
 	case pos < len(list):
 		c.histPos = pos
-		c.input.SetValue(list[len(list)-1-pos])
+		c.setInput(list[len(list)-1-pos])
 	default:
 		return
 	}
@@ -696,7 +719,7 @@ func (c *Composer) rows(value []rune, width int) ([][2]int, int) {
 	pos := min(c.input.Position(), len(value))
 	rows := wrapRanges(value, width)
 	if last := rows[len(rows)-1]; c.Focused() && pos == len(value) &&
-		ansi.StringWidth(string(value[last[0]:last[1]])) >= width {
+		(ansi.StringWidth(string(value[last[0]:last[1]])) >= width || value[len(value)-1] == lineBreak) {
 		rows = append(rows, [2]int{len(value), len(value)}) // the cursor starts a new row
 	}
 	cursorRow := len(rows) - 1
@@ -743,7 +766,14 @@ func inputRow(value []rune, r [2]int, kinds []mentionKind, cursor int, st compos
 		if j == cursor {
 			style = st.cursor
 		}
-		line.WriteString(style.Render(string(value[j])))
+		r := string(value[j])
+		if value[j] == lineBreak {
+			r = "" // the row ends here
+			if j == cursor {
+				r = " "
+			}
+		}
+		line.WriteString(style.Render(r))
 	}
 	if cursor >= r[1] {
 		line.WriteString(st.cursor.Render(" "))
@@ -787,6 +817,11 @@ func wrapRanges(runes []rune, width int) [][2]int {
 	for start := 0; start < len(runes); {
 		end, cells, lastSpace := start, 0, -1
 		for end < len(runes) {
+			if runes[end] == lineBreak {
+				end++ // it ends the row, where the cursor can stand on it
+				lastSpace = -1
+				break
+			}
 			w := ansi.StringWidth(string(runes[end]))
 			if cells+w > width {
 				break
@@ -797,7 +832,11 @@ func wrapRanges(runes []rune, width int) [][2]int {
 			cells += w
 			end++
 		}
-		if end < len(runes) && lastSpace > start && ansi.StringWidth(string(runes[end])) == 1 {
+		switch {
+		case end < len(runes) && runes[end] == lineBreak:
+			end++ // a full row ends where the line does, with no empty row after it
+		case end < len(runes) && lastSpace > start && runes[end-1] != lineBreak &&
+			ansi.StringWidth(string(runes[end])) == 1:
 			end = lastSpace + 1
 		}
 		if end == start {

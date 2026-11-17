@@ -10,7 +10,8 @@ import (
 // down and sideways, or the session it shows, which wraps its lines and so
 // only scrolls down. It also scrolls the
 // Details box at the foot, without giving it the keyboard, and the help
-// menu while it is open. Everything else takes
+// menu while it is open. The left button selects text in the session
+// preview, and copies it (the user, 2026-11-17). Everything else takes
 // nothing from the mouse, the file panels and the session list included
 // (the user, 2026-11-06). Mouse reporting stays on all the same (see
 // restoreMouseReporting).
@@ -41,10 +42,19 @@ type filePreviewDocMsg struct {
 }
 
 // handleMouse scrolls the preview under the pointer with the wheel: down and
-// up, and sideways with a trackpad's sideways scroll or shift. The rest of
-// the mouse does nothing.
+// up, and sideways with a trackpad's sideways scroll or shift. The left
+// button selects text in the session preview (session_select.go). The rest
+// of the mouse does nothing.
 func (m *model) handleMouse(msg tea.MouseMsg) tea.Cmd {
-	if msg.Action != tea.MouseActionPress || !m.firstLoadingComplete {
+	if !m.firstLoadingComplete {
+		return nil
+	}
+	if !m.helpMenu.open && !m.overlayOpen() {
+		if cmd, took := m.selectInSessionPreview(msg); took {
+			return cmd
+		}
+	}
+	if msg.Action != tea.MouseActionPress {
 		return nil
 	}
 	lines, cols, ok := wheelScroll(msg)
@@ -65,7 +75,8 @@ func (m *model) handleMouse(msg tea.MouseMsg) tea.Cmd {
 	case filePreviewArea:
 		return m.scrollFilePreview(lines, cols)
 	case sessionPreviewArea:
-		m.scrollSessionsPaneBy(-lines) // the session scrolls back, to older turns, when positive
+		m.sessions.selection = previewSelection{} // what it lit scrolls away
+		m.scrollSessionsPaneBy(-lines)            // the session scrolls back, to older turns, when positive
 	case detailsArea:
 		m.details.ScrollBy(lines)
 	case noPreview:

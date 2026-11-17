@@ -144,7 +144,7 @@ func getHelpMenuData() []helpMenuModalData {
 		},
 		{
 			hotkey:         common.Hotkeys.JumpToUnreadSession,
-			description:    "Sessions box at the foot: the session that most recently needs you, else the last one, else the first; again to go back",
+			description:    "Sessions box at the foot, on a session that needs you (again: the next one), else the first; esc goes back",
 			hotkeyWorkType: globalType,
 		},
 		{

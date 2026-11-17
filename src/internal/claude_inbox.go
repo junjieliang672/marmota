@@ -262,8 +262,10 @@ func (m *model) renderClaudeToast(t claudeToast) string {
 	bg := lipgloss.Color(common.Theme.FilePanelBG)
 	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(common.Theme.Hint)).Background(bg).Bold(true)
 	dim := lipgloss.NewStyle().Foreground(lipgloss.Color(common.GitUntrackedColor)).Background(bg)
-	keys := keyStyle.Render(firstKey(common.Hotkeys.JumpToUnreadSession)) + dim.Render(" open  ") +
-		keyStyle.Render("esc") + dim.Render(" later")
+	keys := keyStyle.Render("esc") + dim.Render(" later")
+	if m.dockPick(m.dockSessions(), "") == t.id { // where ! goes: one that needs you
+		keys = keyStyle.Render(firstKey(common.Hotkeys.JumpToUnreadSession)) + dim.Render(" open  ") + keys
+	}
 
 	width := min(claudeToastMaxWidth, max(claudeToastMinWidth, m.fullWidth/claudeToastWidthShare))
 	inner := width - common.BorderPadding - common.BorderPadding // border, then a space each side
