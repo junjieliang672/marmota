@@ -323,6 +323,11 @@ def main() -> int:
                     subprocess.run(["wezterm", "cli", "kill-pane", "--pane-id", str(pane["pane_id"])],
                                    capture_output=True)
             tmux("kill-server")
+            subprocess.run(["tmux", "-L", socket + "-remote", "kill-server"], capture_output=True)
+            # A killed server leaves its socket file behind.
+            sockets = Path(os.environ.get("TMUX_TMPDIR", "/tmp")) / f"tmux-{os.getuid()}"
+            for name in (socket, socket + "-remote"):
+                (sockets / name).unlink(missing_ok=True)
             shutil.rmtree(work, ignore_errors=True)
 
 
