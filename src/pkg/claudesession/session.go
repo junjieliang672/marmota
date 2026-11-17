@@ -46,7 +46,7 @@ type Session struct {
 	Agent Agent
 	// Host is the computer it runs on, as Marmota names it; "" for this one.
 	Host string
-	Name  string // name from `claude agents`, accepted by `claude attach`
+	Name string // name from `claude agents`, accepted by `claude attach`
 	// Title is the best human label: the AI title, else the last prompt,
 	// else the agents name, else the folder name.
 	Title string
