@@ -620,7 +620,7 @@ func noTmuxNotice() string {
 // Claude Code puts the session's name in the window's title. A window
 // whose own session still runs there isn't it.
 func (m *model) tmuxPaneShowingSession(s claudesession.Session) (weztermPane, bool) {
-	if !s.Live || s.Name == "" {
+	if !s.Live || s.Name == "" || s.Host != "" {
 		return weztermPane{}, false
 	}
 	taken := map[string]bool{}
