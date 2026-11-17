@@ -602,3 +602,21 @@ func TestEqualsMovesACodexSessionHere(t *testing.T) {
 	runCmd(t, m, m.moveClaudeSessionTo(s))
 	assert.Equal(t, "Couldn't move fix the login: no server", m.claude.flash)
 }
+
+// The folded Ask box says which computer the session at the cursor runs on.
+func TestTheFoldedAskBoxSaysTheComputer(t *testing.T) {
+	ownAskHistory(t)
+	m := newClaudeTestModel(t)
+	keyLine := func(s claudesession.Session) string {
+		return ansi.Strip(m.dockAskIdleLines(s, 40, 8)[2])
+	}
+	here := thisComputerName()
+	require.NotEmpty(t, here)
+	assert.Contains(t, keyLine(claudesession.Session{}), "write · ", "a new session starts here")
+	assert.True(t, strings.HasSuffix(keyLine(claudesession.Session{}), here), keyLine(claudesession.Session{}))
+	local := claudesession.Session{ID: "a1", Title: "fix", Live: true}
+	assert.True(t, strings.HasSuffix(keyLine(local), " "+here), keyLine(local))
+	remote := claudesession.Session{ID: "r1", Title: "sweep", Live: true, Host: "mac-mini"}
+	assert.True(t, strings.HasSuffix(keyLine(remote), " mac-mini"), keyLine(remote))
+	assert.NotContains(t, keyLine(remote), here)
+}

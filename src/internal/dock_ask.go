@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -340,7 +341,7 @@ func (m *model) dockAskIdleLines(s claudesession.Session, width, rows int) []str
 	key := firstKey(common.Hotkeys.OpenAskBar)
 	if s.ID == "" {
 		lines := []string{st.val.Render(ansi.Truncate("→ "+m.newSessionName(), width, "…")),
-			m.dockAgentLine(s, width), st.dim.Render(key + " write")}
+			m.dockAgentLine(s, width), dockKeyLine(key+" write", "", width)}
 		lines = append(lines, m.dockDraftLine(width)...)
 		mode := "⏵⏵ " + claudeask.PermissionModeLabel(m.sessions.composer.PermissionMode())
 		return fillRows(lines, dimLines(wrapLines("starts in the background, "+mode, width, rows)), rows)
@@ -351,7 +352,7 @@ func (m *model) dockAskIdleLines(s claudesession.Session, width, rows int) []str
 		verb = " answer its question"
 	}
 	head := []string{st.val.Render(ansi.Truncate("→ "+s.DisplayTitle(), width, "…")),
-		m.dockAgentLine(s, width), st.dim.Render(key + verb)}
+		m.dockAgentLine(s, width), dockKeyLine(key+verb, s.Host, width)}
 	head = append(head, m.dockDraftLine(width)...)
 	turn, ok := m.dock.lastTurn(s)
 	now := time.Now()
@@ -569,4 +570,42 @@ func (m *model) dockAskStatusLine() string {
 	}
 	keys = append(keys, statusline.Hotkey{Key: "esc", Description: "close, keeps the draft"})
 	return m.statusLineModel.RenderModeHotkeys("Ask", keys)
+}
+
+// dockKeyLine is the Ask box's key line, then the computer the session runs
+// on (host, or "" for this one): "K write · 󰍹 kingjj".
+func dockKeyLine(keys, host string, width int) string {
+	st := dockStyles()
+	name := host
+	if name == "" {
+		name = thisComputerName()
+	}
+	line := st.dim.Render(keys)
+	if name == "" {
+		return line
+	}
+	mark := common.HostMark(host, common.FooterBGColor)
+	if mark != "" {
+		mark += st.dim.Render(" ")
+	}
+	sep := st.dim.Render(" · ")
+	return ansi.Truncate(line+sep+mark+st.val.Render(name), width, "…")
+}
+
+var (
+	thisComputerOnce sync.Once //nolint:gochecknoglobals // read once
+	thisComputer     string    //nolint:gochecknoglobals // read once
+)
+
+// thisComputerName is this computer's name, without its domain: "kingjj"
+// for kingjj.local.
+func thisComputerName() string {
+	thisComputerOnce.Do(func() {
+		name, err := os.Hostname()
+		if err != nil {
+			return
+		}
+		thisComputer, _, _ = strings.Cut(name, ".")
+	})
+	return thisComputer
 }
