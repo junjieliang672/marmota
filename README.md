@@ -129,7 +129,7 @@ Each one stops where it ran (its terminal goes back to its shell, or closes when
 and goes on with the same conversation, permission mode, model and Remote Control in Marmota's tmux.
 
 If a computer needs you to log in again, say when a sign-in expires, its sessions stay in the
-Sessions box, greyed, with "needs login": `enter` on one opens a pane below Marmota where ssh (or the
+Sessions box, greyed, with "needs login": `enter` on one opens a pane beside Marmota where ssh (or the
 company CLI's login) asks what it asks, and Marmota reaches the computer again once you're done.
 
 ## Configuration

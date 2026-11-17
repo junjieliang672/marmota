@@ -136,6 +136,12 @@ class Style:
             i += 1
 
 
+def is_icon(ch):
+    """A Nerd Font icon: in the private use areas."""
+    o = ord(ch)
+    return 0xE000 <= o <= 0xF8FF or o >= 0xF0000
+
+
 def width(ch):
     if unicodedata.combining(ch):
         return 0
@@ -221,6 +227,12 @@ def pane_html(p, subs):
     out = []
     for y, cells in enumerate(lines):
         cells = substitute(cells, subs)
+        # The space after a Nerd Font icon joins the icon's run, so the icon
+        # can be drawn across both cells (see is_icon below).
+        cells = list(cells)
+        for i in range(len(cells) - 1):
+            if is_icon(cells[i][0]) and cells[i + 1][0] == " ":
+                cells[i + 1] = (" ", cells[i][1], cells[i + 1][2])
         x = 0
         runs = []
         for ch, key, w in cells:
@@ -247,8 +259,18 @@ def pane_html(p, subs):
             if deco:
                 css.append("text-decoration:" + " ".join(deco))
             body = []
-            for ch, w in chars:
+            skip = False
+            for i, (ch, w) in enumerate(chars):
+                if skip:
+                    skip = False
+                    continue
                 if w == 0:
+                    continue
+                if is_icon(ch) and i + 1 < len(chars) and chars[i + 1][0] == " ":
+                    # WezTerm draws a Nerd Font icon followed by a space across
+                    # both cells (allow_square_glyphs_to_overflow_width).
+                    body.append(f'<i class="icon" style="width:{2 * CW:.2f}px">{html.escape(ch)}</i>')
+                    skip = True
                     continue
                 if ord(ch) < 128:
                     body.append(html.escape(ch))
@@ -309,6 +331,7 @@ html,body{{margin:0;background:{BG}}}
 .row i.quad{{display:inline-grid;grid-template:1fr 1fr/1fr 1fr;height:{LH}px;vertical-align:top}}
 .row i.quad b{{display:block}}
 .row i.box{{transform:scaleY(1.25)}}
+.row i.icon{{text-align:left}}
 .split{{position:absolute;background:{BLUE}}}
 </style><div class="win">{"".join(splits)}{"".join(pane_html(p, subs) for p in panes)}</div>"""
     page_path = OUT / f"{name}.html"
@@ -332,8 +355,12 @@ def user_subs():
 
 
 def main():
-    subs_file = HERE / "subs.json"
-    subs = user_subs() + (json.loads(subs_file.read_text()) if subs_file.exists() else [])
+    # subs.local.json, which git ignores, holds what only your machine
+    # shows, such as another computer's address; it goes first.
+    subs = user_subs()
+    for subs_file in (HERE / "subs.local.json", HERE / "subs.json"):
+        if subs_file.exists():
+            subs += json.loads(subs_file.read_text())
     for name in sys.argv[1:]:
         render(name, subs)
 

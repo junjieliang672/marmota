@@ -5,7 +5,8 @@
 #   ./start.sh [FOLDER]     FOLDER is $DEMO/tidepool by default
 #
 # Its settings, state, Claude Code transcripts and Codex home are the demo's
-# (./demo.sh makes them), so nothing of yours shows. COLS and ROWS set the
+# (./demo.sh makes them), so nothing of yours shows; its sessions run in a
+# tmux server of their own (marmota-shots), here and on other computers. COLS and ROWS set the
 # window's size: 160x44 by default.
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
@@ -21,4 +22,5 @@ exec wezterm --config "initial_cols=${COLS:-160}" --config "initial_rows=${ROWS:
 	PATH="$here/wrappers:$PATH" DEMO="$DEMO" CLAUDE_CONFIG_DIR="$H/claude" CODEX_HOME="$H/codex" \
 	XDG_CONFIG_HOME="$H/xdg/config" XDG_DATA_HOME="$H/xdg/data" XDG_STATE_HOME="$H/xdg/state" \
 	XDG_CACHE_HOME="$H/xdg/cache" _ZO_DATA_DIR="$H/zoxide" MARMOTA_NO_IME_HOLD=1 TERM=xterm-256color \
+	MARMOTA_TMUX_SOCKET=marmota-shots \
 	"${Y:-$here/../../bin/y}"

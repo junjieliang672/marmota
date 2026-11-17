@@ -12,7 +12,7 @@
 Nothing about your computer reaches a picture:
 - your user name becomes `alex.morgan`, cut or repeated to the same length;
 - memory and disk in Details are scaled to a 16 GB / 512 GB Mac, so the bars still match;
-- `subs.json` replaces e-mail addresses and Claude Code's weekly usage line; add pairs there for anything else.
+- `subs.json` replaces e-mail addresses and Claude Code's weekly usage line; add pairs there for anything else. Pairs for what only your machine shows, such as another computer's user name or address, go in `subs.local.json`, which git ignores.
 
 Read each picture before you commit it all the same: `ls -l` in a session's output, for one, prints your user name.
 
