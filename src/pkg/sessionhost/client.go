@@ -52,8 +52,6 @@ const (
 	// configPath is where Marmota's tmux config is written, on each
 	// computer, before its server starts.
 	configPath = "$HOME/.config/marmota/tmux.conf"
-	// configFile is configPath as tmux expands it.
-	configFile = "~/.config/marmota/tmux.conf"
 )
 
 // Config is Marmota's tmux config: tmux stays out of sight and out of the
@@ -70,7 +68,7 @@ unbind-key -q -a -T copy-mode-vi
 # Marmota draws on WezTerm's main screen, so what scrolls off its top goes
 # into that scrollback.
 set -g mouse off
-set -as terminal-overrides ",*:smcup@:rmcup@"
+set -s terminal-overrides[90] "*:smcup@:rmcup@"
 # No copy mode, ever: a pane in it shows no new output and takes no typing.
 # Nothing enters it (no mouse, no prefix), and a pane that does anyway
 # leaves it at once.
@@ -80,7 +78,7 @@ set -g history-limit 100000
 set -sg escape-time 0
 set -g focus-events on
 set -g default-terminal "tmux-256color"
-set -as terminal-features ",*:RGB:hyperlinks:clipboard:extkeys:usstyle:strikethrough:overline:sync:title"
+set -s terminal-features[90] "*:RGB:hyperlinks:clipboard:extkeys:usstyle:strikethrough:overline:sync:title"
 set -g extended-keys always
 set -g extended-keys-format csi-u
 set -g allow-passthrough on
@@ -310,13 +308,17 @@ func Dial(ctx context.Context, h Host) (*Client, error) {
 		_ = cmd.Wait()
 		return nil, dialError(before, stderr.String())
 	}
-	// Each window's output would stream in otherwise. A server that was
-	// already running takes the config as written now.
-	for _, command := range []string{"refresh-client -f no-output", "source-file -q " + Quote(configFile)} {
-		if _, err := c.Command(command); err != nil {
-			c.Close()
-			return nil, err
-		}
+	// Each window's output would stream in otherwise.
+	if _, err := c.Command("refresh-client -f no-output"); err != nil {
+		c.Close()
+		return nil, err
+	}
+	// A server that was already running takes the config as written now,
+	// through a tmux client of its own: sourced here, each of its commands
+	// would answer this connection, out of turn.
+	if _, err := c.Shell(Tmux()+` source-file -q "`+configPath+`"`, commandTimeout); err != nil {
+		c.Close()
+		return nil, err
 	}
 	c.reattachOnNewConfig()
 	return c, nil

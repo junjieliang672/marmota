@@ -66,6 +66,29 @@ func TestTheConnectionWritesTheConfigAndAnswersCommands(t *testing.T) {
 	assert.Equal(t, []string{"hello"}, lines)
 }
 
+func TestARunningServerTakesTheConfigAgainOnEachConnection(t *testing.T) {
+	c := localClient(t)
+	_, err := c.Command("set-option -g set-titles off")
+	require.NoError(t, err)
+	c.Close()
+
+	again, err := Dial(context.Background(), Host{Local: true})
+	require.NoError(t, err)
+	defer again.Close()
+	lines, err := again.Command("show-options -g set-titles")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"set-titles on"}, lines)
+	features, err := again.Command("show-options -s terminal-features")
+	require.NoError(t, err)
+	n := 0
+	for _, f := range features {
+		if strings.Contains(f, ":title") && strings.HasPrefix(f, "terminal-features[90]") {
+			n++
+		}
+	}
+	assert.Equal(t, 1, n, "loading it again adds nothing twice: %v", features)
+}
+
 func TestShellRunsOverThereAndReturnsItsOutput(t *testing.T) {
 	c := localClient(t)
 	out, err := c.Shell(`printf 'one\ntwo'; echo " it's $((1+2))"`, 5*time.Second)
