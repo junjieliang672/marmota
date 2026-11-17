@@ -406,7 +406,7 @@ func (m *model) keepOneViewer(self int, panes []weztermPane, ttys []string) {
 			continue
 		}
 		if m.tmux.viewer == 0 {
-			m.tmux.viewer = p.PaneID
+			m.tmux.viewer, m.tmux.viewerHost = p.PaneID, ""
 			continue
 		}
 		if err := killWeztermPane(cwd, p.PaneID); err != nil {
