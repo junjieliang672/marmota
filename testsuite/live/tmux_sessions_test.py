@@ -8,12 +8,12 @@ on PATH and a tmux server of its own (MARMOTA_TMUX_SOCKET). Checks:
   1. The old Marmota (--old, built from before sessions ran in tmux) opens
      two sessions, one beside it and one parked in the hidden workspace; a
      third is started by hand in a pane of its own.
-  2. The old Marmota quits and the new one (--binary) starts in the same
+  2. The old Marmota quits and the new one (--binary) starts in another
      pane: the Sessions box lists the same three sessions. The parked, idle
      one moves into tmux: its WezTerm pane closes and it runs on in a tmux
-     window; the one beside Marmota stays where it was.
-  3. enter on the moved session shows it beside Marmota: one pane that
-     attaches to tmux, and the old pane beside it is parked.
+     window; the one beside the old Marmota stays where it was.
+  3. enter on the moved session shows it beside the new Marmota: one pane
+     that attaches to tmux.
   4. The Ask box starts a new session in a tmux window, with no WezTerm pane;
      a follow-up is typed into it.
   5. x stops it: its window closes and it leaves the Sessions box.
@@ -115,7 +115,7 @@ def main() -> int:
     spf = 0
     try:
         # 1. the old Marmota, in a shell that starts the new one after it
-        script = f"{shlex.quote(old)}; {shlex.quote(new)}; sleep 600"
+        script = f"{shlex.quote(old)}; sleep 600"
         spf = spawn("/bin/sh", "-c", script)
         spf_tab = pane_by_id(spf)["tab_id"]
         main_screen(spf)
@@ -136,16 +136,19 @@ def main() -> int:
         assert not windows(), "the old Marmota started nothing in tmux"
         print(f"ok   the old Marmota lists {sorted(old_titles)}: one beside it, one parked, one started by hand")
 
-        # 2. quit; the new Marmota starts in the same pane
+        # 2. quit; the new Marmota starts in a pane of its own
         type_keys(spf, "q")
         wait_for("the old Marmota to quit", lambda: "K:ask" not in screen(spf))
+        old_tab = spf_tab
+        spf = spawn(new)
+        spf_tab = pane_by_id(spf)["tab_id"]
         main_screen(spf)
         type_keys(spf, "F")
         moved = wait_for("the parked session to move into tmux", lambda: next(iter(windows().values()), None)
                          if pane_by_id(parked["pane_id"]) is None else None, timeout=30)
         new_titles = wait_for("the new Marmota to list the same three",
                               lambda: (lambda t: t if t == old_titles else None)(listed(spf)), timeout=20)
-        assert pane_by_id(beside["pane_id"])["tab_id"] == spf_tab, "the session beside Marmota moved"
+        assert pane_by_id(beside["pane_id"])["tab_id"] == old_tab, "the session beside the old Marmota moved"
         assert pane_by_id(by_hand) is not None, "the session started by hand was touched"
         print(f"ok   the new Marmota lists the same sessions {sorted(new_titles)}; the parked one runs on in "
               f"tmux (pane {moved}); the one beside Marmota and the one started by hand are untouched")
@@ -157,13 +160,10 @@ def main() -> int:
         select_session(spf, moved_title)
         type_keys(spf, "\r")
         viewer = wait_for("a pane beside Marmota that attaches to tmux", lambda: next(
-            (p for p in panes() if p["tab_id"] == spf_tab and p["pane_id"] not in (spf, beside["pane_id"])), None))
+            (p for p in panes() if p["tab_id"] == spf_tab and p["pane_id"] != spf), None))
         wait_for("it to draw the moved session", lambda: screen(viewer["pane_id"]).strip())
-        wait_for("the old pane beside it parked",
-                 lambda: (pane_by_id(beside["pane_id"]) or {}).get("workspace") == HIDDEN_WORKSPACE)
         type_keys(spf, "\x1b")
-        print(f"ok   enter showed the moved session beside Marmota in pane {viewer['pane_id']}, attached to tmux; "
-              "the old pane was parked")
+        print(f"ok   enter showed the moved session beside Marmota in pane {viewer['pane_id']}, attached to tmux")
 
         # 4. the Ask box starts a new session in tmux
         if in_sessions_box(spf):

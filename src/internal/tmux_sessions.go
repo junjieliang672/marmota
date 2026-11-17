@@ -476,41 +476,40 @@ func tmuxSince() time.Time {
 	return now
 }
 
-// migrateToTmux moves the sessions Marmota started in WezTerm panes, before
-// sessions ran in tmux, into tmux: each, once it is idle, is closed and
-// resumed in a window of its own. Busy ones wait for a later refresh.
+// migrateToTmux moves the sessions that wait in WezTerm's hidden workspace,
+// parked there by a Marmota from before sessions ran in tmux (this one or
+// any other), into tmux: each, once it is idle with nothing typed, is closed
+// and resumed in a window of its own. Busy ones wait for a later refresh.
+// The one beside a Marmota stays; it moves once it is parked.
 func (m *model) migrateToTmux() tea.Cmd {
 	if !m.tmuxSessionsOn() {
-		return nil
-	}
-	if !m.managedWeztermState.loaded {
-		m.refreshManagedWeztermState() // the panes an earlier Marmota in this pane started
-	}
-	if len(m.managedWeztermState.Sessions) == 0 {
 		return nil
 	}
 	self, err := currentWeztermPaneID()
 	if err != nil {
 		return nil
 	}
+	if !m.managedWeztermState.loaded {
+		m.refreshManagedWeztermState() // the panes an earlier Marmota in this pane started
+	}
 	cwd := m.getFocusedFilePanel().location
-	state := m.managedWeztermState
-	kept := state.Sessions[:0]
 	var moved []string
-	for _, managed := range state.Sessions {
-		s, found := m.sessionInPane(managed.PaneID)
-		// Only a hidden one, that waits for you with nothing typed: closing
-		// and resuming it then changes nothing you see or lose.
-		if !found || s.Status != claudesession.StatusIdle || managed.VisibleSlot != managedAgentHiddenSlot ||
-			!promptEmpty(s, managed.PaneID) {
-			kept = append(kept, managed)
+	gone := map[int]bool{}
+	for _, pane := range append([]weztermPane(nil), m.claude.panes...) {
+		if isTmuxPane(pane.PaneID) || pane.Workspace != managedAgentHiddenWorkspace {
 			continue
 		}
-		if err := killWeztermPane(cwd, managed.PaneID); err != nil {
-			slog.Warn("Could not close a session's old pane", "pane", managed.PaneID, "error", err)
-			kept = append(kept, managed)
+		s, found := m.sessionInPane(pane.PaneID)
+		// Only one that waits for you with nothing typed: closing and
+		// resuming it then changes nothing you see or lose.
+		if !found || s.Status != claudesession.StatusIdle || !promptEmpty(s, pane.PaneID) {
 			continue
 		}
+		if err := killWeztermPane(cwd, pane.PaneID); err != nil {
+			slog.Warn("Could not close a session's old pane", "pane", pane.PaneID, "error", err)
+			continue
+		}
+		gone[pane.PaneID] = true
 		provider := managedAgentProviderClaude
 		if s.IsCodex() {
 			provider = managedAgentProviderCodex
@@ -524,11 +523,18 @@ func (m *model) migrateToTmux() tea.Cmd {
 		if s.IsCodex() {
 			m.recordCodexPane(s.ID, paneID)
 		}
-		m.movedToPane(s.ID, managed.PaneID, paneID)
+		m.movedToPane(s.ID, pane.PaneID, paneID)
 		moved = append(moved, s.DisplayTitle())
 	}
-	if len(moved) == 0 {
+	if len(gone) == 0 {
 		return nil
+	}
+	state := m.managedWeztermState
+	kept := state.Sessions[:0]
+	for _, managed := range state.Sessions {
+		if !gone[managed.PaneID] {
+			kept = append(kept, managed)
+		}
 	}
 	state.Sessions = kept
 	state = normalizeWeztermPaneLayoutState(state)
@@ -538,7 +544,9 @@ func (m *model) migrateToTmux() tea.Cmd {
 	if err := activateWeztermPane(cwd, self); err != nil {
 		slog.Debug("Could not keep the keyboard in Marmota", "error", err)
 	}
-	m.flashClaude("Moved into tmux, where they outlive WezTerm: " + strings.Join(moved, ", "))
+	if len(moved) > 0 {
+		m.flashClaude("Moved into tmux, where they outlive WezTerm: " + strings.Join(moved, ", "))
+	}
 	return nil
 }
 
