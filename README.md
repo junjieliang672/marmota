@@ -7,6 +7,9 @@ Yorukot and its contributors (MIT License), and has since been changed enough to
 it doesn't follow superfile's releases, and superfile's install scripts and release notes don't apply
 to it.
 
+**Website:** [junjieliang672.github.io/marmota](https://junjieliang672.github.io/marmota/) ·
+**Tutorial:** [Getting started with Marmota](https://junjieliang672.github.io/marmota/tutorial.html)
+
 ## What it does
 
 - **Files**: panels, previews, copy, move, rename, trash, archives, and `s` to go anywhere: pinned folders, sessions, folders zoxide knows, files edited lately.
