@@ -86,6 +86,10 @@ set -g extended-keys-format csi-u
 set -g allow-passthrough on
 # Programs in it draw in true color, as they do in WezTerm.
 set-environment -g COLORTERM truecolor
+# The WezTerm the server was started from may be gone: without these,
+# wezterm cli finds the one running now.
+set-environment -gu WEZTERM_PANE
+set-environment -gu WEZTERM_UNIX_SOCKET
 set -g allow-rename off
 set -g set-clipboard on
 set -g window-size latest
