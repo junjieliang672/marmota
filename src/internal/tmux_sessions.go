@@ -19,9 +19,11 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -143,6 +145,9 @@ func listTmuxPanes() ([]weztermPane, error) {
 	panes := make([]weztermPane, 0, len(windows))
 	for _, w := range windows {
 		panes = append(panes, tmuxPaneOf(w))
+	}
+	if ttys, err := c.ClientTTYs(); err == nil {
+		viewerTTYs.Store(ttys)
 	}
 	return panes, nil
 }
@@ -411,6 +416,16 @@ func (m *model) hideTmuxViewer() error {
 	m.tmux.viewer, m.tmux.viewWindow = 0, ""
 	m.markTmuxShown(0)
 	return nil
+}
+
+// viewerTTYs are the terminals of the panes that show a tmux window, as last
+// listed: their titles are the sessions', yet no session runs in them.
+var viewerTTYs atomic.Value //nolint:gochecknoglobals // set by refreshes
+
+// isViewerPane reports a WezTerm pane that only shows a tmux window.
+func isViewerPane(p weztermPane) bool {
+	ttys, _ := viewerTTYs.Load().([]string)
+	return p.TTYName != "" && slices.Contains(ttys, p.TTYName)
 }
 
 // tmuxState is this Marmota's side of the sessions in tmux.

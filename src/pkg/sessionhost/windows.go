@@ -202,20 +202,59 @@ func (c *Client) LeaveCopyMode(paneID string) error {
 	return err
 }
 
+// historyLines is how much of a session's history the pane beside Marmota
+// is given to scroll back through when it shows the session.
+const historyLines = 10000
+
 // AttachCommand is the shell command, for this computer's pane, that shows a
 // window: a tmux client of a session of its own in the group of "marmota",
 // so two panes can show two windows, which ends when the pane closes. view
 // names it, one per Marmota.
+//
+// The pane's scrollback is the window's history first: it is cleared, and
+// what scrolled off the window's top is printed into it, so the wheel
+// scrolls back through this session's output alone, as in a pane of its own.
 func AttachCommand(view, windowID string) string {
-	return Tmux() + " new-session -A -t " + TmuxSession + " -s " + shellQuote(view) +
+	t := Tmux()
+	return `printf '\033[H\033[2J\033[3J'; ` +
+		t + ` capture-pane -p -e -J -S -` + strconv.Itoa(historyLines) + ` -E -1 -t ` + shellQuote(windowID) +
+		` 2>/dev/null; exec ` +
+		t + " new-session -A -t " + TmuxSession + " -s " + shellQuote(view) +
 		` \; set-option destroy-unattached on \; select-window -t ` + shellQuote(windowID)
 }
 
-// Show makes the view's pane show a window: the view is the session
-// AttachCommand made.
+// Show makes the view's pane show a window: its tmux client starts over,
+// with that window's history in the pane's scrollback (see AttachCommand).
+// Without a client, as when the pane is gone, the view just selects it.
 func (c *Client) Show(view, windowID string) error {
-	_, err := c.Command("select-window -t " + Quote(view+":"+windowID))
-	return err
+	clients, err := c.Command("list-clients -t " + Quote(view) + " -F " + Quote("#{client_name}"))
+	if err != nil || len(clients) == 0 {
+		_, err = c.Command("select-window -t " + Quote(view+":"+windowID))
+		return err
+	}
+	for _, client := range clients {
+		if _, err := c.Command("detach-client -t " + Quote(client) + " -E " +
+			Quote(Script(AttachCommand(view, windowID)))); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ClientTTYs are the terminals of the tmux clients attached here: the
+// panes that show a window, whose titles are their windows' own.
+func (c *Client) ClientTTYs() ([]string, error) {
+	lines, err := c.Command("list-clients -F " + Quote("#{client_tty}"))
+	if err != nil {
+		return nil, err
+	}
+	var ttys []string
+	for _, l := range lines {
+		if l = strings.TrimSpace(l); l != "" {
+			ttys = append(ttys, l)
+		}
+	}
+	return ttys, nil
 }
 
 // ViewWindow is the window a view shows, or "" when there is no such view.

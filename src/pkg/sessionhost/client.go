@@ -19,7 +19,9 @@ package sessionhost
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -78,7 +80,7 @@ set -g history-limit 100000
 set -sg escape-time 0
 set -g focus-events on
 set -g default-terminal "tmux-256color"
-set -as terminal-features ",*:RGB:hyperlinks:clipboard:extkeys:usstyle:strikethrough:overline:sync"
+set -as terminal-features ",*:RGB:hyperlinks:clipboard:extkeys:usstyle:strikethrough:overline:sync:title"
 set -g extended-keys always
 set -g extended-keys-format csi-u
 set -g allow-passthrough on
@@ -89,6 +91,10 @@ set-environment -g COLORTERM truecolor
 set-environment -gu WEZTERM_PANE
 set-environment -gu WEZTERM_UNIX_SOCKET
 set -g allow-rename off
+# The pane beside Marmota, and its WezTerm tab, carry the session's own
+# title, as without tmux.
+set -g set-titles on
+set -g set-titles-string "#{pane_title}"
 set -g set-clipboard on
 set -g window-size latest
 set -g aggressive-resize on
@@ -194,6 +200,38 @@ func Script(command string) string {
 	return `eval "$(printf %s ` + encoded + ` | base64 --decode)"`
 }
 
+// configOption holds which config the server last took.
+const configOption = "@marmota-config"
+
+// reattachOnNewConfig attaches the panes that show a window anew when the
+// server takes a config it hadn't: a tmux client reads part of it, such as
+// whether to draw on WezTerm's main screen, only as it attaches. Each pane
+// stays where it is, showing the same window; only its tmux client starts
+// over.
+func (c *Client) reattachOnNewConfig() {
+	sum := sha256.Sum256([]byte(Config))
+	version := hex.EncodeToString(sum[:8])
+	lines, err := c.Command("show-options -gqv " + configOption)
+	if err != nil || strings.TrimSpace(strings.Join(lines, "")) == version {
+		return
+	}
+	if _, err := c.Command("set-option -g " + configOption + " " + version); err != nil {
+		return
+	}
+	clients, err := c.Command("list-clients -F " + Quote("#{client_name}\t#{session_name}\t#{window_id}"))
+	if err != nil {
+		return
+	}
+	for _, line := range clients {
+		f := strings.SplitN(line, "\t", 3)
+		if len(f) < 3 || !strings.HasPrefix(f[1], "view-") {
+			continue
+		}
+		_, _ = c.Command("detach-client -t " + Quote(f[0]) + " -E " +
+			Quote(Script(AttachCommand(f[1], f[2]))))
+	}
+}
+
 // ErrClosed is returned once the connection has ended.
 var ErrClosed = errors.New("the connection has ended")
 
@@ -280,6 +318,7 @@ func Dial(ctx context.Context, h Host) (*Client, error) {
 			return nil, err
 		}
 	}
+	c.reattachOnNewConfig()
 	return c, nil
 }
 

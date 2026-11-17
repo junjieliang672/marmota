@@ -177,7 +177,7 @@ func (m *model) codexPane(s claudesession.Session, claimed map[int]bool) (wezter
 	}
 	self, selfErr := currentWeztermPaneID()
 	usable := func(p weztermPane) bool {
-		return !claimed[p.PaneID] && p.TTYName != "" && (selfErr != nil || p.PaneID != self)
+		return !claimed[p.PaneID] && p.TTYName != "" && (selfErr != nil || p.PaneID != self) && !isViewerPane(p)
 	}
 	if id, ok := m.codex.panes[s.ID]; ok {
 		for _, p := range m.claude.panes {
