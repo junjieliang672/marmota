@@ -6,7 +6,8 @@ session draws one: a rule, "❯" and a no-break space before what is typed (a
 dim placeholder when nothing is), a rule. It takes typing, a paste (a long one
 shows as "[Pasted text #1 +N lines]"), ctrl+s (stash, or bring the stash back
 into an empty box), ctrl+_ (undo the last paste) and enter, which sends what is
-typed, shows it above the box, and brings back a stashed prompt.
+typed, shows it above the box, and brings back a stashed prompt. A line feed
+typed starts a new line in the box, as in Claude Code.
 
     fake_prompt.py TITLE
 """
@@ -55,6 +56,9 @@ class Prompt:
             self.text, self.shown, self.undo = "", "", []
             if self.stash is not None:
                 (self.text, self.shown), self.stash = self.stash, None
+        elif key == b"\n":
+            # A line feed typed, as shift+enter sends it: a new line in the box.
+            self.text, self.shown = self.text + "\n", self.shown + "\n"
         elif key == BACKSPACE:
             self.text, self.shown = self.text[:-1], self.shown[:-1]
         elif key.isascii() and key.decode().isprintable():

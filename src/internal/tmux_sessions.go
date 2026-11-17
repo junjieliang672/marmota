@@ -274,6 +274,16 @@ func tmuxGetText(id int) (string, error) {
 	return c.Capture(ref.pane)
 }
 
+// tmuxGetHistory is a pane's screen with the rows lines that scrolled off
+// above it.
+func tmuxGetHistory(id, rows int) (string, error) {
+	c, ref, err := tmuxTarget(id)
+	if err != nil {
+		return "", err
+	}
+	return c.CaptureHistory(ref.pane, rows)
+}
+
 func tmuxSendText(id int, text string) error {
 	c, ref, err := tmuxTarget(id)
 	if err != nil {

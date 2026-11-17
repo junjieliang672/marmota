@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	variable "github.com/junjieliang672/marmota/src/config"
 	"github.com/junjieliang672/marmota/src/internal/ui"
@@ -315,11 +316,17 @@ func (panel *filePanel) renderSelectBox(isSelected bool, bg lipgloss.Color) stri
 }
 
 func (m *model) statusLineRender() string {
+	sep := lipgloss.NewStyle().Background(lipgloss.Color(common.Theme.FilePanelBG)).Render("   ")
 	right := m.claudeStatusSummary()
 	if ops := m.opsStatus(); ops != "" {
-		sep := lipgloss.NewStyle().Background(lipgloss.Color(common.Theme.FilePanelBG)).Render("   ")
 		right = ops + sep + right
 	}
+	// The time ends the line, where the eye finds it: this computer's, in
+	// its time zone.
+	if right != "" {
+		right += sep
+	}
+	right += statusClock(statusNow())
 	m.statusLineModel.SetRight(right)
 	if m.jumpUI.IsOpen() {
 		keys := m.jumpUI.FootKeys()
@@ -348,6 +355,17 @@ func (m *model) statusLineRender() string {
 	}
 
 	return m.statusLineModel.Render()
+}
+
+// statusNow is the time the status line shows.
+var statusNow = time.Now //nolint:gochecknoglobals // test seam
+
+// statusClock is the time as the status line shows it, "Tue 15:04 PST": the
+// day, since a long session runs past midnight, and the zone, since sessions
+// run on computers elsewhere.
+func statusClock(now time.Time) string {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(common.GitUntrackedColor)).
+		Background(lipgloss.Color(common.Theme.FilePanelBG)).Render(now.Format("Mon 15:04 MST"))
 }
 
 func (m *model) terminalSizeWarnRender() string {

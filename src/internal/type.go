@@ -323,6 +323,13 @@ type element struct {
 
 type editorFinishedMsg struct{ err error }
 
+// askDraftEditedMsg says the editor that held the Ask box's question, in
+// the file at path, has closed.
+type askDraftEditedMsg struct {
+	path string
+	err  error
+}
+
 // asyncRecursiveSearchMsg contains results from async recursive search
 type asyncRecursiveSearchMsg struct {
 	elements     []element

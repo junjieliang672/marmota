@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
+	"unicode/utf8"
 )
 
 // Window is one of Marmota's tmux windows: one session.
@@ -209,9 +211,53 @@ func splitKeys(b []byte) []keyPart {
 
 // Paste puts text into a pane as if typed, newlines as line feeds, not as
 // a bracketed paste: Claude Code wraps a paste in <pasted_content>, and
-// Claude doesn't take what is inside as yours to follow.
+// Claude doesn't take what is inside as yours to follow. It goes in a piece
+// at a time (see TypedPieces).
 func (c *Client) Paste(paneID, text string) error {
-	return c.pasteBuffer(paneID, []byte(text))
+	for i, piece := range TypedPieces(text) {
+		if i > 0 {
+			time.Sleep(TypedGap)
+		}
+		if err := c.pasteBuffer(paneID, []byte(piece)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// typedPiece is how much text is typed at once, and TypedGap the pause
+// before the next piece. Claude Code takes about 800 characters or more
+// read at once for a paste, bracketed or not (2.1.326: 790 were typed, 820
+// a paste), so a long message goes in pieces small enough that three read
+// together still count as typed.
+const (
+	typedPiece = 256
+	TypedGap   = 20 * time.Millisecond
+)
+
+// TypedPieces cuts text into the pieces to type one after another, each at
+// most typedPiece bytes, no character cut in two.
+func TypedPieces(text string) []string {
+	var pieces []string
+	for len(text) > 0 {
+		n := min(len(text), typedPiece)
+		for n < len(text) && n > 0 && !utf8.RuneStart(text[n]) {
+			n--
+		}
+		pieces = append(pieces, text[:n])
+		text = text[n:]
+	}
+	return pieces
+}
+
+// CaptureHistory is what a pane shows with the rows lines above it that
+// scrolled off, colors included.
+func (c *Client) CaptureHistory(paneID string, rows int) (string, error) {
+	lines, err := c.Command("capture-pane -p -e -N -S -" + strconv.Itoa(max(rows, 0)) + " -t " + Quote(paneID))
+	if err != nil {
+		return "", err
+	}
+	return strings.Join(lines, "\n"), nil
 }
 
 // pasteBuffer writes b into a pane through a tmux buffer of its own, filled

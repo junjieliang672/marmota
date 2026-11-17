@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/assert"
@@ -385,4 +386,19 @@ func TestYPutsTheFilesASessionChangedOnTheShelf(t *testing.T) {
 	assert.Equal(t, []string{"/bin/y-shelf", filepath.Join(dir, "new.go"), filepath.Join(dir, "src", "edited.go")}, got,
 		"the files it changed that are still there, as one pile")
 	assert.Equal(t, "2 items → the shelf", m.claude.flash)
+}
+
+// The status line ends with this computer's time, with its day and zone.
+func TestTheStatusLineEndsWithTheTime(t *testing.T) {
+	m := dockTestModel(t)
+	zone := time.FixedZone("PST", -8*60*60)
+	setForTest(t, &statusNow, func() time.Time { return time.Date(2026, 11, 17, 15, 4, 0, 0, zone) })
+
+	line := strings.TrimRight(ansi.Strip(m.statusLineRender()), " ")
+	assert.True(t, strings.HasSuffix(line, "✳ 1 working   Tue 15:04 PST"), line)
+
+	bang(m)
+	line = strings.TrimRight(ansi.Strip(m.statusLineRender()), " ")
+	assert.True(t, strings.HasSuffix(line, "Tue 15:04 PST"), "in the Sessions box too: %s", line)
+	assert.LessOrEqual(t, ansi.StringWidth(m.statusLineRender()), m.fullWidth)
 }

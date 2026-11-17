@@ -149,6 +149,8 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case editorFinishedMsg:
 		updateCmd = m.applyEditorFinished(msg)
+	case askDraftEditedMsg:
+		updateCmd = m.applyAskDraftEdited(msg)
 
 	case jumpZoxideMsg:
 		updateCmd = m.applyJumpZoxide(msg)

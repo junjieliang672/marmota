@@ -23,6 +23,7 @@ import (
 	"github.com/junjieliang672/marmota/src/internal/utils"
 	"github.com/junjieliang672/marmota/src/pkg/claudesession"
 	"github.com/junjieliang672/marmota/src/pkg/codexsession"
+	"github.com/junjieliang672/marmota/src/pkg/sessionhost"
 )
 
 const (
@@ -49,11 +50,21 @@ var (
 		if isTmuxPane(paneID) {
 			return tmuxSendText(paneID, text)
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), claudeSendTextTimeout)
-		defer cancel()
-		//nolint:gosec // fixed binary and numeric pane id; text is an argument, never run by a shell
-		return exec.CommandContext(ctx, "wezterm", "cli", "send-text", "--no-paste", "--pane-id",
-			strconv.Itoa(paneID), "--", text).Run()
+		// A piece at a time, or Claude Code takes a long text for a paste.
+		for i, piece := range sessionhost.TypedPieces(text) {
+			if i > 0 {
+				time.Sleep(sessionhost.TypedGap)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), claudeSendTextTimeout)
+			//nolint:gosec // fixed binary and numeric pane id; text is an argument, never run by a shell
+			err := exec.CommandContext(ctx, "wezterm", "cli", "send-text", "--no-paste", "--pane-id",
+				strconv.Itoa(paneID), "--", piece).Run()
+			cancel()
+			if err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 )
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os/exec"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -45,6 +46,19 @@ var (
 		//nolint:gosec // fixed binary and numeric pane id
 		out, err := exec.CommandContext(ctx, "wezterm", "cli", "get-text", "--pane-id",
 			strconv.Itoa(paneID), "--escapes").Output()
+		return string(out), err
+	}
+	// weztermGetHistory returns a pane's screen with the rows lines that
+	// scrolled off above it.
+	weztermGetHistory = func(paneID, rows int) (string, error) { //nolint:gochecknoglobals // test seam
+		if isTmuxPane(paneID) {
+			return tmuxGetHistory(paneID, rows)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), claudeSendTextTimeout)
+		defer cancel()
+		//nolint:gosec // fixed binary and numeric arguments
+		out, err := exec.CommandContext(ctx, "wezterm", "cli", "get-text", "--pane-id",
+			strconv.Itoa(paneID), "--escapes", "--start-line", strconv.Itoa(-rows)).Output()
 		return string(out), err
 	}
 	// weztermSendKeys sends keys to a pane as keystrokes, not as a paste.
@@ -104,7 +118,25 @@ func sendToClaudePrompt(paneID int, text string) (claudeprompt.Box, error) {
 		takeBackClaudePaste(paneID, text, stashed)
 		return before, err
 	}
-	if _, err := waitForClaudePrompt(paneID, func(b claudeprompt.Box) bool {
+	// A text of many rows makes a box taller than the pane, its top above
+	// the screen: then it is read with the rows that scrolled off.
+	tall := false
+	holding := func() (claudeprompt.Box, error) {
+		box, err := readClaudePrompt(paneID)
+		tall = false
+		if err != nil || box.Shown {
+			return box, err
+		}
+		rows := strings.Count(text, "\n") + len(text)/claudePromptNarrowest + claudePromptRowsAround
+		if screen, err := weztermGetHistory(paneID, rows); err == nil {
+			if above := claudeprompt.Read(screen); above.Shown {
+				tall = true
+				return above, nil
+			}
+		}
+		return box, nil
+	}
+	if _, err := waitForPrompt(holding, func(b claudeprompt.Box) bool {
 		exactly, _ := claudeprompt.Holds(b.Text, text)
 		return b.Shown && exactly
 	}); err != nil {
@@ -114,8 +146,24 @@ func sendToClaudePrompt(paneID int, text string) (claudeprompt.Box, error) {
 	if err := weztermSendKeys(paneID, claudeKeyEnter); err != nil {
 		return before, err
 	}
+	if tall {
+		// Sent, the box is short again and back on the screen.
+		after, _ := waitForClaudePrompt(paneID, func(b claudeprompt.Box) bool {
+			_, within := claudeprompt.Holds(b.Text, text)
+			return b.Shown && !within
+		})
+		return after, nil
+	}
 	return settleClaudePrompt(paneID, text, before, stashed)
 }
+
+const (
+	// claudePromptNarrowest is the fewest characters a row of the prompt
+	// box is taken to hold, and claudePromptRowsAround the rows read beyond
+	// the text's own, when a box taller than the pane is read.
+	claudePromptNarrowest  = 20
+	claudePromptRowsAround = 100
+)
 
 // settleClaudePrompt waits for the session to take what was sent, then leaves
 // the box as the person had it: their message back in it, and a message they
@@ -177,9 +225,15 @@ func takeBackClaudePaste(paneID int, pasted string, stashed bool) {
 // waitForClaudePrompt reads the pane until done holds for its prompt box, for
 // up to claudePromptWait, and returns the box it read last.
 func waitForClaudePrompt(paneID int, done func(claudeprompt.Box) bool) (claudeprompt.Box, error) {
+	return waitForPrompt(func() (claudeprompt.Box, error) { return readClaudePrompt(paneID) }, done)
+}
+
+// waitForPrompt is waitForClaudePrompt with the box read by read.
+func waitForPrompt(read func() (claudeprompt.Box, error), done func(claudeprompt.Box) bool,
+) (claudeprompt.Box, error) {
 	deadline := time.Now().Add(claudePromptWait)
 	for {
-		box, err := readClaudePrompt(paneID)
+		box, err := read()
 		if err != nil {
 			return box, err
 		}

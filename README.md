@@ -86,6 +86,7 @@ y
 | `K` | Ask box: write to the selected session (or `n` in the Sessions box for a new one) |
 | `tab` · `ctrl+o` · `ctrl+t` · `shift+tab` | In the Ask box: Claude Code or Codex · model · effort · permission mode |
 | `shift+enter` | In the Ask box: a new line (the WezTerm setup sends it as `ctrl+j`, which works as well) |
+| `ctrl+g` | In the Ask box: write the question in your editor, as in Claude Code; closing it brings what you wrote back, unsent. A long question shows folded, `[first words… +11 lines]` |
 | drag | In the session preview: select text; letting go copies it |
 | `>` | Agent mode: `claude`, `claude rc`, `codex` |
 | `:` | Run a shell command in the current folder |

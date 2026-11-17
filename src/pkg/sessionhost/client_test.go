@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -255,4 +256,22 @@ func tmuxSocketPath(name string) string {
 		dir = "/tmp"
 	}
 	return fmt.Sprintf("%s/tmux-%d/%s", dir, os.Getuid(), name)
+}
+
+// A long text is typed in pieces small enough that Claude Code doesn't take
+// it for a paste, with no character cut in two.
+func TestTypedPiecesAreSmallAndWhole(t *testing.T) {
+	text := strings.Repeat("修复登录流程 fix the login flow\n", 200)
+	pieces := TypedPieces(text)
+	if strings.Join(pieces, "") != text {
+		t.Fatal("the pieces don't make up the text")
+	}
+	for _, p := range pieces {
+		if len(p) > typedPiece || !utf8.ValidString(p) {
+			t.Fatalf("a piece of %d bytes, valid UTF-8: %v", len(p), utf8.ValidString(p))
+		}
+	}
+	if len(TypedPieces("")) != 0 || len(TypedPieces("short")) != 1 {
+		t.Fatal("a short text is one piece, none for no text")
+	}
 }

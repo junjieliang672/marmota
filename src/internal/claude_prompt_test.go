@@ -28,7 +28,12 @@ type fakeClaudePane struct {
 	asksOnSend string
 	// stray is typed into the box along with the next paste, as if
 	// someone typed in the pane at the same moment.
-	stray   string
+	stray string
+	// typed is set for a pane that shows a text of several lines as typed,
+	// as Claude Code does one that reaches it a piece at a time; rows, when
+	// set, is how many rows of the pane show: the rest scrolled off above.
+	typed   bool
+	rows    int
 	pastes  int
 	history []string // the box before each paste, for ctrl+_
 	sent    []string
@@ -45,8 +50,18 @@ func newFakeClaudePane(t *testing.T) *fakeClaudePane {
 		if id != f.paneID {
 			return "", fmt.Errorf("no pane %d", id)
 		}
-		return f.screen(), nil
+		lines := strings.Split(f.screen(), "\n")
+		if f.rows > 0 && len(lines) > f.rows {
+			lines = lines[len(lines)-f.rows:]
+		}
+		return strings.Join(lines, "\n"), nil
 	}
+	setForTest(t, &weztermGetHistory, func(id, _ int) (string, error) {
+		if id != f.paneID {
+			return "", fmt.Errorf("no pane %d", id)
+		}
+		return f.screen(), nil
+	})
 	weztermSendText = func(id int, text string) error {
 		if id != f.paneID {
 			return fmt.Errorf("no pane %d", id)
@@ -123,7 +138,7 @@ func (f *fakeClaudePane) paste(text string) {
 	f.history = append(f.history, f.input)
 	f.pastes++
 	shown := text
-	if strings.Count(text, "\n") >= 2 {
+	if strings.Count(text, "\n") >= 2 && !f.typed {
 		shown = fmt.Sprintf("[Pasted text #%d +%d lines]", f.pastes, strings.Count(text, "\n"))
 	}
 	f.input += f.stray + shown
@@ -241,6 +256,21 @@ func TestSendToClaudePromptSendsALongRequest(t *testing.T) {
 	require.NoError(t, err, "it shows as [Pasted text #1 +4 lines]")
 	_, _, sent := f.state()
 	assert.Equal(t, []string{"[Pasted text #1 +4 lines]"}, sent)
+}
+
+// A request of more rows than the pane has makes a box whose top is above
+// the screen: it is read with the rows that scrolled off, and sent.
+func TestSendToClaudePromptSendsARequestTallerThanThePane(t *testing.T) {
+	f := newFakeClaudePane(t)
+	f.typed, f.rows = true, 12
+	request := "Fix the login flow\n" + strings.Repeat("one more step\n", 30) + "the end"
+
+	box, err := sendToClaudePrompt(20, request)
+
+	require.NoError(t, err)
+	assert.True(t, box.Shown, "sent, the box is short and on the screen again")
+	_, _, sent := f.state()
+	assert.Equal(t, []string{request}, sent)
 }
 
 func TestSendToClaudePromptPassesWeztermErrorsOn(t *testing.T) {

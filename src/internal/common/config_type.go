@@ -249,4 +249,6 @@ type HotkeysType struct {
 	// Resume a session that has ended, picked from a list, in place of
 	// starting one.
 	AskResume []string `toml:"ask_resume"`
+	// Write the question in the editor, as ctrl+g does in Claude Code.
+	AskEdit []string `toml:"ask_edit"`
 }

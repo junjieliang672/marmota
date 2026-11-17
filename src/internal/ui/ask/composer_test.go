@@ -469,3 +469,53 @@ func TestShiftEnterStartsANewLine(t *testing.T) {
 	c.AddMention("@a.go", "/r/a.go")
 	assert.Equal(t, "line\n@a.go ", c.Value(), "a mention on a new line starts it")
 }
+
+// A question put in whole that is longer than the box's rows (from the
+// editor, a paste, or recalled) shows as its first words and its size, as
+// Claude Code shows a long paste. Typing in it shows it as before.
+func TestALongQuestionPutInWholeIsFolded(t *testing.T) {
+	c := NewComposer()
+	c.Focus()
+	long := "Fix the login flow\n" + strings.Repeat("a step\n", 10) + "the end"
+	c.SetValue(long)
+	question := func() []string {
+		var rows []string
+		for _, l := range strings.Split(ansi.Strip(c.Render(60, Sending{})), "\n") {
+			if strings.Contains(l, "Fix the login") || strings.Contains(l, "a step") || strings.Contains(l, "the end") {
+				rows = append(rows, l)
+			}
+		}
+		return rows
+	}
+	rows := question()
+	require.Len(t, rows, 1)
+	assert.Contains(t, rows[0], "[Fix the login flow… +11 lines]")
+	assert.Equal(t, long, c.Value(), "all of it is still the question")
+
+	typeText(&c, "!")
+	rows = question()
+	assert.Len(t, rows, maxInputRows, "typing shows the rows with the cursor again")
+	assert.Contains(t, rows[len(rows)-1], "the end!")
+
+	c.SetValue("two\nlines")
+	assert.NotContains(t, ansi.Strip(c.Render(60, Sending{})), "[two", "one that fits shows whole")
+
+	c.SetValue(strings.Repeat("word ", 60))
+	assert.Contains(t, ansi.Strip(c.Render(60, Sending{})), "… 300 characters]", "one long line says its length")
+
+	c.Clear()
+	c.HandleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("pasted\n" + strings.Repeat("row\n", 8)), Paste: true})
+	assert.Contains(t, ansi.Strip(c.Render(60, Sending{})), "[pasted… +8 lines]", "a long paste folds")
+	c.HandleKey(tea.KeyMsg{Type: tea.KeyUp})
+	assert.NotContains(t, ansi.Strip(c.Render(60, Sending{})), "[pasted…", "moving in it unfolds it")
+
+	c.Clear()
+	c.SetHistory([]string{long})
+	c.HandleKey(key("ctrl+p"))
+	assert.Contains(t, ansi.Strip(c.Render(60, Sending{})), "[Fix the login flow… +11 lines]", "a recalled one too")
+
+	narrow := ansi.Strip(c.Render(30, Sending{}))
+	for _, l := range strings.Split(narrow, "\n") {
+		assert.LessOrEqual(t, ansi.StringWidth(l), 30, "it fits a narrow box: %q", l)
+	}
+}

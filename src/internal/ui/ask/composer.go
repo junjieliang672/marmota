@@ -5,6 +5,7 @@ package ask
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -21,7 +22,7 @@ import (
 
 const (
 	historyLimit   = 100
-	inputCharLimit = 4000
+	inputCharLimit = 50000 // a long prompt written in the editor (ctrl+g) fits
 	maxInputRows   = 3
 	composerChrome = 2 // its border
 )
@@ -58,6 +59,12 @@ type Composer struct {
 	sessions map[string]bool
 	notice   string
 	failed   bool
+	// folded is set while the question is as it was put in whole: by the
+	// editor, a paste of several lines, or an earlier question recalled.
+	// One longer than the box's rows then shows as its first words and its
+	// size, as Claude Code shows a long paste. Typing or moving in it
+	// unfolds it.
+	folded bool
 	// escText is what esc does, for the keys line: "" says "back to the list".
 	escText string
 }
@@ -111,6 +118,7 @@ func (c *Composer) SetValue(text string) {
 // setInput puts text in the input, its line breaks kept.
 func (c *Composer) setInput(text string) {
 	c.input.SetValue(withLineBreaks(text))
+	c.folded = true
 }
 
 func withLineBreaks(text string) string {
@@ -140,6 +148,7 @@ func (c *Composer) AddMention(text, path string) bool {
 	}
 	c.input.SetValue(value + text + " ")
 	c.input.CursorEnd()
+	c.folded = false // the mention shows
 	if path != "" {
 		c.mentions[text] = path
 	} else {
@@ -378,6 +387,7 @@ func (c *Composer) HandleKey(msg tea.KeyMsg) tea.Cmd {
 		// shift+enter, as a terminal set up for Claude Code sends it
 		c.input, _ = c.input.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{lineBreak}})
 		c.histPos = -1
+		c.folded = false
 	case key == "up":
 		c.up()
 	case key == "down":
@@ -386,6 +396,8 @@ func (c *Composer) HandleKey(msg tea.KeyMsg) tea.Cmd {
 		if msg.Paste {
 			msg.Runes = []rune(withLineBreaks(string(msg.Runes)))
 		}
+		// A paste of several lines folds when it is long; typing unfolds.
+		c.folded = msg.Paste && slices.Contains(msg.Runes, lineBreak)
 		var cmd tea.Cmd
 		c.input, cmd = c.input.Update(msg)
 		c.histPos = -1
@@ -414,6 +426,7 @@ func (c *Composer) down() {
 		c.recall(-1)
 	case !c.moveRow(1):
 		c.input.CursorEnd()
+		c.folded = false
 	}
 }
 
@@ -439,6 +452,7 @@ func (c *Composer) moveRow(step int) bool {
 		pos-- // the row's end is the next row's start
 	}
 	c.input.SetCursor(pos)
+	c.folded = false
 	return true
 }
 
@@ -697,6 +711,9 @@ func (c *Composer) inputLines(width int, st composerStyles) []string {
 	c.textWidth = textWidth
 	pos := min(c.input.Position(), len(value))
 	rows, cursorRow := c.rows(value, textWidth)
+	if c.folded && len(rows) > maxInputRows {
+		return []string{st.input.Render(inputMark) + foldedLine(value, textWidth, focused, st)}
+	}
 	kinds := c.mentionKinds(value)
 	first := max(0, cursorRow-maxInputRows+1)
 	lines := make([]string, 0, maxInputRows)
@@ -712,6 +729,32 @@ func (c *Composer) inputLines(width int, st composerStyles) []string {
 		lines = append(lines, prefix+inputRow(value, rows[i], kinds, cursor, st))
 	}
 	return lines
+}
+
+// foldedLine is a long question on one row: its first words and how much
+// more there is, "[Fix the login… +11 lines]", as Claude Code shows a long
+// paste. The editor shows it whole.
+func foldedLine(value []rune, width int, focused bool, st composerStyles) string {
+	first, rest, _ := strings.Cut(string(value), string(lineBreak))
+	rest = strings.TrimRight(rest, string(lineBreak)) // an empty last line is no line more
+	more := strconv.Itoa(len(value)) + " characters"
+	if n := strings.Count(rest, string(lineBreak)) + 1; rest != "" {
+		more = "+" + strconv.Itoa(n) + " lines"
+		if n == 1 {
+			more = "+1 line"
+		}
+	}
+	tail := "… " + more + "]"
+	cursor := 0
+	if focused {
+		cursor = 1
+	}
+	words := ansi.Truncate(strings.TrimSpace(first), max(1, width-len("[")-ansi.StringWidth(tail)-cursor), "")
+	line := st.dim.Render("[") + st.input.Render(words) + st.dim.Render(tail)
+	if focused {
+		line += st.cursor.Render(" ")
+	}
+	return line
 }
 
 // rows wraps the question to width, and says which row the cursor is on.

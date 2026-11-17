@@ -87,6 +87,7 @@ func TestMain(m *testing.M) {
 	weztermSendText = func(int, string) error { return errors.New("tests must not type into WezTerm") }
 	weztermSendKeys = func(int, string) error { return errors.New("tests must not type into WezTerm") }
 	weztermGetText = func(int) (string, error) { return "", errors.New("tests must not read WezTerm") }
+	weztermGetHistory = func(int, int) (string, error) { return "", errors.New("tests must not read WezTerm") }
 	// Nor reach the Codex server of the computer they run on.
 	codexHome = func() string { return filepath.Join(testDir, "codex-home") }
 	codexCollect = func(codexsession.Options) ([]claudesession.Session, error) { return nil, codexsession.ErrNoServer }

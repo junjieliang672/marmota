@@ -165,6 +165,8 @@ func (m *model) dockAskKey(msg tea.KeyMsg) tea.Cmd {
 	case slices.Contains(common.Hotkeys.CancelTyping, key):
 		m.closeDockAsk()
 		return nil
+	case slices.Contains(common.Hotkeys.AskEdit, key):
+		return m.editAskDraft()
 	case slices.Contains(common.Hotkeys.ConfirmTyping, key):
 		cmd := m.sendAsk()
 		if id := m.sessions.pendingSelect; id != "" {
@@ -560,6 +562,7 @@ func (m *model) dockAskStatusLine() string {
 	keys := []statusline.Hotkey{
 		{Key: "enter", Description: "send"},
 		{Key: "shift+enter", Description: "new line"},
+		{Key: firstKey(common.Hotkeys.AskEdit), Description: "editor"},
 		{Key: "↑↓", Description: "history"},
 		{Key: firstKey(common.Hotkeys.AskClear), Description: "clear"},
 	}

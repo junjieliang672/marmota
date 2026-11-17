@@ -303,6 +303,11 @@ func getHelpMenuData() []helpMenuModalData {
 			hotkeyWorkType: globalType,
 		},
 		{
+			hotkey:         common.Hotkeys.AskEdit,
+			description:    "Write the question in the editor; when it closes, what it holds is the question",
+			hotkeyWorkType: globalType,
+		},
+		{
 			hotkey:         []string{"esc/" + firstKey(common.Hotkeys.OpenAskBar), ""},
 			description:    "Back to the list; your question stays",
 			hotkeyWorkType: globalType,
