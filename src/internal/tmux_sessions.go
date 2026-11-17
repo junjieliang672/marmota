@@ -23,6 +23,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -427,6 +429,41 @@ type tmuxState struct {
 func noTmuxNotice() string {
 	return "tmux isn't installed: sessions run in WezTerm panes and end with WezTerm. " +
 		"Install it with `brew install tmux`."
+}
+
+// tmuxPaneShowingSession is the tmux window that shows a session whose own
+// terminal is in no pane: one Claude Code runs in the background, such as
+// one /resume brought into a window whose session it replaced.
+// Claude Code puts the session's name in the window's title. A window
+// whose own session still runs there isn't it.
+func (m *model) tmuxPaneShowingSession(s claudesession.Session) (weztermPane, bool) {
+	if !s.Live || s.Name == "" {
+		return weztermPane{}, false
+	}
+	taken := map[string]bool{}
+	for _, live := range m.claude.snapshot.Live {
+		if live.TTY != "" {
+			taken[live.TTY] = true
+		}
+	}
+	for _, p := range m.claude.panes {
+		if isTmuxPane(p.PaneID) && !taken[p.TTYName] && sessionNameInTitle(p.Title) == s.Name {
+			return p, true
+		}
+	}
+	return weztermPane{}, false
+}
+
+// sessionNameInTitle is the session name in a Claude Code window's title,
+// "✳ marmota-nova" or "marmota-nova".
+func sessionNameInTitle(title string) string {
+	title = strings.TrimSpace(title)
+	if glyph, rest, ok := strings.Cut(title, " "); ok && utf8.RuneCountInString(glyph) == 1 {
+		if r, _ := utf8.DecodeRuneInString(glyph); !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+			return strings.TrimSpace(rest)
+		}
+	}
+	return title
 }
 
 // focusAgentPane puts the keyboard in a session's pane, showing it beside

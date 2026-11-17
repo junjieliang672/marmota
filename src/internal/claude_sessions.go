@@ -314,7 +314,7 @@ func claudePaneConversationTitle(paneTitle string) string {
 
 func (m *model) weztermPaneForSession(s claudesession.Session) (weztermPane, bool) {
 	if s.TTY == "" {
-		return weztermPane{}, false
+		return m.tmuxPaneShowingSession(s)
 	}
 	self, selfErr := currentWeztermPaneID()
 	for _, p := range m.claude.panes {
@@ -328,7 +328,9 @@ func (m *model) weztermPaneForSession(s claudesession.Session) (weztermPane, boo
 		}
 		return p, true
 	}
-	return weztermPane{}, false
+	// Its terminal is in no pane: Claude Code runs it in the background, and
+	// a window may show it.
+	return m.tmuxPaneShowingSession(s)
 }
 
 // superfileTabID returns the WezTerm tab superfile runs in, or -1.

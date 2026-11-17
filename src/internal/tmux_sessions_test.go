@@ -224,3 +224,25 @@ func tmuxSocketPath(name string) string {
 	}
 	return fmt.Sprintf("%s/tmux-%d/%s", dir, os.Getuid(), name)
 }
+
+func TestASessionResumedIntoAWindowIsFoundThereByItsName(t *testing.T) {
+	m := newClaudeTestModel(t)
+	m.claude.panes = []weztermPane{
+		{PaneID: -1, TabID: -1, TTYName: "/dev/ttys040", Title: "marmota-nova", Workspace: tmuxPaneWorkspace},
+		{PaneID: -2, TabID: -1, TTYName: "/dev/ttys041", Title: "✳ busy-one", Workspace: tmuxPaneWorkspace},
+	}
+	// Claude Code's background process has a terminal of its own, in no pane.
+	resumed := claudesession.Session{ID: "09c7", Name: "marmota-nova", Live: true, Background: true,
+		TTY: "/dev/ttys011"}
+	m.claude.snapshot.Live = []claudesession.Session{
+		resumed,
+		{ID: "own", Name: "busy-one", TTY: "/dev/ttys041", Live: true},
+	}
+	pane, ok := m.weztermPaneForSession(resumed)
+	require.True(t, ok, "a background session /resume brought into a window is found by the window's title")
+	assert.Equal(t, -1, pane.PaneID)
+
+	other := claudesession.Session{ID: "x", Name: "busy-one", Live: true, Background: true}
+	_, ok = m.weztermPaneForSession(other)
+	assert.False(t, ok, "a window whose own session runs there isn't another's")
+}

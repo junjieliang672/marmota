@@ -60,22 +60,20 @@ const Config = `# Written by Marmota for its own tmux server (tmux -L marmota); 
 set -g status off
 set -g prefix None
 set -g prefix2 None
-unbind-key -a
-unbind-key -a -T copy-mode
-unbind-key -a -T copy-mode-vi
+unbind-key -q -a
+unbind-key -q -a -T copy-mode
+unbind-key -q -a -T copy-mode-vi
 # The mouse is WezTerm's: dragging selects and copies, and the wheel scrolls
 # WezTerm's own scrollback, as in a pane without tmux. The pane beside
 # Marmota draws on WezTerm's main screen, so what scrolls off its top goes
 # into that scrollback.
 set -g mouse off
 set -as terminal-overrides ",*:smcup@:rmcup@"
-# Should a pane end up in copy mode, any key returns to the session, and a
-# line on top says so meanwhile: a pane in copy mode shows no new output
-# and takes no typing.
-bind-key -T copy-mode Any send-keys -X cancel
+# No copy mode, ever: a pane in it shows no new output and takes no typing.
+# Nothing enters it (no mouse, no prefix), and a pane that does anyway
+# leaves it at once.
 set -g pane-border-status off
-set -g pane-border-format "#[fg=yellow] scrolled back · press any key to return "
-set-hook -g pane-mode-changed 'if-shell -F "#{pane_in_mode}" "set-option -w pane-border-status top" "set-option -w pane-border-status off"'
+set-hook -g pane-mode-changed 'if-shell -F "#{pane_in_mode}" "send-keys -X cancel"'
 set -g history-limit 100000
 set -sg escape-time 0
 set -g focus-events on

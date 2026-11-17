@@ -170,7 +170,7 @@ func TestBytesReachTheProgramAsTheyAre(t *testing.T) {
 	assert.Equal(t, sent[:32], string(got))
 }
 
-func TestAPaneScrolledBackSaysSoAndIsLeftWhenTypedInto(t *testing.T) {
+func TestAPaneNeverStaysInCopyMode(t *testing.T) {
 	c := localClient(t)
 	w, err := c.Start(NameFor(ClaudePrefix, "cm"), t.TempDir(),
 		`for i in $(seq 1 100); do echo "row $i"; done; read l; echo "got: $l"; sleep 30`)
@@ -179,24 +179,16 @@ func TestAPaneScrolledBackSaysSoAndIsLeftWhenTypedInto(t *testing.T) {
 		screen, _ := c.Capture(w.PaneID)
 		return strings.Contains(screen, "row 100")
 	})
-	state := func() string {
-		lines, err := c.Command("display-message -p -t " + Quote(w.PaneID) +
-			" '#{pane_in_mode} #{pane-border-status}'")
+	inMode := func() bool {
+		lines, err := c.Command("display-message -p -t " + Quote(w.PaneID) + " '#{pane_in_mode}'")
 		require.NoError(t, err)
-		return strings.Join(lines, "")
+		return strings.Join(lines, "") == "1"
 	}
 	_, err = c.Command("copy-mode -t " + Quote(w.PaneID))
 	require.NoError(t, err)
-	_, err = c.Command("send-keys -t " + Quote(w.PaneID) + " -X -N 30 scroll-up")
-	require.NoError(t, err)
-	waitFor(t, "the line that says it is scrolled back", func() bool { return state() == "1 top" })
-
-	screen, err := c.Capture(w.PaneID)
-	require.NoError(t, err)
-	assert.Contains(t, screen, "row 100", "what is read is the program's screen, not the scrolled-back one")
+	waitFor(t, "the pane out of copy mode", func() bool { return !inMode() })
 
 	require.NoError(t, c.SendBytes(w.PaneID, []byte("hello\r")))
-	waitFor(t, "the pane back to its program", func() bool { return state() == "0 off" })
 	waitFor(t, "the answer", func() bool {
 		screen, _ := c.Capture(w.PaneID)
 		return strings.Contains(screen, "got: hello")
