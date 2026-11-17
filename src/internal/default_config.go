@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"os"
 	"path/filepath"
 
 	zoxidelib "github.com/lazysegtree/go-zoxide"
@@ -52,7 +53,10 @@ func defaultModelConfig(toggleDotFile, toggleFooter, firstUse bool,
 		hasTrash:          common.InitTrash(),
 		searchCoordinator: search.NewCoordinator(search.FilePanelConfig()),
 
-		imeHold: ime.New(common.Config.IMEASCIIHold, common.Config.IMEASCIIHoldDir),
+		// MARMOTA_NO_IME_HOLD keeps a Marmota under test, which the person
+		// never looks at, from holding their input method in ASCII.
+		imeHold: ime.New(common.Config.IMEASCIIHold && os.Getenv("MARMOTA_NO_IME_HOLD") == "",
+			common.Config.IMEASCIIHoldDir),
 		// Terminals that do not report focus never send FocusMsg, so assume
 		// we have it until told otherwise.
 		terminalFocused: true,

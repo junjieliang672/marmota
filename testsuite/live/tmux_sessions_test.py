@@ -82,6 +82,8 @@ def main() -> int:
         "XDG_STATE_HOME": str(iso / "state"),
         "XDG_CACHE_HOME": str(iso / "cache"),
         "MARMOTA_TMUX_SOCKET": socket,
+        # It never has your focus: it mustn't hold your input method in ASCII.
+        "MARMOTA_NO_IME_HOLD": "1",
         "TERM": "xterm-256color",
     }
     env_args = ["env", *[f"{k}={v}" for k, v in env.items()]]

@@ -255,9 +255,6 @@ func tmuxView(superfilePaneID int) string {
 // tmuxViewerPane is the WezTerm pane beside Marmota that shows a tmux window,
 // when there is one in Marmota's tab.
 func (m *model) tmuxViewerPane() (weztermPane, bool) {
-	if m.tmux.viewer == 0 {
-		return weztermPane{}, false
-	}
 	self, err := currentWeztermPaneID()
 	if err != nil {
 		return weztermPane{}, false
@@ -266,6 +263,9 @@ func (m *model) tmuxViewerPane() (weztermPane, bool) {
 	if err != nil {
 		return weztermPane{}, false
 	}
+	if m.tmux.viewer == 0 {
+		m.adoptTmuxViewer(self, panes)
+	}
 	for _, p := range panes {
 		if p.PaneID == m.tmux.viewer {
 			return p, true
@@ -273,6 +273,54 @@ func (m *model) tmuxViewerPane() (weztermPane, bool) {
 	}
 	m.tmux.viewer, m.tmux.viewWindow = 0, ""
 	return weztermPane{}, false
+}
+
+// adoptTmuxViewer takes back the pane beside Marmota an earlier Marmota in
+// this pane left showing tmux: the panes in its tab attached to its view.
+// Of two, one stays; the other closes, or both would show the same window.
+func (m *model) adoptTmuxViewer(self int, panes []weztermPane) {
+	if !useTmuxSessions() || !tmuxServerRunning() {
+		return
+	}
+	c, err := localTmux()
+	if err != nil {
+		return
+	}
+	lines, err := c.Command("list-clients -t " + sessionhost.Quote(tmuxView(self)) + " -F " +
+		sessionhost.Quote("#{client_tty}"))
+	if err != nil {
+		return
+	}
+	m.keepOneViewer(self, panes, lines)
+	if m.tmux.viewer == 0 {
+		return
+	}
+	// Its scrollback may hold another session's history: it attaches anew
+	// to the window it shows, with that window's.
+	view := tmuxView(self)
+	if window := c.ViewWindow(view); window != "" {
+		if err := c.Show(view, window); err != nil {
+			slog.Debug("Could not attach the pane beside Marmota anew", "error", err)
+		}
+	}
+}
+
+// keepOneViewer takes the first pane of the tab whose terminal is one of
+// ttys, a view's clients, as the pane beside Marmota, and closes the others.
+func (m *model) keepOneViewer(self int, panes []weztermPane, ttys []string) {
+	cwd := m.getFocusedFilePanel().location
+	for _, p := range panes {
+		if p.PaneID == self || p.TTYName == "" || !slices.Contains(ttys, p.TTYName) {
+			continue
+		}
+		if m.tmux.viewer == 0 {
+			m.tmux.viewer = p.PaneID
+			continue
+		}
+		if err := killWeztermPane(cwd, p.PaneID); err != nil {
+			slog.Debug("Could not close a second pane showing tmux", "pane", p.PaneID, "error", err)
+		}
+	}
 }
 
 // showTmuxPane shows a tmux window beside Marmota: in the pane already there

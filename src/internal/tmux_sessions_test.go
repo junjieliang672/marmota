@@ -246,3 +246,19 @@ func TestASessionResumedIntoAWindowIsFoundThereByItsName(t *testing.T) {
 	_, ok = m.weztermPaneForSession(other)
 	assert.False(t, ok, "a window whose own session runs there isn't another's")
 }
+
+func TestARestartedMarmotaTakesBackThePaneBesideIt(t *testing.T) {
+	m := newClaudeTestModel(t)
+	wez := newFakeWezterm(t, superfileTab(),
+		weztermPane{PaneID: 31, TabID: 1, WindowID: 1, TTYName: "/dev/ttysA", Size: weztermPaneSize{Rows: 50, Cols: 99}},
+		weztermPane{PaneID: 32, TabID: 1, WindowID: 1, TTYName: "/dev/ttysB", Size: weztermPaneSize{Rows: 50, Cols: 99}},
+		weztermPane{PaneID: 33, TabID: 1, WindowID: 1, TTYName: "/dev/ttysC", Size: weztermPaneSize{Rows: 50, Cols: 99}})
+	panes, err := listWeztermTabPanes(m.getFocusedFilePanel().location, 10)
+	require.NoError(t, err)
+	// ttysA and ttysB are the clients of its view: a restarted Marmota
+	// opened a second pane beside it before this.
+	m.keepOneViewer(10, panes, []string{"/dev/ttysA", "/dev/ttysB"})
+	assert.Equal(t, 31, m.tmux.viewer, "the first pane attached to its view is taken back")
+	assert.Nil(t, wez.panes[32], "a second pane attached to it closes")
+	assert.NotNil(t, wez.panes[33], "a pane of the tab that shows no view stays")
+}

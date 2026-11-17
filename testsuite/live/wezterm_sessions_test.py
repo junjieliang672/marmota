@@ -204,6 +204,8 @@ def main() -> int:
         # Sessions in WezTerm panes, as Marmota runs them without tmux; the
         # tmux ones are tmux_sessions_test.py's.
         "MARMOTA_NO_TMUX=1",
+        # It never has your focus: it mustn't hold your input method in ASCII.
+        "MARMOTA_NO_IME_HOLD=1",
     ]
     before_workspace, before_focus = client_state()
     started: list[int] = []
