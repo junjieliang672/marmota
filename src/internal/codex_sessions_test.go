@@ -297,9 +297,12 @@ func TestTheFoldedAskBoxSaysTheProgramAndModel(t *testing.T) {
 	assert.Contains(t, idle(codex), "co gpt-6.1-sol · low")
 
 	codex.LastPrompt = "can you show a checkbox instead of me answering the question in words"
-	lines := m.dockAskIdleLines(codex, 30, 6)
+	lines := m.dockAskIdleLines(codex, 30, 7)
+	assert.NotContains(t, ansi.Strip(strings.Join(lines, "\n")), "replied", "its row says it has replied")
+	codex.Status = claudesession.StatusWorking
+	lines = m.dockAskIdleLines(codex, 30, 6)
 	assert.Len(t, lines, 6)
-	assert.Contains(t, ansi.Strip(lines[5]), "replied", "how it stands keeps its row over the message's second")
+	assert.Contains(t, ansi.Strip(lines[5]), "working", "how it stands keeps its row over the message's second")
 }
 
 // A second Codex start in a folder waits for the first to be found: they

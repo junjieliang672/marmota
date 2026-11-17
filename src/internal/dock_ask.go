@@ -384,11 +384,7 @@ func (m *model) dockAskIdleLines(s claudesession.Session, width, rows int) []str
 			Background(common.FooterBGColor).Render("◉ asks you"))
 		more = firstNonEmpty(s.PendingTool, s.WaitingFor)
 	case sessionsui.Unread, sessionsui.Idle, sessionsui.Ended:
-		replied := sessionAgeAnchor(s)
-		if !turn.RepliedAt.IsZero() {
-			replied = turn.RepliedAt
-		}
-		body = append(body, st.ok.Render("✓ replied "+agoWords(now, replied)))
+		// It has replied: its row and the preview say so.
 	}
 	if more == "working" {
 		more = ""
