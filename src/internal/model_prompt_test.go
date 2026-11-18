@@ -103,7 +103,7 @@ func testBasicPromptFunctionality(t *testing.T, dir1 string) {
 		for _, key := range common.Hotkeys.CancelTyping {
 			TeaUpdate(m, utils.TeaKeyMsg(common.Hotkeys.OpenAgentPrompt[0]))
 			assert.True(t, m.promptModal.IsOpen())
-			TeaUpdate(m, utils.TeaRuneKeyMsg(key))
+			TeaUpdate(m, utils.TeaKeyMsg(key))
 			assert.False(t, m.promptModal.IsOpen(), "Prompt should get closed")
 		}
 	})

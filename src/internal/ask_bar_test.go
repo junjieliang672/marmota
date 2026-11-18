@@ -590,3 +590,50 @@ func TestShiftEnterInTheAskBoxStartsANewLine(t *testing.T) {
 	assert.Equal(t, "a\nb", m.sessions.composer.Value())
 	assert.Equal(t, dockAskFocus, m.focusPanel, "nothing was sent")
 }
+
+// An input method commits a word as one key message, which Bubble Tea names
+// by its text: the word "enter" was taken for the enter key and sent the
+// draft, "tab" for tab, "esc" closed the box. A word is written, whatever
+// key it names.
+func TestAWordPutInWholeIsWrittenInTheAskBoxNotTakenForTheKeyItNames(t *testing.T) {
+	m := defaultTestModel(t.TempDir())
+	m.openDockAsk("")
+	codex := m.sessions.composer.StartsCodex()
+
+	for _, w := range []string{"hit ", "enter", " tab", " esc", " ctrl+u", " up", " end"} {
+		TeaUpdate(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(w)})
+	}
+
+	assert.Equal(t, "hit enter tab esc ctrl+u up end", m.sessions.composer.Value())
+	assert.Equal(t, dockAskFocus, m.focusPanel, "nothing was sent, and the box stays open")
+	assert.Equal(t, codex, m.sessions.composer.StartsCodex(), "the word tab doesn't change the agent")
+
+	// "home" is a key of the text field itself: written where the cursor
+	// is, it leaves the cursor there.
+	TeaUpdate(m, utils.TeaKeyMsg("left"))
+	TeaUpdate(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("home")})
+	assert.Equal(t, "hit enter tab esc ctrl+u up enhomed", m.sessions.composer.Value())
+
+	// The keys themselves do what they did.
+	TeaUpdate(m, utils.TeaKeyMsg("esc"))
+	assert.NotEqual(t, dockAskFocus, m.focusPanel, "esc closes the box")
+}
+
+func TestOnlyAMessageOfSeveralCharactersIsTextPutInWhole(t *testing.T) {
+	word, ok := typedText(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("enter")}).(tea.KeyMsg)
+	require.True(t, ok)
+	assert.True(t, word.Paste)
+	assert.Equal(t, "[enter]", word.String())
+	assert.Equal(t, "enter", string(word.Runes))
+
+	for _, key := range []tea.KeyMsg{
+		{Type: tea.KeyRunes, Runes: []rune("K")},
+		{Type: tea.KeyRunes, Runes: []rune("好")},
+		{Type: tea.KeyRunes, Runes: []rune("d"), Alt: true},
+		{Type: tea.KeyEnter},
+		{Type: tea.KeySpace, Runes: []rune(" ")},
+	} {
+		assert.Equal(t, key, typedText(key), key.String())
+	}
+	assert.Equal(t, tea.FocusMsg{}, typedText(tea.FocusMsg{}))
+}

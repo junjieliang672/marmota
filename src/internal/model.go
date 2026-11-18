@@ -77,9 +77,26 @@ func (m *model) Init() tea.Cmd {
 // The real work is in update(). This wrapper exists so that syncIMEHold runs
 // after every message, including the ones update() returns from early.
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	newModel, cmd := m.update(msg)
+	newModel, cmd := m.update(typedText(msg))
 	m.syncIMEHold()
 	return newModel, cmd
+}
+
+// typedText marks a key message that holds several characters as text put in
+// whole, which is what it is: an input method commits a word as one message,
+// and no key sends two characters. Bubble Tea names such a message by its
+// text, so the word "enter" read as the enter key and sent the Ask box's
+// draft, "esc" closed the box, and "end" moved a text field's cursor to the
+// line's end instead of being written. Marked as a paste it is named
+// "[enter]", which is no key's name, and text fields write its characters as
+// they do a paste's.
+func typedText(msg tea.Msg) tea.Msg {
+	key, ok := msg.(tea.KeyMsg)
+	if !ok || key.Type != tea.KeyRunes || len(key.Runes) < 2 || key.Paste {
+		return msg
+	}
+	key.Paste = true
+	return key
 }
 
 // syncIMEHold tells the input method whether to pass keys through as plain
