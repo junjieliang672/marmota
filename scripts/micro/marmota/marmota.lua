@@ -581,6 +581,152 @@ local function folder()
     return dir
 end
 
+-- Moving and deleting by word in a line of Chinese, Japanese or Korean.
+-- micro takes a run of letters for a word, and these characters are
+-- letters with no spaces between them: option+← went over half a sentence,
+-- and option+backspace deleted it. The system knows their words (我认为应该这样
+-- is 我, 认为, 应该, 这样), and y asks it: `y words <line>` prints where each
+-- word starts and ends. A line is asked about once, and remembered. Deleting
+-- takes what moving goes over.
+--
+-- A line without such characters keeps micro's own rule, with nothing
+-- asked: code is moved through as it was.
+local lineWords = {}
+local linesKept = 0
+local linesMost = 200
+
+-- wide reports a line with such characters: in UTF-8 they start with a byte
+-- from 227 to 237 (U+3000 to U+DFFF: the punctuation, kana, Chinese
+-- characters and Hangul).
+local function wide(line)
+    return line:find("[\227-\237]") ~= nil
+end
+
+-- wordsOf is the words of line, each where it starts and ends, in
+-- characters; nil when y can't say.
+local function wordsOf(line)
+    local found = lineWords[line]
+    if found ~= nil then
+        return found
+    end
+    local out, err = shell.ExecCommand(marmota, "words", "--", line)
+    if err ~= nil then
+        return nil
+    end
+    found = {}
+    for from, to in out:gmatch("(%d+),(%d+)") do
+        table.insert(found, { tonumber(from), tonumber(to) })
+    end
+    if linesKept >= linesMost then
+        lineWords, linesKept = {}, 0
+    end
+    lineWords[line] = found
+    linesKept = linesKept + 1
+    return found
+end
+
+-- wordStop is where a move by a word goes from the cursor, left with step
+-- -1 and right with 1: the start of the nearest word before it, the end of
+-- the nearest after it, what lies between moved over with the word. It is
+-- nil where micro's own move serves: a line without such characters, and
+-- from a line's edge, which goes on to the line before or after.
+local function wordStop(bp, step)
+    local c = bp.Cursor
+    local line = bp.Buf:Line(c.Y)
+    if not wide(line) then
+        return nil
+    end
+    local length = util.CharacterCountInString(line)
+    if (step < 0 and c.X == 0) or (step > 0 and c.X >= length) then
+        return nil
+    end
+    local found = wordsOf(line)
+    if found == nil then
+        return nil
+    end
+    if step < 0 then
+        local to = 0
+        for _, w in ipairs(found) do
+            if w[1] < c.X then
+                to = w[1]
+            end
+        end
+        return buffer.Loc(to, c.Y)
+    end
+    for _, w in ipairs(found) do
+        if w[2] > c.X then
+            return buffer.Loc(w[2], c.Y)
+        end
+    end
+    return buffer.Loc(length, c.Y)
+end
+
+local function wordMove(bp, step, own)
+    local to = wordStop(bp, step)
+    if to == nil then
+        return own(bp)
+    end
+    bp.Cursor:ResetSelection()
+    bp.Cursor:GotoLoc(to)
+    bp:Relocate()
+    return true
+end
+
+-- wordLeft and wordRight are option+← and option+→.
+function wordLeft(bp)
+    return wordMove(bp, -1, function(b) return b:WordLeft() end)
+end
+
+function wordRight(bp)
+    return wordMove(bp, 1, function(b) return b:WordRight() end)
+end
+
+local function wordSelect(bp, step, own)
+    local to = wordStop(bp, step)
+    if to == nil then
+        return own(bp)
+    end
+    selectTo(bp, to)
+    return true
+end
+
+-- selectWordLeft and selectWordRight are shift+option+← and →.
+function selectWordLeft(bp)
+    return wordSelect(bp, -1, function(b) return b:SelectWordLeft() end)
+end
+
+function selectWordRight(bp)
+    return wordSelect(bp, 1, function(b) return b:SelectWordRight() end)
+end
+
+local function wordDelete(bp, step, own)
+    if bp.Cursor:HasSelection() or bp.Buf.Type.Readonly then
+        return own(bp)
+    end
+    local to = wordStop(bp, step)
+    if to == nil then
+        return own(bp)
+    end
+    local at = buffer.Loc(bp.Cursor.X, bp.Cursor.Y)
+    if step < 0 then
+        bp.Buf:Remove(to, at)
+    else
+        bp.Buf:Remove(at, to)
+    end
+    bp:Relocate()
+    return true
+end
+
+-- deleteWordLeft is option+backspace, deleteWordRight option+delete
+-- (fn+option+backspace): what option+← and option+→ would go over.
+function deleteWordLeft(bp)
+    return wordDelete(bp, -1, function(b) return b:DeleteWordLeft() end)
+end
+
+function deleteWordRight(bp)
+    return wordDelete(bp, 1, function(b) return b:DeleteWordRight() end)
+end
+
 -- paneNamed is the pane that shows the buffer of that name, when one does.
 local function paneNamed(name)
     local tabs = micro.Tabs().List

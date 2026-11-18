@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/junjieliang672/marmota/src/internal/common"
+	"github.com/junjieliang672/marmota/src/pkg/words"
 )
 
 // State is what a session is doing, which its glyph shows.
@@ -160,7 +161,7 @@ func (l *List) IsRenaming() bool { return l.renameID != "" }
 // UpdateRename passes a key to the rename box.
 func (l *List) UpdateRename(msg tea.Msg) tea.Cmd {
 	var cmd tea.Cmd
-	l.rename, cmd = l.rename.Update(msg)
+	l.rename, cmd = words.UpdateField(l.rename, msg)
 	return cmd
 }
 

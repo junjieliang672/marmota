@@ -28,7 +28,7 @@ option key.
 | option+↑ / option+↓ | Move the line, or the selected lines, up / down |
 | ctrl+D | Duplicate the line, or what is selected |
 | tab / shift+tab | Indent / outdent what is selected. While you type a word, tab completes it from the words of the file |
-| option+backspace | Delete the word before the cursor |
+| option+backspace | Delete the word before the cursor: what option+← would go over. fn+option+backspace deletes the word after it |
 | cmd+backspace | Delete back to the start of the line |
 | ctrl+K | Cut the line |
 
@@ -60,7 +60,7 @@ option key.
 | Key | Does |
 |-----|------|
 | cmd+← / cmd+→ | Start / end of the line (ctrl+A / ctrl+E too) |
-| option+← / option+→ | A word left / right |
+| option+← / option+→ | A word left / right. In a line of Chinese, Japanese or Korean the words are the system's, as in any text field of the Mac: 我认为应该这样 is 我, 认为, 应该, 这样 |
 | cmd+↑ / cmd+↓ | Start / end of the file |
 | page up / page down | A screen up / down |
 | cmd+G | Go to a place: a line's number and enter, or one key (below) |

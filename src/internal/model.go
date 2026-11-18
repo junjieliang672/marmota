@@ -30,6 +30,7 @@ import (
 	"github.com/junjieliang672/marmota/src/pkg/codexsession"
 	filepreview "github.com/junjieliang672/marmota/src/pkg/file_preview"
 	stringfunction "github.com/junjieliang672/marmota/src/pkg/string_function"
+	"github.com/junjieliang672/marmota/src/pkg/words"
 )
 
 // These represent model's state information, its not a global preperty
@@ -130,7 +131,7 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// The help menu isn't a Model: its search bar is updated here.
 	var helpMenuCmd tea.Cmd
 	if m.helpMenu.searchBar.Focused() {
-		m.helpMenu.searchBar, helpMenuCmd = m.helpMenu.searchBar.Update(msg)
+		m.helpMenu.searchBar, helpMenuCmd = words.UpdateField(m.helpMenu.searchBar, msg)
 	}
 
 	if cmd, done := m.handleOwnMsg(msg); done {
@@ -911,11 +912,11 @@ func (m *model) updateFilePanelsState(msg tea.Msg) tea.Cmd {
 	case m.firstTextInput:
 		m.firstTextInput = false
 	case m.fileModel.renaming:
-		focusPanel.rename, cmd = focusPanel.rename.Update(msg)
+		focusPanel.rename, cmd = words.UpdateField(focusPanel.rename, msg)
 	case focusPanel.searchBar.Focused():
-		focusPanel.searchBar, cmd = focusPanel.searchBar.Update(msg)
+		focusPanel.searchBar, cmd = words.UpdateField(focusPanel.searchBar, msg)
 	case m.typingModal.open:
-		m.typingModal.textInput, cmd = m.typingModal.textInput.Update(msg)
+		m.typingModal.textInput, cmd = words.UpdateField(m.typingModal.textInput, msg)
 	case m.promptModal.IsOpen():
 		// TODO : Separate this to a utility
 		cwdLocation := m.fileModel.filePanels[m.filePanelFocusIndex].location

@@ -18,6 +18,7 @@ import (
 	"github.com/junjieliang672/marmota/src/internal/common"
 	"github.com/junjieliang672/marmota/src/pkg/claudeask"
 	"github.com/junjieliang672/marmota/src/pkg/codexsession"
+	"github.com/junjieliang672/marmota/src/pkg/words"
 )
 
 const (
@@ -399,7 +400,7 @@ func (c *Composer) HandleKey(msg tea.KeyMsg) tea.Cmd {
 		// A paste of several lines folds when it is long; typing unfolds.
 		c.folded = msg.Paste && slices.Contains(msg.Runes, lineBreak)
 		var cmd tea.Cmd
-		c.input, cmd = c.input.Update(msg)
+		c.input, cmd = words.UpdateField(c.input, msg)
 		c.histPos = -1
 		c.notice = ""
 		return cmd

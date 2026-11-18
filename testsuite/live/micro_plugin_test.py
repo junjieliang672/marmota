@@ -8,6 +8,8 @@ sent as the bytes WezTerm sends micro for them (setup-macos-hotkeys.sh's
 block in ~/.wezterm.lua). Checks:
 
   1. The Mac keys: line and word moves, selecting by word, line and
+     paragraph; in a line of Chinese the words are the system's, and
+     option+backspace deletes what option+left goes over;
      paragraph, delete to the line's start, undo and redo.
   2. cmd+G goes to a line, the file's top and bottom, the paragraph after
      and before, a bracket's match, and back; g keeps it open until esc;
@@ -73,6 +75,7 @@ KEY = {
     "cmd+h": b"\x1bOP", "cmd+w": b"\x11", "cmd+/": b"\x1b/", "opt+n": b"\x1bn", "opt+]": b"\x1b]",
     "opt+m": b"\x1bm", "opt+x": b"\x1bx", "cmd+o": b"\x1bOQ", "cmd+m": b"\x1bOR",
     "shift+enter": b"\n", "backspace": b"\x7f", "up": b"\x1b[A", "opt+,": b"\x1b,",
+    "opt+left": b"\x1bb", "opt+delete": b"\x1b[3;3~",
 }
 PLAN = "# Plan\n\nline three\nline four\nline five\n\nlast para one\nlast para two\n"
 BRACKETS = "# Plan\n\nline three\nsay (a [b] c) d\n\nlast para one\nlast para two\n"
@@ -291,7 +294,29 @@ def main() -> int:
         assert after("zzz", "cmd+z", "cmd+shift+z")[0] == "zzz# Plan", "cmd+shift+Z redoes"
         assert after("cmd+down", "END")[-1].endswith("END") or "END" in "".join(after("cmd+down", "END")), \
             "cmd+down goes to the file's end"
-        print("ok   the Mac keys move, select and delete as in a text field; undo and redo work")
+        # A line of Chinese has no spaces, and micro takes it for one word: the words are the system's,
+        # which y asks, and deleting takes what moving goes over.
+        zh = "我认为应该这样，enter 进入\n"
+        assert after("cmd+right", "opt+left", "X", text=zh)[0] == "我认为应该这样，enter X进入", \
+            "option+left goes to the start of the word before"
+        assert after("cmd+right", "opt+left", "opt+left", "opt+left", "X", text=zh)[0] == "我认为应该X这样，enter 进入", \
+            "and on, over the comma"
+        assert after("opt+right", "opt+right", "X", text=zh)[0] == "我认为X应该这样，enter 进入", \
+            "option+right goes to the end of the word after"
+        assert after("cmd+right", "opt+backspace", "X", text=zh)[0] == "我认为应该这样，enter X", \
+            "option+backspace deletes one word"
+        assert after("cmd+right", "opt+backspace", "opt+backspace", "opt+backspace", text=zh)[0] == "我认为应该", \
+            "and again, what option+left goes over each time"
+        assert after("opt+delete", "opt+delete", text=zh)[0] == "应该这样，enter 进入", \
+            "option+delete deletes the word after"
+        assert after("cmd+right", "shift+opt+left", "shift+opt+left", "X", text=zh)[0] == "我认为应该这样，X", \
+            "shift+option+left selects by the same words"
+        assert after("opt+right", "shift+opt+right", "X", text=zh)[0] == "我X应该这样，enter 进入", \
+            "and shift+option+right"
+        assert after("cmd+right", "opt+left", "X", text="--flag 我认为\n")[0] == "--flag 我X认为", \
+            "a line that starts as an option does is a line all the same"
+        print("ok   the Mac keys move, select and delete as in a text field; undo and redo work; in a line of "
+              "Chinese they go by the system's words, and deleting takes what moving goes over")
 
         # 2. cmd+G goes to a place, cmd+shift+G selects up to it
         assert after("cmd+g", "4", "enter", "!")[3] == "!line four", "cmd+G, a number: that line"

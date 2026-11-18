@@ -23,6 +23,7 @@ import (
 	"github.com/junjieliang672/marmota/src/internal/common"
 	sessionsui "github.com/junjieliang672/marmota/src/internal/ui/sessions"
 	"github.com/junjieliang672/marmota/src/internal/utils"
+	"github.com/junjieliang672/marmota/src/pkg/words"
 )
 
 // Kind is what an item is.
@@ -307,7 +308,7 @@ func (m *Model) searchKey(msg tea.KeyMsg) Action {
 		return Action{}
 	}
 	before := m.input.Value()
-	m.input, _ = m.input.Update(msg)
+	m.input, _ = words.UpdateField(m.input, msg)
 	if m.input.Value() == before {
 		return Action{}
 	}
@@ -397,7 +398,7 @@ func (m *Model) renameKey(msg tea.KeyMsg) Action {
 		}
 		return Action{Kind: Renamed, Item: it, Text: name}
 	}
-	m.rename, _ = m.rename.Update(msg)
+	m.rename, _ = words.UpdateField(m.rename, msg)
 	return Action{}
 }
 

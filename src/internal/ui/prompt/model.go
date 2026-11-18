@@ -12,6 +12,7 @@ import (
 
 	"github.com/junjieliang672/marmota/src/config/icon"
 	"github.com/junjieliang672/marmota/src/internal/common"
+	"github.com/junjieliang672/marmota/src/pkg/words"
 )
 
 func DefaultModel(maxHeight int, width int) Model {
@@ -61,7 +62,7 @@ func (m *Model) HandleUpdate(msg tea.Msg, cwdLocation string) (common.ModelActio
 		}
 	default:
 		// Non keypress updates like Cursor Blink
-		m.textInput, cmd = m.textInput.Update(msg)
+		m.textInput, cmd = words.UpdateField(m.textInput, msg)
 	}
 	return action, cmd
 }
@@ -99,7 +100,7 @@ func (m *Model) handleNormalKeyInput(msg tea.KeyMsg) tea.Cmd {
 	case m.textInput.Value() == "" && msg.String() == m.shellPromptHotkey:
 		m.setShellMode(true)
 	default:
-		m.textInput, cmd = m.textInput.Update(msg)
+		m.textInput, cmd = words.UpdateField(m.textInput, msg)
 	}
 	m.resultMsg = ""
 	m.actionSuccess = true
