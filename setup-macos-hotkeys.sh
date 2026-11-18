@@ -899,6 +899,7 @@ do
     { 'z', 'CMD', '\x1a' }, -- undo
     { 'z', 'CMD|SHIFT', '\x19' }, -- redo
     { 'c', 'CMD', '\x03' }, -- copy
+    { 'c', 'CMD|SHIFT', '\x1bC' }, -- copy the file and lines as @file#L3-9
     { 'x', 'CMD', '\x18' }, -- cut
     { 'a', 'CMD', '\x1ba' }, -- select all
     { 'f', 'CMD', '\x06' }, -- find

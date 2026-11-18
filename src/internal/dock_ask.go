@@ -348,6 +348,9 @@ func (m *model) dockAskIdleLines(s claudesession.Session, width, rows int) []str
 		mode := "⏵⏵ " + claudeask.PermissionModeLabel(m.sessions.composer.PermissionMode())
 		return fillRows(lines, dimLines(wrapLines("starts in the background, "+mode, width, rows)), rows)
 	}
+	if s.App != nil {
+		return m.dockAskAppLines(s, width, rows)
+	}
 	state := m.sessionState(s)
 	verb := " write"
 	if state == sessionsui.NeedsYou {
@@ -409,6 +412,31 @@ func (m *model) dockAskIdleLines(s claudesession.Session, width, rows int) []str
 		}
 	}
 	return lines
+}
+
+// dockAskAppLines is the folded box for a session of the Remote section,
+// which is written to in the Claude app: its title, then what claude.ai says
+// it is doing or waits for. Which computer it runs on and its model aren't
+// known from there, so they aren't said.
+func (m *model) dockAskAppLines(s claudesession.Session, width, rows int) []string {
+	st := dockStyles()
+	head := []string{st.val.Render(ansi.Truncate("→ "+s.DisplayTitle(), width, "…")),
+		common.HostMark(remoteSectionTitle, common.FooterBGColor) + st.dim.Render(" "+
+			ansi.Truncate("on another computer", max(1, width-2), "…")),
+		st.dim.Render(ansi.Truncate("enter: open in Claude app", width, "…"))}
+	body := []string{}
+	if s.App.Doing != "" {
+		body = wrapLines(s.App.Doing, width, max(1, rows-len(head)))
+		if m.sessionState(s) == sessionsui.NeedsYou {
+			for i, l := range body {
+				body[i] = lipgloss.NewStyle().Foreground(sessionsui.StateColor(sessionsui.NeedsYou)).
+					Background(common.FooterBGColor).Render(l)
+			}
+		} else {
+			body = dimLines(body)
+		}
+	}
+	return fillRows(head, body, rows)
 }
 
 // maxIdlePromptRows is how many rows your last message takes in the folded

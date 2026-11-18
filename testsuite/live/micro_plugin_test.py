@@ -60,7 +60,7 @@ KEY = {
     "shift+cmd+right": b"\x1b[1;6C", "shift+cmd+left": b"\x1b[1;6D", "cmd+down": b"\x1b[1;5B",
     "shift+opt+down": b"\x1b[1;4B", "cmd+a": b"\x1ba", "cmd+z": b"\x1a", "cmd+shift+z": b"\x19",
     "cmd+g": b"\x1bg", "cmd+shift+g": b"\x1bG", "cmd+s": b"\x13", "esc": b"\x1b", "right": b"\x1b[C",
-    "cmd+l": b"\x1bl", "cmd+shift+l": b"\x1bL", "cmd+k": b"\x1bk",
+    "cmd+l": b"\x1bl", "cmd+shift+l": b"\x1bL", "cmd+k": b"\x1bk", "cmd+shift+c": b"\x1bC",
     "cmd+enter": b"\x1b\r", "cmd+j": b"\x1bj", "enter": b"\r", "down": b"\x1b[B", "shift+down": b"\x1b[1;2B",
     "cmd+h": b"\x1bOP", "cmd+w": b"\x11", "cmd+/": b"\x1b/", "opt+n": b"\x1bn", "opt+]": b"\x1b]",
     "opt+m": b"\x1bm", "opt+x": b"\x1bx", "cmd+o": b"\x1bOQ", "cmd+m": b"\x1bOR",
@@ -317,6 +317,21 @@ def main() -> int:
             "option+M puts a cursor on each selected line"
         assert after("opt+x", "replace line row -a", "enter")[2:5] == ["row three", "row four", "row five"], \
             "option+X opens the command bar, and replace with -a replaces all"
+        # cmd+shift+C copies the file and lines as a session reads them,
+        # to a pbcopy of the test's, not yours
+        clip = work / "clip"
+        clip.mkdir(exist_ok=True)
+        (clip / "pbcopy").write_text(f"#!/bin/sh\ncat > '{work / 'clipboard'}'\n")
+        (clip / "pbcopy").chmod(0o755)
+        plan.write_text(PLAN)
+        m = Micro(server, project, {**env, "PATH": f"{clip}:{env['PATH']}"}, config, "plan.md")
+        m.press("down", "down", "shift+down", "shift+down", "cmd+shift+c")
+        wait_for("the reference copied", lambda: (work / "clipboard").exists())
+        assert (work / "clipboard").read_text() == f"@{plan}#L3-4", (work / "clipboard").read_text()
+        assert f"Copied @{plan}#L3-4" in m.screen(), "the status line says what was copied"
+        m.press("right", "cmd+shift+c")
+        wait_for("the cursor's line", lambda: (work / "clipboard").read_text() == f"@{plan}#L5")
+        m.quit()
         m = editor()
         m.press("cmd+h")
         wait_for("the page of keys", lambda: "Keys in micro" in m.screen())
@@ -336,7 +351,8 @@ def main() -> int:
         m = None
         print("ok   cmd+H showed the page of keys and put it away; cmd+W closed the page, then micro, asking "
               "about what wasn't saved; cmd+/ commented, option+N and option+M typed at several cursors, "
-              "option+] found the change, the command bar replaced all")
+              "option+] found the change, the command bar replaced all; cmd+shift+C copied @file#L3-4, and the "
+              "cursor's line with nothing selected")
 
         # two sessions to ask
         first = session("start", "--cwd", str(project), "--", "hello").split()[1]

@@ -272,8 +272,7 @@ func (m *model) handleOwnMsg(msg tea.Msg) (tea.Cmd, bool) {
 	case appSessionsMsg:
 		return m.applyAppSessions(msg), true
 	case appOpenedMsg:
-		m.applyAppOpened(msg)
-		return nil, true
+		return m.applyAppOpened(msg), true
 
 	case macTickMsg:
 		return m.applyMacTick(), true

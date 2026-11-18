@@ -25,5 +25,6 @@
     "Alt-Enter": "lua:marmota.insertReply",
     "Alt-j": "lua:marmota.toggleReplies",
     "Alt-k": "lua:marmota.edit",
+    "Alt-C": "lua:marmota.copyReference",
     "MouseLeftDrag": "lua:marmota.drag"
 }

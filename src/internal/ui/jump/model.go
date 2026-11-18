@@ -63,6 +63,9 @@ type Item struct {
 	// mark before Tag and Meta in its color. Stated says it has one.
 	State  sessionsui.State
 	Stated bool
+	// Goes is what the foot line says enter does, when it isn't going to
+	// Where: "b1 · opens in the Claude app".
+	Goes string
 	// Dir is set for a folder.
 	Dir bool
 }

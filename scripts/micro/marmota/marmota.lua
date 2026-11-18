@@ -922,6 +922,47 @@ local function pickSession(bp, after)
     end
 end
 
+-- copyReference is cmd+shift+C: the file and the selected lines, or the
+-- cursor's line, copied as Claude Code reads them pasted in a session,
+-- "@src/app.go#L3-9", the path from the git repository's top (else as it
+-- is), as nvim's gy writes it.
+function copyReference(bp)
+    local path = bp.Buf.AbsPath
+    if bp.Buf.Path == "" or path == "" then
+        micro.InfoBar():Error("This buffer is no file")
+        return true
+    end
+    local top = shell.ExecCommand("git", "-C", filepath.Dir(path), "rev-parse", "--show-toplevel")
+    top = strings.TrimSpace(top or "")
+    if top ~= "" and strings.HasPrefix(path, top .. "/") then
+        path = string.sub(path, #top + 2)
+    end
+    if path:find(" ") then
+        path = '"' .. path .. '"'
+    end
+    local first, last = bp.Cursor.Y, bp.Cursor.Y
+    local from, to = selection(bp.Cursor)
+    if from ~= nil then
+        first, last = from.Y, to.Y
+        if to.X == 0 and to.Y > from.Y then
+            last = to.Y - 1 -- the selection ends before this line's first character
+        end
+    end
+    local ref = "@" .. path .. "#L" .. (first + 1)
+    if last > first then
+        ref = ref .. "-" .. (last + 1)
+    end
+    local _, err = shell.ExecCommand("sh", "-c",
+        'printf %s "$1" | { pbcopy 2>/dev/null || wl-copy 2>/dev/null || xclip -selection clipboard; }',
+        "sh", ref)
+    if err ~= nil then
+        micro.InfoBar():Error("Could not copy " .. ref .. ": " .. err:Error())
+        return true
+    end
+    micro.InfoBar():Message("Copied " .. ref)
+    return true
+end
+
 -- ask is cmd+L: a question to the session, about this file.
 function ask(bp)
     if session.id == "" then

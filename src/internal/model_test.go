@@ -81,6 +81,7 @@ func TestMain(m *testing.M) {
 	variable.RemotesFile = filepath.Join(testDir, "remotes.json") //nolint:reassign // test isolation
 	//nolint:reassign // test isolation
 	variable.TemporarySessionsFile = filepath.Join(testDir, "temporary_sessions.json")
+	variable.AppSessionsSeenFile = filepath.Join(testDir, "app_sessions_seen.json") //nolint:reassign // test isolation
 	// Nor ask claude.ai, or open the Claude app.
 	appSessionsAutoRefresh = false
 	listAppSessions = func(context.Context) ([]claudecloud.Session, error) {

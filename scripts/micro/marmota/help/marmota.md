@@ -41,6 +41,7 @@ option key.
 | cmd+shift+G | Select up to a place: a line, the top, a paragraph's end, what brackets hold (below) |
 | cmd+A | Select all |
 | cmd+C | Copy what is selected; with nothing selected, the line |
+| cmd+shift+C | Copy the file and the selected lines (or the cursor's line) as `@src/app.go#L3-9`, to paste in a session |
 | cmd+X | Cut what is selected; with nothing selected, the line |
 | cmd+V | Paste |
 | the mouse | Click puts the cursor, drag selects, double click a word, triple click a line. The wheel, turned while you drag, scrolls and the selection goes on |

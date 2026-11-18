@@ -327,6 +327,8 @@ func (m *Model) pathLine(width int, st common.PopupStyleSet, target Item, ok boo
 	}
 	text := ""
 	switch {
+	case ok && target.Goes != "":
+		text = target.Goes
 	case ok && (target.Kind == Session || target.Kind == Ended):
 		text = target.Title
 		if target.Where != "" {

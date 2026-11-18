@@ -2,17 +2,22 @@ package internal
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	variable "github.com/junjieliang672/marmota/src/config"
 	"github.com/junjieliang672/marmota/src/internal/common"
 	"github.com/junjieliang672/marmota/src/internal/utils"
 	"github.com/junjieliang672/marmota/src/pkg/claudecloud"
@@ -62,11 +67,23 @@ type appSessionsState struct {
 	err      error
 	at       time.Time
 	inflight bool
-	// opened is, by claude.ai id, the last event of each session as it stood
-	// when enter opened it in the Claude app: read from then, and answered if
-	// it needed you, until claude.ai lists a later event. claude.ai doesn't
-	// say at once what the app has read.
-	opened map[string]time.Time
+	// seen is, by claude.ai id, how far each session has been seen, saved
+	// in AppSessionsSeenFile; seenRead says it has been read from there.
+	seen     map[string]appSeen
+	seenRead bool
+}
+
+// appSeen is how far a session has been seen. claude.ai's unread is only
+// cleared by opening the session in the Claude app or on claude.ai, so a
+// session read anywhere else would stay unread: a session is unread only
+// when claude.ai says so of an event after At. At is the last event of a
+// session as it stood when Marmota first listed it (a session it first
+// lists while running has none: claude.ai's word goes), or when enter
+// opened it in the Claude app; then Opened, and it is answered too, if it
+// needed you, until a later event.
+type appSeen struct {
+	At     time.Time `json:"at"`
+	Opened bool      `json:"opened,omitempty"`
 }
 
 type appSessionsTickMsg struct{}
@@ -76,10 +93,15 @@ type appSessionsMsg struct {
 	bridge   map[string]string
 	err      error
 	at       time.Time
+	// seen is AppSessionsSeenFile, read with the first listing (seenRead).
+	seen     map[string]appSeen
+	seenRead bool
 }
 
 type appOpenedMsg struct {
 	id  string
+	was appSeen
+	had bool
 	err error
 }
 
@@ -100,13 +122,59 @@ func (m *model) appSessionsRefreshCmd() tea.Cmd {
 		return nil
 	}
 	m.app.inflight = true
-	projects := claudeProjectsDir()
+	projects, readSeen := claudeProjectsDir(), !m.app.seenRead
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), appSessionsTimeout)
 		defer cancel()
 		list, err := listAppSessions(ctx)
-		return appSessionsMsg{sessions: list, err: err, at: time.Now(),
+		msg := appSessionsMsg{sessions: list, err: err, at: time.Now(),
 			bridge: claudesession.BridgeIDs(projects)}
+		if readSeen {
+			msg.seen, msg.seenRead = loadAppSeen(), true
+		}
+		return msg
+	}
+}
+
+// loadAppSeen reads AppSessionsSeenFile; nil when there is none.
+func loadAppSeen() map[string]appSeen {
+	data, err := os.ReadFile(variable.AppSessionsSeenFile)
+	if err != nil {
+		return nil
+	}
+	var seen map[string]appSeen
+	if err := json.Unmarshal(data, &seen); err != nil {
+		slog.Warn("Could not read the Remote section's seen sessions", "error", err)
+		return nil
+	}
+	return seen
+}
+
+// appSeenSaving keeps two saves from writing the file at once.
+var appSeenSaving sync.Mutex
+
+// saveAppSeenCmd writes AppSessionsSeenFile off the screen's loop.
+func (m *model) saveAppSeenCmd() tea.Cmd {
+	data, err := json.Marshal(m.app.seen)
+	if err != nil {
+		return nil
+	}
+	return func() tea.Msg {
+		appSeenSaving.Lock()
+		defer appSeenSaving.Unlock()
+		if err := os.MkdirAll(filepath.Dir(variable.AppSessionsSeenFile), 0o755); err != nil {
+			slog.Error("Could not save the Remote section's seen sessions", "error", err)
+			return nil
+		}
+		tmp := variable.AppSessionsSeenFile + ".tmp"
+		err := os.WriteFile(tmp, append(data, '\n'), 0o600)
+		if err == nil {
+			err = os.Rename(tmp, variable.AppSessionsSeenFile)
+		}
+		if err != nil {
+			slog.Error("Could not save the Remote section's seen sessions", "error", err)
+		}
+		return nil
 	}
 }
 
@@ -123,8 +191,55 @@ func (m *model) applyAppSessions(msg appSessionsMsg) tea.Cmd {
 	} else {
 		m.app.listed, m.app.err, m.app.at = msg.sessions, nil, msg.at
 	}
+	var save tea.Cmd
+	if msg.seenRead {
+		m.app.seenRead = true
+		for id, s := range msg.seen {
+			if _, ok := m.app.seen[id]; !ok {
+				m.setAppSeen(id, s)
+			}
+		}
+	}
+	if msg.err == nil && m.app.seenRead && m.noteAppSeen(msg.seenRead) {
+		save = m.saveAppSeenCmd()
+	}
 	m.refreshSessionsList()
-	return nil
+	return save
+}
+
+func (m *model) setAppSeen(id string, s appSeen) {
+	if m.app.seen == nil {
+		m.app.seen = map[string]appSeen{}
+	}
+	m.app.seen[id] = s
+}
+
+// noteAppSeen records the sessions listed for the first time: as seen up to
+// their last event in the first listing since Marmota started, so it doesn't
+// open with every session unread; with nothing seen when one turns up while
+// it runs. It forgets those no longer listed, and reports a change.
+func (m *model) noteAppSeen(first bool) bool {
+	changed := false
+	listed := map[string]bool{}
+	for _, c := range m.app.listed {
+		listed[c.ID] = true
+		if _, ok := m.app.seen[c.ID]; ok {
+			continue
+		}
+		s := appSeen{}
+		if first {
+			s.At = c.Updated
+		}
+		m.setAppSeen(c.ID, s)
+		changed = true
+	}
+	for id := range m.app.seen {
+		if !listed[id] {
+			delete(m.app.seen, id)
+			changed = true
+		}
+	}
+	return changed
 }
 
 // appSessions is the Remote section's sessions, as rows of the box: what
@@ -156,9 +271,9 @@ func (m *model) appSessions() []claudesession.Session {
 		if here[c.LinkID()] {
 			continue
 		}
-		if at, ok := m.app.opened[c.ID]; ok && !c.Updated.After(at) {
+		if seen, ok := m.app.seen[c.ID]; ok && !c.Updated.After(seen.At) {
 			c.Unread = false
-			if c.Bucket == "blocked" {
+			if seen.Opened && c.Bucket == "blocked" {
 				c.Bucket, c.NeedsAction = "", ""
 			}
 		}
@@ -201,6 +316,22 @@ func appSession(c claudecloud.Session) claudesession.Session {
 		s.App.Doing = firstNonEmpty(where, "waiting for your next prompt")
 	}
 	return s
+}
+
+// appDoingWithoutState is what appSession says a session does, without the
+// state it starts with: "bring b2 back online" of "needs you: bring b2 back
+// online", for a row that says the state apart.
+func appDoingWithoutState(doing string) string {
+	for _, state := range []string{"needs you: ", "offline · ", "working · ", "replied, unread · "} {
+		if rest, ok := strings.CutPrefix(doing, state); ok {
+			return rest
+		}
+	}
+	switch doing {
+	case "offline", "working", "replied, unread":
+		return ""
+	}
+	return doing
 }
 
 func joinWords(a, b string) string {
@@ -247,12 +378,11 @@ func (m *model) appKey(s claudesession.Session, key string) (tea.Cmd, bool) {
 	switch {
 	case slices.Contains(common.Hotkeys.Confirm, key):
 		url, id := s.App.URL, strings.TrimPrefix(s.ID, appIDPrefix)
-		if m.app.opened == nil {
-			m.app.opened = map[string]time.Time{}
-		}
-		m.app.opened[id] = s.LastActivity // so ! goes on to the next one
+		was, had := m.app.seen[id]
+		m.setAppSeen(id, appSeen{At: s.LastActivity, Opened: true}) // so ! goes on to the next one
 		m.refreshSessionsList()
-		return func() tea.Msg { return appOpenedMsg{id: id, err: openAppURL(url)} }, true
+		return tea.Batch(m.saveAppSeenCmd(),
+			func() tea.Msg { return appOpenedMsg{id: id, was: was, had: had, err: openAppURL(url)} }), true
 	case slices.ContainsFunc([][]string{common.Hotkeys.OpenAskBar, common.Hotkeys.SessionMention,
 		common.Hotkeys.SessionRename, common.Hotkeys.SessionFork, common.Hotkeys.SessionStop,
 		common.Hotkeys.MoveSessionHere, common.Hotkeys.ShowSessionFiles, common.Hotkeys.CopyPath,
@@ -263,13 +393,19 @@ func (m *model) appKey(s claudesession.Session, key string) (tea.Cmd, bool) {
 	return nil, false
 }
 
-func (m *model) applyAppOpened(msg appOpenedMsg) {
-	if msg.err != nil {
-		delete(m.app.opened, msg.id)
-		m.refreshSessionsList()
-		slog.Error("Could not open the session in the Claude app", "error", msg.err)
-		m.flashClaude("Could not open it: " + msg.err.Error())
+func (m *model) applyAppOpened(msg appOpenedMsg) tea.Cmd {
+	if msg.err == nil {
+		return nil
 	}
+	if msg.had {
+		m.app.seen[msg.id] = msg.was
+	} else {
+		delete(m.app.seen, msg.id)
+	}
+	m.refreshSessionsList()
+	slog.Error("Could not open the session in the Claude app", "error", msg.err)
+	m.flashClaude("Could not open it: " + msg.err.Error())
+	return m.saveAppSeenCmd()
 }
 
 // openURLDetached opens a session's claude:// link, which the Claude app

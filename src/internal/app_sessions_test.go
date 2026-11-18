@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	variable "github.com/junjieliang672/marmota/src/config"
 	"github.com/junjieliang672/marmota/src/internal/common"
 	sessionsui "github.com/junjieliang672/marmota/src/internal/ui/sessions"
 	"github.com/junjieliang672/marmota/src/internal/utils"
@@ -82,7 +83,7 @@ func TestEnterOpensARemoteSessionInTheClaudeApp(t *testing.T) {
 	cmd := m.dockSessionsKey(utils.TeaKeyMsg(common.Hotkeys.Confirm[0]))
 	require.NotNil(t, cmd, "opening runs off the screen's loop")
 	assert.Empty(t, opened, "not before the command runs")
-	TeaUpdate(m, cmd())
+	runCmds(m, cmd)
 	assert.Equal(t, []string{"claude://claude.ai/code/session_01b1"}, opened)
 	assert.Equal(t, dockSessionsFocus, m.focusPanel)
 }
@@ -158,8 +159,9 @@ func TestThePreviewOfARemoteSessionSaysWhereItIs(t *testing.T) {
 	m.focusDockSessionsOn("app:cse_01b1")
 	v := m.sessionsPaneView()
 	assert.Equal(t, "b1", v.Title)
-	assert.Contains(t, v.Place, "Claude app")
-	assert.Equal(t, "needs you: bring b2 back online", v.Now)
+	assert.Equal(t, "on another computer", v.Place)
+	assert.Equal(t, "needs you: bring b2 back online", v.About[0])
+	assert.Contains(t, v.About[1], "Claude app")
 }
 
 func TestRemoteSessionsListTheLatestFirstAndTheOfflineOnesLast(t *testing.T) {
@@ -195,7 +197,7 @@ func TestARemoteSessionOpenedInTheAppIsReadAndAnsweredUntilItMovesOn(t *testing.
 	assert.NotEqual(t, sessionsui.NeedsYou, m.sessionState(row), "answered in the app: ! goes on")
 	assert.False(t, row.App.Unread)
 	assert.NotContains(t, row.App.Doing, "needs you")
-	TeaUpdate(m, cmd())
+	runCmds(m, cmd)
 
 	m.applyAppSessions(appSessionsMsg{at: time.Now(), sessions: []claudecloud.Session{
 		{ID: "cse_01b1", Title: "b1", Bucket: "blocked", Unread: true, Connected: true, Updated: at},
@@ -216,7 +218,7 @@ func TestARemoteSessionThatFailedToOpenStaysUnread(t *testing.T) {
 		{ID: "cse_01b2", Title: "b2", Bucket: "completed", Unread: true, Connected: true},
 	}})
 	m.focusDockSessionsOn("app:cse_01b2")
-	TeaUpdate(m, m.dockSessionsKey(utils.TeaKeyMsg(common.Hotkeys.Confirm[0]))())
+	runCmds(m, m.dockSessionsKey(utils.TeaKeyMsg(common.Hotkeys.Confirm[0])))
 	row, _ := m.appSessionByID("app:cse_01b2")
 	assert.True(t, row.App.Unread)
 }
@@ -264,5 +266,68 @@ func TestTheGoToListShowsEachSessionsStateAndWhatARemoteOneWaitsFor(t *testing.T
 	}
 	require.NotEmpty(t, b1, view)
 	assert.Contains(t, b1, "⚑ cc", "its mark, as in the Sessions box")
-	assert.Contains(t, b1, "needs you: bring b2", "what it waits for, in its folder's place")
+	assert.Contains(t, b1, "bring b2 back online", "what it waits for, in its folder's place")
+}
+
+// listedWith is a listing as the first one since Marmota started brings it,
+// with the file of seen sessions as it was read.
+func listedWith(seen map[string]appSeen, sessions ...claudecloud.Session) appSessionsMsg {
+	return appSessionsMsg{at: time.Now(), sessions: sessions, seen: seen, seenRead: true}
+}
+
+func TestMarmotaOpensWithTheRemoteSessionsRead(t *testing.T) {
+	m := appTestModel(t)
+	at := time.Now().Add(-time.Hour)
+	runCmds(m, m.applyAppSessions(listedWith(nil,
+		claudecloud.Session{ID: "cse_01b2", Title: "b2", Bucket: "completed", Unread: true, Connected: true,
+			Updated: at})))
+	row, _ := m.appSessionByID("app:cse_01b2")
+	assert.False(t, row.App.Unread, "claude.ai says unread of what was there before Marmota started")
+	assert.FileExists(t, variable.AppSessionsSeenFile, "and a restart remembers it")
+
+	m.applyAppSessions(appSessionsMsg{at: time.Now(), sessions: []claudecloud.Session{
+		{ID: "cse_01b2", Title: "b2", Bucket: "completed", Unread: true, Connected: true, Updated: time.Now()},
+		{ID: "cse_01new", Title: "new", Bucket: "completed", Unread: true, Connected: true, Updated: at},
+	}})
+	row, _ = m.appSessionByID("app:cse_01b2")
+	assert.True(t, row.App.Unread, "it replied since")
+	row, _ = m.appSessionByID("app:cse_01new")
+	assert.True(t, row.App.Unread, "one that turns up while Marmota runs: claude.ai's word goes")
+}
+
+func TestARestartRemembersWhatWasSeenAndOpened(t *testing.T) {
+	m := appTestModel(t)
+	at := time.Now().Add(-time.Hour)
+	seen := map[string]appSeen{"cse_01b1": {At: at, Opened: true}, "cse_01b2": {At: at.Add(-time.Hour)}}
+	m.applyAppSessions(listedWith(seen,
+		claudecloud.Session{ID: "cse_01b1", Title: "b1", Bucket: "blocked", Unread: true, Connected: true,
+			Updated: at, NeedsAction: "bring b2 back online"},
+		claudecloud.Session{ID: "cse_01b2", Title: "b2", Bucket: "completed", Unread: true, Connected: true,
+			Updated: at}))
+	row, _ := m.appSessionByID("app:cse_01b1")
+	assert.NotEqual(t, sessionsui.NeedsYou, m.sessionState(row), "opened before the restart: answered")
+	row, _ = m.appSessionByID("app:cse_01b2")
+	assert.True(t, row.App.Unread, "it replied while Marmota was closed")
+}
+
+func TestARemoteSessionIsShownWithoutThisComputersNameOrAConversation(t *testing.T) {
+	m := appTestModel(t)
+	m.fileModel.filePreview.SetOpen(true)
+	m.setFilePreviewPanelSize()
+	m.focusDockSessionsOn("app:cse_01b2")
+	view := ansi.Strip(viewText(m))
+	assert.NotContains(t, view, thisComputerName(), "the Ask box doesn't say it runs here")
+	assert.Contains(t, view, "on another computer")
+	assert.Contains(t, view, "offline · on another computer", "the preview says it is offline")
+	assert.NotContains(t, view, "pgup/pgdown", "no conversation to scroll: it is in the Claude app")
+	assert.NotContains(t, view, "waiting for your next prompt · on another", "nor that it waits")
+}
+
+func TestTheGoToListSaysARemoteSessionsStateOnce(t *testing.T) {
+	m := appTestModel(t)
+	pressKey(m, common.Hotkeys.GoTo[0])
+	typeInto(m, "b1")
+	view := ansi.Strip(m.jumpUI.Render(true))
+	assert.Equal(t, 1, strings.Count(view, "needs you"), view)
+	assert.Contains(t, view, "b1 · opens in the Claude app", "the foot line says where enter goes")
 }

@@ -205,12 +205,16 @@ func (m *model) jumpSections() []jump.Section {
 	sec = jump.Section{Kind: jump.Session}
 	for _, s := range m.dockSessions() {
 		state := m.sessionState(s)
-		where := s.Cwd
-		if s.App != nil { // on another computer: what it does there, as the Sessions box says
-			where = s.App.Doing
+		it := jump.Item{Kind: jump.Session, Key: s.ID, Title: s.DisplayTitle(), Where: s.Cwd,
+			Tag: agentTag(s), Meta: jumpSessionState(state), State: state, Stated: true}
+		if s.App != nil { // on another computer: what it does there, without the state Meta says
+			it.Where = appDoingWithoutState(s.App.Doing)
+			it.Goes = s.DisplayTitle() + " · opens in the Claude app"
+			if s.App.Offline {
+				it.Meta = "offline"
+			}
 		}
-		sec.Items = append(sec.Items, jump.Item{Kind: jump.Session, Key: s.ID, Title: s.DisplayTitle(), Where: where,
-			Tag: agentTag(s), Meta: jumpSessionState(state), State: state, Stated: true})
+		sec.Items = append(sec.Items, it)
 	}
 	sections = append(sections, sec)
 

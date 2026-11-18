@@ -41,9 +41,15 @@ func (m *model) sessionPaneViewOf(s claudesession.Session, convo sessionsConvers
 	}
 	if s.App != nil {
 		// claude.ai says only how it is: its conversation is in the app.
+		words := m.sessionStateWords(s, state)
+		if s.App.Offline {
+			words = "offline"
+		}
 		return askui.Session{Glyph: sessionsui.Symbol(state), GlyphColor: sessionsui.StateColor(state),
-			Title: title, State: m.sessionStateWords(s, state), Now: s.App.Doing,
-			Place: "on another computer · " + firstKey(common.Hotkeys.Confirm) + " opens it in the Claude app"}
+			Title: title, State: words, Place: "on another computer",
+			AboutTitle: "In the Claude app",
+			About: []string{s.App.Doing, firstKey(common.Hotkeys.Confirm) +
+				" opens it in the Claude app, where its conversation is"}}
 	}
 	v := askui.Session{
 		Glyph:      sessionsui.Symbol(state),
