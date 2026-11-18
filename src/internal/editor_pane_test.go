@@ -88,7 +88,8 @@ func TestMicroQuote(t *testing.T) {
 }
 
 // The editor is told which session the Ask box writes to: questions asked
-// from it go there. A Codex session isn't told: `y session` can't reach one.
+// from it go there, and who runs it, since the editor words a question for
+// Codex as Codex reads it.
 func TestTheEditorIsToldTheSessionTheAskBoxWritesTo(t *testing.T) {
 	m := dockTestModel(t)
 	bang(m)
@@ -98,9 +99,12 @@ func TestTheEditorIsToldTheSessionTheAskBoxWritesTo(t *testing.T) {
 	assert.Contains(t, env, "MARMOTA_SESSION=s50")
 	assert.Contains(t, env, "MARMOTA_SESSION_TITLE=ime hold tests")
 	assert.Contains(t, env, "MARMOTA_SESSION_HOST=here")
+	assert.Contains(t, env, "MARMOTA_SESSION_AGENT=cc")
 
 	for i := range m.claude.snapshot.Live {
 		m.claude.snapshot.Live[i].Agent = "codex"
 	}
-	assert.NotContains(t, strings.Join(m.editorEnv(), "\n"), "MARMOTA_SESSION=")
+	env = strings.Join(m.editorEnv(), "\n")
+	assert.Contains(t, env, "MARMOTA_SESSION=s50", "a Codex session too")
+	assert.Contains(t, env, "MARMOTA_SESSION_AGENT=co")
 }

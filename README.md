@@ -89,7 +89,7 @@ y
 | `ctrl+g` | In the Ask box: write the question in your editor, as in Claude Code; closing it brings what you wrote back, unsent. A long question shows folded, `[first words… +11 lines]` |
 | drag | In the session preview: select text; letting go copies it |
 | `e` | Open the file in the editor, in Marmota's place until you close it; with `editor_beside = true`, in a pane on Marmota's right instead. The editor is micro, one without modes where the Mac's keys (cmd+S, cmd+Z, cmd+←, shift+option+→ …) work as in a text field: on a Mac `./build.sh` installs and sets it up, also as `$EDITOR`, so Claude Code's ctrl+G opens it too; `E` opens it in a new tab |
-| cmd+L (in micro) | Ask a session about the file you are writing, with the lines you selected: its reply shows on the right, cmd+enter puts it at the cursor. cmd+shift+L picks another session or starts one; cmd+K has the session change the selected lines in the file |
+| cmd+L (in micro) | Ask a session about the file you are writing, with the lines you selected: its reply shows on the right, cmd+enter puts it at the cursor. cmd+shift+L picks another session, Claude Code's or Codex's, or starts one of either; cmd+K has the session change the selected lines in the file |
 | cmd+H, cmd+W (in micro) | cmd+H shows the page of keys worth knowing, micro's and Marmota's, and puts it away. cmd+W closes the file, tab or pane the cursor is in, and the last one micro itself (ctrl+Q does too). cmd+/ comments a line. Elsewhere these keys do what they did: cmd+H hides WezTerm, cmd+W closes its tab |
 | cmd+G (in micro) | Go to a place: a line's number and enter, or one key: `t` top, `b` bottom, `p`/`P` the next paragraph or the one before, `m` the matching bracket, `n` back. `g` keeps it open for more, until esc. cmd+shift+G selects up to the same places, and with `m` what the brackets hold |
 | `>` | Agent mode: `claude`, `claude rc`, `codex` |
@@ -114,7 +114,8 @@ on my Mac mini in ~/proj that fixes the flaky test"); the `marmota-sessions` ski
 
 ```bash
 y session start --on "ssh me@192.168.1.20" --cwd ~/proj -- "fix the flaky test"
-y session list                       # every session, here and there, and what each is doing
+y session start --agent co -- "review the diff"   # a Codex session instead, on this computer
+y session list                       # every session, here and there, who runs it and what each is doing
 y session send <id> "and add a test" # type into its prompt and send it
 y session read <id> --turns 3        # its last turns
 ```

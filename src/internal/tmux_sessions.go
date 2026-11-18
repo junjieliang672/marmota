@@ -59,6 +59,8 @@ const tmuxDialTimeout = 10 * time.Second
 // ("" for this one), in which window.
 type tmuxRef struct {
 	host, window, pane string
+	// name is the window's name, which says whose session it holds.
+	name string
 }
 
 // tmuxPanes numbers Marmota's tmux windows for the rest of Marmota, and holds
@@ -184,7 +186,7 @@ func (r *tmuxRegistry) paneIDOf(host string, w sessionhost.Window) int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	key := host + "\x00" + w.ID
-	ref := tmuxRef{host: host, window: w.ID, pane: w.PaneID}
+	ref := tmuxRef{host: host, window: w.ID, pane: w.PaneID, name: w.Name}
 	if id, ok := r.ids[key]; ok {
 		r.refs[id] = ref
 		return id
@@ -203,6 +205,46 @@ func (r *tmuxRegistry) ref(id int) (tmuxRef, bool) {
 }
 
 func isTmuxPane(id int) bool { return id < 0 }
+
+// codexWindowOf is the Codex session a pane's tmux window is named for,
+// "" for a pane that isn't one, or whose session wasn't known when it
+// opened and hasn't been named since.
+func codexWindowOf(paneID int) string {
+	ref, ok := tmuxPanes.ref(paneID)
+	if !ok {
+		return ""
+	}
+	prefix, id, _ := sessionhost.SessionOf(ref.name)
+	if prefix != sessionhost.CodexPrefix || strings.HasPrefix(id, unnamedWindow) {
+		return ""
+	}
+	return id
+}
+
+// nameCodexWindow names the tmux window of a Codex session for it,
+// "co-<id>", once its id is known: `y session` and the next Marmota find
+// the session's window by that.
+func nameCodexWindow(paneID int, id string) {
+	ref, ok := tmuxPanes.ref(paneID)
+	name := sessionhost.NameFor(sessionhost.CodexPrefix, id)
+	if !ok || ref.host != "" || ref.name == name || id == "" {
+		return
+	}
+	c, err := localTmux()
+	if err == nil {
+		err = c.Rename(ref.window, name)
+	}
+	if err != nil {
+		slog.Warn("Could not name a Codex session's window", "session", id, "error", err)
+		return
+	}
+	tmuxPanes.mu.Lock()
+	defer tmuxPanes.mu.Unlock()
+	if now, ok := tmuxPanes.refs[paneID]; ok && now.window == ref.window {
+		now.name = name
+		tmuxPanes.refs[paneID] = now
+	}
+}
 
 // remoteTTY stands for the terminal of a pane on another computer: a
 // session there is matched to its pane by it, as one here is by its tty.

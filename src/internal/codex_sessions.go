@@ -186,7 +186,20 @@ func (m *model) codexPane(s claudesession.Session, claimed map[int]bool) (wezter
 			}
 		}
 	}
+	// A tmux window named for the session, "co-<id>": one Marmota or
+	// `y session start` started.
 	recorded := map[int]bool{}
+	for _, p := range m.claude.panes {
+		switch codexWindowOf(p.PaneID) {
+		case "":
+		case s.ID:
+			if usable(p) {
+				return p, true
+			}
+		default:
+			recorded[p.PaneID] = true // another session's
+		}
+	}
 	for _, id := range m.codex.panes {
 		recorded[id] = true
 	}
@@ -250,6 +263,9 @@ func (m *model) recordCodexPane(id string, paneID int) {
 		m.codex.panes = make(map[string]int)
 	}
 	m.codex.panes[id] = paneID
+	if isTmuxPane(paneID) {
+		nameCodexWindow(paneID, id)
+	}
 	for i := range m.managedWeztermState.Sessions {
 		if s := &m.managedWeztermState.Sessions[i]; s.PaneID == paneID {
 			s.CodexSession = id

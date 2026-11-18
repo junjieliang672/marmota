@@ -187,7 +187,7 @@ const testRollout = `{"timestamp":"2026-11-08T09:13:55.042Z","type":"session_met
 {"timestamp":"2026-11-08T09:13:59.395Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"CommandExecution","command":["/bin/zsh","-lc","go test ./..."]}}}
 {"timestamp":"2026-11-08T09:14:00.000Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"FileChange","changes":{"/w/repo/login.go":{"type":"update","unified_diff":"@@ -3,2 +3,2 @@\n ctx\n-old\n+new\n","move_path":null}}}}}
 {"timestamp":"2026-11-08T09:14:01.000Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"FileChange","changes":{"/w/repo/new.go":{"type":"add","content":"package repo\n\nfunc New() {}\n"}}}}}
-{"timestamp":"2026-11-08T09:14:02.000Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"AgentMessage","content":[{"type":"Text","text":"Fixed."}]}}}
+{"timestamp":"2026-11-08T09:14:02.000Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"AgentMessage","content":[{"type":"Text","text":"Fixed."}],"phase":"final_answer"}}}
 {"timestamp":"2026-11-08T09:14:02.100Z","type":"event_msg","payload":{"type":"task_complete","completed_at":1794129242}}
 `
 
@@ -207,7 +207,8 @@ func TestSummaryReadsTheRollout(t *testing.T) {
 	assert.Equal(t, "gpt-6.1-sol", sum.Model)
 	assert.Equal(t, "low", sum.Effort)
 	assert.Equal(t, "fix the login", sum.LastPrompt, "superfile's context block is left out")
-	assert.Equal(t, time.Unix(1794129242, 0), sum.LastTurnEnd)
+	assert.Equal(t, "2026-11-08T09:14:02.1Z", sum.LastTurnEnd.UTC().Format(time.RFC3339Nano),
+		"the record's time: completed_at, in whole seconds, may fall before the turn's own prompt")
 	assert.Equal(t, []string{"/w/repo/login.go", "/w/repo/new.go"}, sum.EditedFiles)
 
 	// Appended lines are read on the next call, and only they.
@@ -237,6 +238,7 @@ func TestConversationMakesTurns(t *testing.T) {
 	require.Len(t, turns, 1)
 	assert.Equal(t, "fix the login", turns[0].Prompt)
 	assert.Equal(t, "Looking at it.\n\nFixed.", turns[0].Reply)
+	assert.Equal(t, "Fixed.", turns[0].Answer, "what it marked as its answer, apart from what it said as it worked")
 	assert.Equal(t, []string{"Ran(go test ./...)", "Edit(login.go)", "Edit(new.go)"}, turns[0].Tools)
 	assert.False(t, turns[0].RepliedAt.IsZero())
 }
@@ -347,6 +349,22 @@ func TestCollectListsLoadedAndRecentSessions(t *testing.T) {
 	assert.Equal(t, claudesession.StatusEnded, done.Status)
 	assert.Equal(t, "finished today", done.Title, "no name: its first prompt")
 	assert.Contains(t, srv.methods(), "thread/list")
+}
+
+func TestReadIsOneSessionNow(t *testing.T) {
+	rollout := writeRollout(t, testRollout)
+	home, _ := startFakeServer(t, map[string]any{
+		"thread/read": map[string]any{"thread": map[string]any{
+			"id": "t1", "cwd": "/w/repo", "createdAt": time.Now().Unix(),
+			"status": map[string]any{"type": "active", "activeFlags": []string{"waitingOnApproval"}},
+			"path":   rollout,
+		}},
+	})
+	s, err := Read(home, "t1", nil)
+	require.NoError(t, err)
+	assert.Equal(t, claudesession.StatusWaiting, s.Status)
+	assert.Equal(t, rollout, s.TranscriptPath)
+	assert.False(t, s.LastTurnEnd.IsZero(), "with what its rollout says")
 }
 
 func TestCollectWithoutAServer(t *testing.T) {

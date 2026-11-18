@@ -522,16 +522,21 @@ if marmota == "" then
 end
 
 -- session is the one questions go to: the one Marmota's Ask box wrote to
--- when it opened this editor, until you pick another (cmd+shift+L).
+-- when it opened this editor, until you pick another (cmd+shift+L). agent is
+-- who runs it, as `y session list` says: "cc" Claude Code, "co" Codex.
 local session = {
     id = os.Getenv("MARMOTA_SESSION"),
     title = os.Getenv("MARMOTA_SESSION_TITLE"),
     host = os.Getenv("MARMOTA_SESSION_HOST"),
+    agent = os.Getenv("MARMOTA_SESSION_AGENT"),
 }
 
 -- newSession stands for a session not started yet: the next question
--- starts one in this editor's folder, with the question as its first message.
+-- starts one in this editor's folder, with the question as its first
+-- message. agents are who can run it, and what each is called.
 local newSession = "new"
+local codex = "co"
+local agents = { { "cc", "Claude Code" }, { codex, "Codex" } }
 
 -- asked holds each question of this editor, oldest first: who was asked,
 -- the question, and the reply once there is one. Several can wait for their
@@ -654,12 +659,16 @@ local function remote()
 end
 
 -- mention names the file to a session, with the selected lines, as Claude
--- Code writes it: "@notes/plan.md#L12-30". It says whether lines are named.
+-- Code writes it: "@notes/plan.md#L12-30". Codex has no such form: it is
+-- told in words, "the file /notes/plan.md, lines 12-30". It says whether
+-- lines are named.
 local function mention(bp)
     local path = bp.Buf.AbsPath
     local from, to = selection(bp.Cursor)
     local out = "@" .. path
-    if path:find(" ") then
+    if session.agent == codex then
+        out = "the file " .. path
+    elseif path:find(" ") then
         out = '@"' .. path .. '"'
     end
     if from == nil then
@@ -668,6 +677,12 @@ local function mention(bp)
     local last = to.Y
     if to.X == 0 and to.Y > from.Y then
         last = to.Y - 1 -- the selection ends before this line's first character
+    end
+    if session.agent == codex then
+        if last > from.Y then
+            return out .. ", lines " .. (from.Y + 1) .. "-" .. (last + 1), true
+        end
+        return out .. ", line " .. (from.Y + 1), true
     end
     if last > from.Y then
         return out .. "#L" .. (from.Y + 1) .. "-" .. (last + 1), true
@@ -694,7 +709,11 @@ local function reference(bp)
     if remote() then
         return excerpt(bp)
     end
-    return (mention(bp))
+    local name = mention(bp)
+    if session.agent == codex then
+        return "This is about " .. name .. "."
+    end
+    return name
 end
 
 -- editRequest is what cmd+K adds to what you ask for: that the change is
@@ -789,7 +808,7 @@ local function onStarted(output, args)
     end
     entry.starting = false
     entry.session = id
-    if session.id == newSession then
+    if session.id == newSession and session.agent == entry.agent then
         -- the next questions go on with it
         session.id, session.title, session.host = id, entry.title, "here"
     end
@@ -807,15 +826,16 @@ local function send(bp, question, edit)
     if bp.Buf.Path ~= "" then
         message = question .. "\n\n" .. (edit and editRequest(bp) or reference(bp))
     end
-    local entry = { title = session.title, question = question, message = message, session = session.id }
+    local entry = { title = session.title, question = question, message = message, session = session.id,
+        agent = session.agent }
     if edit and bp.Buf.Path ~= "" and not remote() then
         entry.edits = bp.Buf.AbsPath
     end
     table.insert(asked, entry)
     if session.id == newSession then
         entry.starting = true
-        shell.JobSpawn(marmota, { "session", "start", "--cwd", folder(), "--", message }, nil, nil,
-            onStarted, #asked, bp)
+        shell.JobSpawn(marmota, { "session", "start", "--agent", session.agent, "--cwd", folder(), "--", message },
+            nil, nil, onStarted, #asked, bp)
     else
         shell.JobSpawn(marmota, { "session", "ask", session.id, message }, nil, nil, onReply, #asked, bp)
     end
@@ -844,11 +864,17 @@ end
 -- pickSession lists Marmota's sessions to pick the one questions go to,
 -- then goes on with after.
 local function pickSession(bp, after)
-    -- the sessions, and first a row for one not started yet
+    -- the sessions, and first a row for one not started yet, by each agent
     local dir = folder()
-    local row = newSession .. "  here  -  + New session in " .. filepath.Base(dir) .. "  " .. dir
-    local list = "{ " .. shellQuote(marmota) .. " session list 2>/dev/null || echo 'ID  HOST  STATUS  TITLE  FOLDER'; }"
-        .. " | awk -v row=" .. shellQuote(row) .. " 'NR==1{print; print row; next} {print}'"
+    local rows = {}
+    for _, agent in ipairs(agents) do
+        table.insert(rows, newSession .. "  " .. agent[1] .. "  here  -  + New " .. agent[2] .. " session in "
+            .. filepath.Base(dir) .. "  " .. dir)
+    end
+    local list = "{ " .. shellQuote(marmota)
+        .. " session list 2>/dev/null || echo 'ID  AGENT  HOST  STATUS  TITLE  FOLDER'; }"
+        -- "\n" as two characters: awk makes the line break of it
+        .. " | awk -v rows=" .. shellQuote(table.concat(rows, "\\n")) .. " 'NR==1{print; print rows; next} {print}'"
     -- the id stays out of sight: the title and the folder say which it is
     local fzf = "fzf --header-lines=1 --with-nth=2.. --layout=reverse --prompt='Ask which session? ' --no-multi"
     local cmd = "sh -c " .. shellQuote(list .. " | " .. fzf)
@@ -857,18 +883,21 @@ local function pickSession(bp, after)
         if line == "" then
             return
         end
-        -- ID  HOST  STATUS  TITLE  FOLDER, two spaces or more apart
+        -- ID  AGENT  HOST  STATUS  TITLE  FOLDER, two spaces or more apart
         local fields = {}
         for field in (line .. "  "):gmatch("(.-)%s%s+") do
             table.insert(fields, field)
         end
-        if #fields < 4 then
+        if #fields < 5 then
             micro.InfoBar():Error("Couldn't read the session picked: " .. line)
             return
         end
-        session.id, session.host, session.title = fields[1], fields[2], fields[4]
+        session.id, session.agent, session.host, session.title = fields[1], fields[2], fields[3], fields[5]
         if session.id == newSession then
             session.title = "new · " .. filepath.Base(folder())
+            if session.agent == codex then
+                session.title = "new Codex · " .. filepath.Base(folder())
+            end
         end
         micro.InfoBar():Message("Questions go to " .. session.title)
         if after ~= nil then

@@ -328,9 +328,13 @@ def main() -> int:
 
         # 5. another session, picked from the list
         m.press("cmd+shift+l")
-        wait_for("the list of sessions", lambda: "New session in project" in m.screen() and "idle" in m.screen())
+        wait_for("the list of sessions", lambda: "New Claude Code session in project" in m.screen()
+                 and "idle" in m.screen())
+        assert "New Codex session in project" in m.screen(), "a row to start each agent's session"
         assert first not in m.screen(), "the ids stay out of sight"
-        m.press("down", "down", "enter")  # the row of the second session
+        assert any(line.split()[:3] == ["cc", "here", "idle"] for line in m.screen().splitlines()), \
+            "each session's row says who runs it: " + m.screen()
+        m.press("down", "down", "down", "enter")  # the row of the second session, after the two that start one
         wait_for("the question's prompt", lambda: "Ask " in m.screen().splitlines()[-1])
         m.type("and you")
         m.press("enter")
@@ -342,8 +346,8 @@ def main() -> int:
 
         # 6. a session the question starts
         m.press("cmd+shift+l")
-        wait_for("the list of sessions", lambda: "New session in project" in m.screen())
-        m.press("enter")  # the first row
+        wait_for("the list of sessions", lambda: "New Claude Code session in project" in m.screen())
+        m.press("enter")  # the first row: a Claude Code session
         wait_for("the question's prompt", lambda: "Ask new · project ›" in m.screen())
         m.type("start with this")
         m.press("enter")

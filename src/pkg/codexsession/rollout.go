@@ -78,6 +78,9 @@ type rolloutItem struct {
 	} `json:"content"`
 	Command []string                 `json:"command"`
 	Changes map[string]rolloutChange `json:"changes"`
+	// Phase is "commentary" for what Codex says as it works, and
+	// "final_answer" for its answer.
+	Phase string `json:"phase"`
 }
 
 type rolloutChange struct {
@@ -139,9 +142,11 @@ func (s *Summary) apply(line []byte) {
 func (s *Summary) applyEvent(p rolloutPayload, ts time.Time) {
 	switch p.Type {
 	case "task_complete":
+		// completed_at is in whole seconds: the record's own time, a moment
+		// after it, says on which side of a prompt of that second it is.
 		end := ts
-		if p.CompletedAt > 0 {
-			end = time.Unix(p.CompletedAt, 0)
+		if at := time.Unix(p.CompletedAt, 0); p.CompletedAt > 0 && at.After(end) {
+			end = at
 		}
 		if end.After(s.LastTurnEnd) {
 			s.LastTurnEnd = end
@@ -390,6 +395,9 @@ func applyTurnLine(turns []claudesession.Turn, line []byte) []claudesession.Turn
 			}
 			t.Reply += text
 			t.RepliedAt = at
+			if it.Phase == "final_answer" {
+				t.Answer = text
+			}
 		}
 	case "CommandExecution":
 		if len(it.Command) > 0 {

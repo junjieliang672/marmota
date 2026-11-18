@@ -1,6 +1,6 @@
 ---
 name: marmota-sessions
-description: Start, list, write to and read Claude Code sessions on this computer or on another one (over ssh or a company CLI), through Marmota's `y session` command. Use when the user asks to open, start or run a session (or agent) on another machine or in a folder, to check what such sessions are doing, to send one a message, or to read its reply.
+description: Start, list, write to and read Claude Code sessions on this computer or on another one (over ssh or a company CLI), and Codex sessions on this computer, through Marmota's `y session` command. Use when the user asks to open, start or run a session (or agent) on another machine or in a folder, to check what such sessions are doing, to send one a message, or to read its reply.
 ---
 
 # Sessions through Marmota
@@ -13,9 +13,14 @@ can watch it, answer it and open it beside Marmota.
 ## Start a session
 
 ```
-y session start [--on "<how to reach the computer>"] [--cwd <folder>] \
+y session start [--agent cc|co] [--on "<how to reach the computer>"] [--cwd <folder>] \
     [--model <model>] [--effort <effort>] [--permission-mode <mode>] -- "<first message>"
 ```
+
+- `--agent co` starts a Codex session instead of a Claude Code one (`cc`, the
+  default). Codex sessions start on this computer only: no `--on`. Its effort
+  is medium unless you give one, and it runs in Codex's nearest to the
+  permission mode.
 
 - `--on` is the command that reaches the other computer, as the user would type
   it: `"ssh me@192.168.1.20"`, `"ssh -J jump.corp me@gpu-1"`, or a company CLI
@@ -51,9 +56,11 @@ doing, so run `--list` first and tell the user what will move.
 ## Follow it
 
 ```
-y session list [--json]          # every session, where it runs, and its status
+y session list [--json]          # every session, who runs it (cc Claude Code, co Codex),
+                                 # where it runs, and its status
 y session read <id> [--turns N]  # its last turns (default 3)
-y session send <id> "<message>"  # type a message into its prompt and send it
+y session send <id> "<message>"  # send it a message (typed into its prompt; Codex takes
+                                 # it through its own server)
 y session ask <id> "<message>"   # send it, wait for that turn to end, print the reply
                                  # (--sent: only wait, for the message it was started with;
                                  #  exit 3: it stopped to ask the user something;

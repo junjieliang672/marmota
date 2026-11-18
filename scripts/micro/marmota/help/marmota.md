@@ -94,7 +94,7 @@ Brackets are ( ) [ ] { }, counted as written: one inside a string counts too.
 | Key | Does |
 |-----|------|
 | cmd+L | Ask the session about this file and the lines you selected: type the question, enter. Its reply shows on the right when its turn has ended |
-| cmd+shift+L | Pick the session questions go to, then ask it. The first row starts a new one with your question |
+| cmd+shift+L | Pick the session questions go to, Claude Code's (cc) or Codex's (co), then ask it. The first two rows start a new one with your question: a Claude Code session, a Codex session |
 | cmd+K | Have the session change the selected lines, or with none the file, as you ask; cmd+Z takes the change back |
 | cmd+enter | Put the last reply at the cursor, or in place of what is selected |
 | cmd+J | Show the replies on the right, or put them away |
@@ -116,6 +116,10 @@ into it may give way to its change when that comes in: cmd+Z brings yours
 back. A session on another computer can't read or change the file: it is
 sent the selected text itself, and after cmd+K replies with the new text
 for cmd+enter to put in.
+
+A Codex session is asked through Codex's own server, and its reply is its
+answer, without what it said as it worked. A new one starts with full
+access, at medium effort, as Marmota's Ask box starts one.
 
 ## The command bar
 

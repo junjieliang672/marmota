@@ -3,7 +3,9 @@ package internal
 // `y session`: what a coding agent runs to start, list, write to and read
 // the sessions Marmota runs in tmux, here or on another computer. It works
 // without Marmota running, on the same tmux servers and remotes file, so
-// what it starts shows in Marmota's Sessions box as any session does.
+// what it starts shows in Marmota's Sessions box as any session does. The
+// sessions are Claude Code's, and on this computer Codex's too (see
+// session_codex.go).
 
 import (
 	"context"
@@ -19,23 +21,29 @@ import (
 
 	"github.com/junjieliang672/marmota/src/pkg/claudeask"
 	"github.com/junjieliang672/marmota/src/pkg/claudesession"
+	"github.com/junjieliang672/marmota/src/pkg/codexsession"
 	"github.com/junjieliang672/marmota/src/pkg/sessionhost"
 )
 
 // SessionStartOptions are what `y session start` takes.
 type SessionStartOptions struct {
+	// Agent is who runs it: "" or "cc" Claude Code, "co" Codex.
+	Agent string
 	// On is how to reach the computer, "ssh me@host"; "" for this one.
 	On     string
 	Cwd    string
 	Prompt string
 	// Model, Effort and Mode as Claude Code takes them; "" for its
 	// defaults, and for Mode bypassPermissions, as the Ask box starts one.
+	// Codex takes its own models, its nearest to each mode, and medium
+	// effort when none is given.
 	Model, Effort, Mode string
 }
 
 // StartedSession is a session `y session start` started.
 type StartedSession struct {
 	ID     string `json:"id"`
+	Agent  string `json:"agent"`
 	Host   string `json:"host"`
 	Cwd    string `json:"cwd"`
 	Window string `json:"window"`
@@ -44,7 +52,17 @@ type StartedSession struct {
 // SessionStart starts a Claude Code session in tmux, on this computer or on
 // the one On reaches, which Marmota remembers from then on. A session on
 // another computer runs with Remote Control, so the Claude app has it too.
+// With Agent "co" it starts a Codex session, on this computer.
 func SessionStart(o SessionStartOptions) (StartedSession, error) {
+	codex, err := isCodexAgent(o.Agent)
+	if err != nil {
+		return StartedSession{}, err
+	}
+	if codex {
+		started, err := sessionStartCodex(o)
+		started.Agent = AgentCodex
+		return started, err
+	}
 	host := ""
 	if strings.TrimSpace(o.On) != "" {
 		h, err := rememberRemoteHost(o.On)
@@ -74,7 +92,7 @@ func SessionStart(o SessionStartOptions) (StartedSession, error) {
 	if err != nil {
 		return StartedSession{}, err
 	}
-	return StartedSession{ID: id, Host: host, Cwd: cwd, Window: w.Name}, nil
+	return StartedSession{ID: id, Agent: AgentClaudeCode, Host: host, Cwd: cwd, Window: w.Name}, nil
 }
 
 // remoteFolder is where a session starts: here the current folder when none
@@ -104,7 +122,9 @@ func remoteFolder(cwd, host string) string {
 
 // ListedSession is one line of `y session list`.
 type ListedSession struct {
-	ID     string `json:"id"`
+	ID string `json:"id"`
+	// Agent is "cc" for Claude Code, "co" for Codex.
+	Agent  string `json:"agent"`
 	Host   string `json:"host"`
 	Status string `json:"status"`
 	Title  string `json:"title"`
@@ -114,8 +134,8 @@ type ListedSession struct {
 }
 
 // SessionList lists the sessions running in Marmota's tmux, here and on
-// every computer it remembers. Computers it can't reach come back as errors
-// beside what could be listed.
+// every computer it remembers: Claude Code's, then Codex's, which run here.
+// Computers it can't reach come back as errors beside what could be listed.
 func SessionList() ([]ListedSession, map[string]error) {
 	tracker := claudesession.NewTracker()
 	var out []ListedSession
@@ -124,10 +144,16 @@ func SessionList() ([]ListedSession, map[string]error) {
 		if s.Status == claudesession.StatusWaiting {
 			waiting = firstNonEmpty(s.PendingTool, s.WaitingFor)
 		}
-		out = append(out, ListedSession{ID: s.ID, Host: s.Host, Status: string(s.Status), Title: s.DisplayTitle(),
-			Cwd: s.Cwd, Waiting: waiting})
+		if waiting == "" && s.IsCodex() && s.Status == claudesession.StatusWaiting {
+			waiting = codexNeedsYou
+		}
+		out = append(out, ListedSession{ID: s.ID, Agent: agentOf(s), Host: s.Host, Status: string(s.Status),
+			Title: s.DisplayTitle(), Cwd: s.Cwd, Waiting: waiting})
 	}
 	for _, s := range localTmuxSessions(tracker) {
+		add(s)
+	}
+	for _, s := range localCodexSessions() {
 		add(s)
 	}
 	remote := listRemoteSessions(tracker, nil)
@@ -180,10 +206,13 @@ func localTmuxSessions(tracker *claudesession.Tracker) []claudesession.Session {
 	return out
 }
 
-// findTmuxSession finds a session's window, here or on a computer Marmota
-// remembers, by its id or the start of it.
+// minSessionIDPrefix is how much of a session's id names it.
+const minSessionIDPrefix = 4
+
+// findTmuxSession finds a Claude Code session's window, here or on a
+// computer Marmota remembers, by its id or the start of it.
 func findTmuxSession(id string) (host string, pane int, err error) {
-	if len(id) < 4 {
+	if len(id) < minSessionIDPrefix {
 		return "", 0, errors.New("give at least 4 characters of the session's id")
 	}
 	hosts := []string{""}
@@ -203,7 +232,10 @@ func findTmuxSession(id string) (host string, pane int, err error) {
 			continue
 		}
 		for _, w := range windows {
-			if _, wid, _ := sessionhost.SessionOf(w.Name); strings.HasPrefix(wid, id) {
+			// A Codex session's prompt isn't typed into: its server takes
+			// what is sent (see codexSessionByID).
+			if prefix, wid, _ := sessionhost.SessionOf(w.Name); prefix == sessionhost.ClaudePrefix &&
+				strings.HasPrefix(wid, id) {
 				return name, tmuxPaneOf(name, w).PaneID, nil
 			}
 		}
@@ -213,8 +245,12 @@ func findTmuxSession(id string) (host string, pane int, err error) {
 
 // SessionSend types text into a session's prompt and sends it, as the Ask
 // box does: what was typed there is set aside and put back. Claude Code
-// queues it while it is busy.
+// queues it while it is busy. A Codex session gets it through Codex's
+// server, which runs it after the turn under way.
 func SessionSend(id, text string) error {
+	if s, ok := codexSessionByID(id); ok {
+		return codexSend(codexHome(), s.ID, text, codexsession.TurnOptions{})
+	}
 	_, pane, err := findTmuxSession(id)
 	if err != nil {
 		return err
@@ -256,6 +292,17 @@ func sessionByID(id string) (host string, pane int, full string, transcript func
 
 // SessionRead writes the last turns of a session's conversation.
 func SessionRead(w io.Writer, id string, turns int) error {
+	if s, ok := codexSessionByID(id); ok {
+		if s.TranscriptPath == "" {
+			return errors.New("it has no conversation yet")
+		}
+		conv, err := codexsession.Conversation(s.TranscriptPath, turns)
+		if err != nil {
+			return err
+		}
+		writeTurns(w, conv, "codex")
+		return nil
+	}
 	_, _, _, transcript, err := sessionByID(id)
 	if err != nil {
 		return err
@@ -271,6 +318,13 @@ func SessionRead(w io.Writer, id string, turns int) error {
 	if err != nil {
 		return err
 	}
+	writeTurns(w, conv, "claude")
+	return nil
+}
+
+// writeTurns writes turns as `y session read` shows them, who being the
+// agent that replied.
+func writeTurns(w io.Writer, conv []claudesession.Turn, who string) {
 	for _, t := range conv {
 		if t.Prompt != "" {
 			fmt.Fprintf(w, "## you\n%s\n\n", strings.TrimSpace(t.Prompt))
@@ -282,10 +336,9 @@ func SessionRead(w io.Writer, id string, turns int) error {
 			fmt.Fprintln(w)
 		}
 		if t.Reply != "" {
-			fmt.Fprintf(w, "## claude\n%s\n\n", strings.TrimSpace(t.Reply))
+			fmt.Fprintf(w, "## %s\n%s\n\n", who, strings.TrimSpace(t.Reply))
 		}
 	}
-	return nil
 }
 
 // findLocalTranscript finds a session's transcript here by its id alone.
@@ -316,7 +369,7 @@ func WriteSessionList(w io.Writer, sessions []ListedSession, failed map[string]e
 		return enc.Encode(l)
 	}
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "ID\tHOST\tSTATUS\tTITLE\tFOLDER")
+	fmt.Fprintln(tw, "ID\tAGENT\tHOST\tSTATUS\tTITLE\tFOLDER")
 	for _, s := range sessions {
 		host := s.Host
 		if host == "" {
@@ -326,7 +379,7 @@ func WriteSessionList(w io.Writer, sessions []ListedSession, failed map[string]e
 		if s.Waiting != "" {
 			status += ": " + s.Waiting
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", s.ID, host, status, s.Title, s.Cwd)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", s.ID, s.Agent, host, status, s.Title, s.Cwd)
 	}
 	if err := tw.Flush(); err != nil {
 		return err

@@ -16,28 +16,32 @@ import (
 // and read the sessions Marmota runs in tmux, here or on another computer.
 func sessionCommand() *cli.Command {
 	return &cli.Command{
-		Name:  "session",
-		Usage: "Start, list, write to and read Claude Code sessions in Marmota's tmux, here or on another computer",
+		Name: "session",
+		Usage: "Start, list, write to and read Claude Code and Codex sessions in Marmota's tmux, here or (Claude " +
+			"Code's) on another computer",
 		Commands: []*cli.Command{
 			{
 				Name:      "start",
 				Usage:     "Start a session; it shows in Marmota's Sessions box",
 				ArgsUsage: "[-- PROMPT]",
 				Flags: []cli.Flag{
+					&cli.StringFlag{Name: "agent", Usage: "cc for Claude Code (default), co for Codex, which " +
+						"starts on this computer only"},
 					&cli.StringFlag{Name: "on", Usage: `how to reach the computer, such as "ssh me@host" or ` +
 						`"corp ssh gpu-1 --"; this computer when not given. Marmota remembers it`},
 					&cli.StringFlag{Name: "cwd", Usage: "the folder to work in, ~ for that computer's home " +
 						"(default: here, the current folder; there, home)"},
-					&cli.StringFlag{Name: "model", Usage: "Claude Code's --model"},
-					&cli.StringFlag{Name: "effort", Usage: "Claude Code's --effort"},
+					&cli.StringFlag{Name: "model", Usage: "the agent's --model"},
+					&cli.StringFlag{Name: "effort", Usage: "Claude Code's --effort; Codex's effort, medium when not given"},
 					&cli.StringFlag{Name: "permission-mode", Usage: "bypassPermissions (default), acceptEdits, auto, " +
-						"plan or default"},
+						"plan or default; Codex runs in its nearest to each"},
 					&cli.BoolFlag{Name: "json", Usage: "print the session as JSON"},
 				},
 				Action: func(_ context.Context, c *cli.Command) error {
 					started, err := internal.SessionStart(internal.SessionStartOptions{
-						On: c.String("on"), Cwd: c.String("cwd"), Prompt: strings.Join(c.Args().Slice(), " "),
-						Model: c.String("model"), Effort: c.String("effort"), Mode: c.String("permission-mode"),
+						Agent: c.String("agent"), On: c.String("on"), Cwd: c.String("cwd"),
+						Prompt: strings.Join(c.Args().Slice(), " "),
+						Model:  c.String("model"), Effort: c.String("effort"), Mode: c.String("permission-mode"),
 					})
 					if err != nil {
 						return cli.Exit("y session start: "+err.Error(), 1)
@@ -105,7 +109,7 @@ func sessionCommand() *cli.Command {
 			},
 			{
 				Name:      "send",
-				Usage:     "Type a message into a session's prompt and send it",
+				Usage:     "Send a session a message: typed into its prompt, or for Codex through its server",
 				ArgsUsage: "ID MESSAGE...",
 				Action: func(_ context.Context, c *cli.Command) error {
 					if c.Args().Len() < 2 {

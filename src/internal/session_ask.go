@@ -14,6 +14,7 @@ import (
 // `y session ask`: a message sent to a session, and the reply to it. It is
 // `y session send`, then a wait for the turn the message starts to end, read
 // off the session's transcript; what Claude wrote in that turn is the reply.
+// A Codex session is asked through Codex's server (see session_codex.go).
 // Marmota's plugin for micro asks sessions through it, and so can a coding
 // agent that wants another session's answer.
 
@@ -59,6 +60,9 @@ type askedState struct {
 // waited for. With patient, a session that stops to ask you something is
 // waited for all the same: you answer it, and its reply comes.
 func SessionAsk(id, text string, timeout time.Duration, sent, patient bool) (string, error) {
+	if s, ok := codexSessionByID(id); ok {
+		return sessionAskCodex(s, text, timeout, sent, patient)
+	}
 	host, pane, full, transcript, err := sessionByID(id)
 	if err != nil {
 		return "", err

@@ -119,20 +119,19 @@ func microQuote(path string) string {
 // editorEnv is what the editor is told of Marmota, for Marmota's plugin for
 // micro (scripts/micro/marmota): the y to ask sessions through, and the
 // session the Ask box writes to now, which is the one a question from the
-// editor goes to until another is picked there. A Codex session isn't one:
-// `y session` reaches Claude Code's.
+// editor goes to until another is picked there, Claude Code's or Codex's.
 func (m *model) editorEnv() []string {
 	env := []string{}
 	if exe, err := os.Executable(); err == nil {
 		env = append(env, "MARMOTA_BIN="+exe)
 	}
-	if s, ok := m.claude.snapshot.Find(m.dockAskTarget()); ok && s.Live && !s.IsCodex() && s.Unreachable == "" {
+	if s, ok := m.claude.snapshot.Find(m.dockAskTarget()); ok && s.Live && s.Unreachable == "" {
 		host := s.Host
 		if host == "" {
 			host = "here" // as `y session list` says it
 		}
 		env = append(env, "MARMOTA_SESSION="+s.ID, "MARMOTA_SESSION_TITLE="+s.DisplayTitle(),
-			"MARMOTA_SESSION_HOST="+host)
+			"MARMOTA_SESSION_HOST="+host, "MARMOTA_SESSION_AGENT="+agentOf(s))
 	}
 	return env
 }

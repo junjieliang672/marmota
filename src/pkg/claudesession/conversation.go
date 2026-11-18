@@ -21,6 +21,9 @@ type Turn struct {
 	// RepliedAt is when Claude last wrote text in the turn; zero until it
 	// has.
 	RepliedAt time.Time
+	// Answer is the part of Reply an agent marked as its answer, apart
+	// from what it said as it worked: Codex does, Claude Code doesn't.
+	Answer string
 }
 
 // conversationTail is how much of a transcript's end Conversation reads.

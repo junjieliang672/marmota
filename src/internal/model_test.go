@@ -95,6 +95,9 @@ func TestMain(m *testing.M) {
 	codexSend = func(string, string, string, codexsession.TurnOptions) error {
 		return errors.New("tests must not reach Codex")
 	}
+	codexRead = func(string, string, *codexsession.Tracker) (claudesession.Session, error) {
+		return claudesession.Session{}, errors.New("tests must not reach Codex")
+	}
 	codexRename = func(string, string, string) error { return errors.New("tests must not reach Codex") }
 	codexInterrupt = func(string, string) error { return errors.New("tests must not reach Codex") }
 	codexMove = func(string, string, string) error { return errors.New("tests must not reach Codex") }

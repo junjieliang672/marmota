@@ -125,6 +125,30 @@ func Collect(o Options) ([]claudesession.Session, error) {
 	return withRemoteControl(out, o), nil
 }
 
+// Read is one session as the server has it now: what it does, and its
+// rollout once it has one.
+func Read(home, id string, tracker *Tracker) (claudesession.Session, error) {
+	if home == "" {
+		home = Home()
+	}
+	if tracker == nil {
+		tracker = NewTracker()
+	}
+	c, cancel, err := connect(home, defaultTimeout)
+	if err != nil {
+		return claudesession.Session{}, err
+	}
+	defer cancel()
+	defer c.Close()
+	var read struct {
+		Thread thread `json:"thread"`
+	}
+	if err := c.Call("thread/read", map[string]any{"threadId": id}, &read); err != nil {
+		return claudesession.Session{}, err
+	}
+	return toSession(read.Thread, tracker), nil
+}
+
 // withRemoteControl marks every session when the server has Remote Control
 // on: it is the server's, not a session's, and the ChatGPT app then reaches
 // every session the server runs.
