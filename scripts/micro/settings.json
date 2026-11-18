@@ -13,5 +13,6 @@
     "saveundo": true,
     "scrollbar": true,
     "softwrap": true,
-    "wordwrap": true
+    "wordwrap": true,
+    "statusformatr": "$(marmota.status)cmd+/: keys"
 }

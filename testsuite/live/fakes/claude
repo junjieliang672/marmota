@@ -65,7 +65,8 @@ now=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
 	content=$(/usr/bin/python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$prompt")
 	printf '{"type":"user","message":{"role":"user","content":%s},"timestamp":"%s","cwd":"%s","sessionId":"%s"}\n' "$content" "$now" "$cwd" "$id"
 	printf '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Ready."}]},"timestamp":"%s"}\n' "$now"
-	printf '{"type":"system","subtype":"turn_duration","durationMs":5,"timestamp":"%s"}\n' "$now"
+	# the turn ends after it began, as a real one does
+	printf '{"type":"system","subtype":"turn_duration","durationMs":5,"timestamp":"%s"}\n' "${now%.000Z}.005Z"
 	[ -z "$remote" ] || printf '{"type":"bridge-session","sessionId":"%s","bridgeSessionId":"cse_test"}\n' "$id"
 } >>"$transcript"
 

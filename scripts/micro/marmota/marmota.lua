@@ -12,6 +12,8 @@ local util = import("micro/util")
 function init()
     -- "help marmota" (cmd+/): the keys Marmota sets up
     config.AddRuntimeFile("marmota", config.RTHelp, "help/marmota.md")
+    -- $(marmota.status) in the status line (statusformatr in settings.json)
+    import("micro").SetStatusInfoFn("marmota.status")
 end
 
 -- deleteToLineStart deletes from the cursor back to the start of the line,
@@ -159,10 +161,45 @@ local session = {
     host = os.Getenv("MARMOTA_SESSION_HOST"),
 }
 
+-- newSession stands for a session not started yet: the next question
+-- starts one in this editor's folder, with the question as its first message.
+local newSession = "new"
+
 -- asked holds each question of this editor, oldest first: who was asked,
--- the question, and the reply once there is one.
+-- the question, and the reply once there is one. Several can wait for their
+-- replies at once, each from its own session. arrived counts the replies, so
+-- the last one to come is known.
 local asked = {}
+local arrived = 0
 local repliesName = "Marmota replies"
+
+-- status is $(marmota.status) in the status line: whom questions go to, and
+-- how many replies are still awaited.
+function status(b)
+    local waiting = 0
+    for _, a in ipairs(asked) do
+        if a.reply == nil then
+            waiting = waiting + 1
+        end
+    end
+    local out = ""
+    if session.id ~= "" then
+        out = "→ " .. session.title .. "  "
+    end
+    if waiting > 0 then
+        out = out .. "✳ " .. waiting .. " asking  "
+    end
+    return out
+end
+
+-- folder is where this editor works: the folder Marmota opened it in.
+local function folder()
+    local dir, err = os.Getwd()
+    if err ~= nil then
+        return ""
+    end
+    return dir
+end
 
 local function shellQuote(s)
     return "'" .. s:gsub("'", "'\\''") .. "'"
@@ -188,7 +225,7 @@ local function repliesText()
         table.insert(out, "› " .. a.question .. "   — " .. a.title)
         if a.reply == nil then
             table.insert(out, "")
-            table.insert(out, "✳ asking…")
+            table.insert(out, a.starting and "✳ starting a session…" or "✳ asking…")
         else
             table.insert(out, "")
             table.insert(out, a.reply)
@@ -272,6 +309,30 @@ local function onReply(output, args)
         entry.done = true
         micro.InfoBar():Message(entry.title .. " replied: cmd+enter puts it at the cursor")
     end
+    arrived = arrived + 1
+    entry.arrived = arrived
+    showReplies(bp)
+end
+
+-- onStarted has the session a question started: the question is its first
+-- message, and its reply is waited for as any other.
+local function onStarted(output, args)
+    local entry, bp = asked[args[1]], args[2]
+    local id = output:match("started (%S+)")
+    if id == nil then
+        entry.reply = "⚠ " .. strings.TrimSpace(output)
+        arrived = arrived + 1
+        entry.arrived = arrived
+        micro.InfoBar():Error("Couldn't start a session: " .. strings.TrimSpace(output))
+        showReplies(bp)
+        return
+    end
+    entry.starting = false
+    if session.id == newSession then
+        -- the next questions go on with it
+        session.id, session.title, session.host = id, entry.title, "here"
+    end
+    shell.JobSpawn(marmota, { "session", "ask", "--sent", id, entry.message }, nil, nil, onReply, args[1], bp)
     showReplies(bp)
 end
 
@@ -283,9 +344,15 @@ local function send(bp, question)
     if bp.Buf.Path ~= "" then
         message = question .. "\n\n" .. reference(bp)
     end
-    local entry = { title = session.title, question = question }
+    local entry = { title = session.title, question = question, message = message }
     table.insert(asked, entry)
-    shell.JobSpawn(marmota, { "session", "ask", session.id, message }, nil, nil, onReply, #asked, bp)
+    if session.id == newSession then
+        entry.starting = true
+        shell.JobSpawn(marmota, { "session", "start", "--cwd", folder(), "--", message }, nil, nil,
+            onStarted, #asked, bp)
+    else
+        shell.JobSpawn(marmota, { "session", "ask", session.id, message }, nil, nil, onReply, #asked, bp)
+    end
     showReplies(bp)
     micro.InfoBar():Message("Asked " .. session.title .. "; go on writing")
 end
@@ -301,7 +368,11 @@ end
 -- pickSession lists Marmota's sessions to pick the one questions go to,
 -- then goes on with after.
 local function pickSession(bp, after)
-    local list = shellQuote(marmota) .. " session list 2>/dev/null"
+    -- the sessions, and first a row for one not started yet
+    local dir = folder()
+    local row = newSession .. "  here  -  + New session in " .. filepath.Base(dir) .. "  " .. dir
+    local list = "{ " .. shellQuote(marmota) .. " session list 2>/dev/null || echo 'ID  HOST  STATUS  TITLE  FOLDER'; }"
+        .. " | awk -v row=" .. shellQuote(row) .. " 'NR==1{print; print row; next} {print}'"
     -- the id stays out of sight: the title and the folder say which it is
     local fzf = "fzf --header-lines=1 --with-nth=2.. --layout=reverse --prompt='Ask which session? ' --no-multi"
     local cmd = "sh -c " .. shellQuote(list .. " | " .. fzf)
@@ -320,6 +391,9 @@ local function pickSession(bp, after)
             return
         end
         session.id, session.host, session.title = fields[1], fields[2], fields[4]
+        if session.id == newSession then
+            session.title = "new · " .. filepath.Base(folder())
+        end
         micro.InfoBar():Message("Questions go to " .. session.title)
         if after ~= nil then
             after(args[1])
@@ -349,11 +423,11 @@ end
 -- insertReply is cmd+enter: the last reply at the cursor, or in place of
 -- what is selected.
 function insertReply(bp)
-    local reply
-    for i = #asked, 1, -1 do
-        if asked[i].done then
-            reply = asked[i].reply
-            break
+    -- the reply that came last, whichever question it answers
+    local reply, last = nil, 0
+    for _, a in ipairs(asked) do
+        if a.done and a.arrived > last then
+            reply, last = a.reply, a.arrived
         end
     end
     if reply == nil then

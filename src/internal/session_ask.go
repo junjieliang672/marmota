@@ -54,8 +54,10 @@ type askedState struct {
 
 // SessionAsk sends text to a session and returns what Claude wrote in the
 // turn it started, once that turn has ended. A session that stops to ask
-// you something first returns a *NeedsYouError.
-func SessionAsk(id, text string, timeout time.Duration) (string, error) {
+// you something first returns a *NeedsYouError. With sent, the message is
+// already the session's: the one it was started with, say. It is only
+// waited for.
+func SessionAsk(id, text string, timeout time.Duration, sent bool) (string, error) {
 	host, pane, full, transcript, err := sessionByID(id)
 	if err != nil {
 		return "", err
@@ -73,6 +75,22 @@ func SessionAsk(id, text string, timeout time.Duration) (string, error) {
 		}
 		st.needsYou = sessionNeedsYou(host, full)
 		return st
+	}
+	if sent {
+		// One that hasn't started may ask something first, such as whether
+		// to trust its folder: Claude Code doesn't list it yet, its pane
+		// shows the question.
+		started := look
+		look = func() askedState {
+			st := started()
+			if len(st.turns) == 0 && st.needsYou == "" {
+				if screen, err := weztermGetText(pane); err == nil {
+					_, st.needsYou = startDialog(screen)
+				}
+			}
+			return st
+		}
+		return awaitAskedTurn(look, askKey(text), time.Time{}, timeout)
 	}
 	before := look()
 	if _, err := sendToClaudePrompt(pane, text); err != nil {

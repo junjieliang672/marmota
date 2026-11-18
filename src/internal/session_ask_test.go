@@ -113,3 +113,26 @@ func TestAskKeyIsTheStartWithoutSpaces(t *testing.T) {
 	_, ok := askedTurn([]claudesession.Turn{askTurn("", "x", time.Now())}, "", time.Time{})
 	assert.False(t, ok, "no message matches no turn")
 }
+
+// Two programs that type into the same prompt take turns: the second waits
+// for the first to be done.
+func TestOnePromptIsTypedIntoByOneProgramAtATime(t *testing.T) {
+	path := t.TempDir() + "/prompt.lock"
+	unlock := lockFile(path)
+	got := make(chan struct{})
+	go func() {
+		defer lockFile(path)()
+		close(got)
+	}()
+	select {
+	case <-got:
+		t.Fatal("the second got the lock while the first held it")
+	case <-time.After(50 * time.Millisecond):
+	}
+	unlock()
+	select {
+	case <-got:
+	case <-time.After(time.Second):
+		t.Fatal("the second never got the lock")
+	}
+}

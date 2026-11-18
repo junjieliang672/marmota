@@ -55,6 +55,8 @@ y session list [--json]          # every session, where it runs, and its status
 y session read <id> [--turns N]  # its last turns (default 3)
 y session send <id> "<message>"  # type a message into its prompt and send it
 y session ask <id> "<message>"   # send it, wait for that turn to end, print the reply
+                                 # (--sent: only wait, for the message it was started with;
+                                 #  exit 3: it stopped to ask the user something)
 ```
 
 The id can be shortened to its first 8 characters. A status of `waiting`

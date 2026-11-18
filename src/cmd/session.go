@@ -122,14 +122,18 @@ func sessionCommand() *cli.Command {
 				Usage: "Send a message to a session and print its reply, once the turn the message started has ended. " +
 					"Exits with 3 when the session stopped to ask you something instead",
 				ArgsUsage: "ID MESSAGE...",
-				Flags: []cli.Flag{&cli.DurationFlag{Name: "timeout", Value: internal.SessionAskTimeout,
-					Usage: "how long to wait for the reply"}},
+				Flags: []cli.Flag{
+					&cli.DurationFlag{Name: "timeout", Value: internal.SessionAskTimeout,
+						Usage: "how long to wait for the reply"},
+					&cli.BoolFlag{Name: "sent", Usage: "the message is already the session's, such as the one " +
+						"it was started with: only wait for its reply"},
+				},
 				Action: func(_ context.Context, c *cli.Command) error {
 					if c.Args().Len() < 2 {
 						return cli.Exit("y session ask: give the session's id and the message", 1)
 					}
 					reply, err := internal.SessionAsk(c.Args().First(), strings.Join(c.Args().Tail(), " "),
-						c.Duration("timeout"))
+						c.Duration("timeout"), c.Bool("sent"))
 					if needs, ok := internal.IsNeedsYou(err); ok {
 						if needs.Reply != "" {
 							fmt.Println(needs.Reply)

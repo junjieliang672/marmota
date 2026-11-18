@@ -3,13 +3,17 @@ package internal
 import (
 	"context"
 	"errors"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/junjieliang672/marmota/src/pkg/claudeprompt"
+	"github.com/junjieliang672/marmota/src/pkg/sessionhost"
 )
 
 // Typing into a running Claude Code session as if at its prompt. superfile
@@ -93,6 +97,9 @@ var claudePromptMu sync.Mutex //nolint:gochecknoglobals // guards the panes type
 func sendToClaudePrompt(paneID int, text string) (claudeprompt.Box, error) {
 	claudePromptMu.Lock()
 	defer claudePromptMu.Unlock()
+	// And one program at a time: Marmota and each `y session` type into
+	// the same panes.
+	defer lockClaudePrompt(paneID)()
 
 	before, err := readClaudePrompt(paneID)
 	switch {
@@ -253,4 +260,22 @@ func readClaudePrompt(paneID int) (claudeprompt.Box, error) {
 		return claudeprompt.Box{}, err
 	}
 	return claudeprompt.Read(screen), nil
+}
+
+// lockClaudePrompt keeps other programs from typing into a pane's prompt
+// until the function it returns is called: a lock on a file named after the
+// pane, which the system lets go if this program ends first. Without the
+// file there is no lock, and typing goes on as it did.
+func lockClaudePrompt(paneID int) func() {
+	key := "wezterm-" + strconv.Itoa(paneID)
+	if ref, ok := tmuxPanes.ref(paneID); ok && isTmuxPane(paneID) {
+		key = sessionhost.Socket + "-" + ref.host + "-" + ref.pane
+	}
+	key = strings.Map(func(r rune) rune {
+		if r == '-' || r == '.' || unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return r
+		}
+		return '_'
+	}, key)
+	return lockFile(filepath.Join(os.TempDir(), "marmota-prompt-"+key+".lock"))
 }
