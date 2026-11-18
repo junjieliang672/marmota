@@ -19,11 +19,11 @@ to it.
   one you pick. The Sessions box at the foot (`!`) lists the running ones; each row says `cc`
   (Claude Code) or `co` (Codex), how it stands (working, needs you, replied) and what it is doing.
   The preview above shows the selected session's conversation.
-- **Sessions on other computers.** A session started on another computer over ssh (or a company
-  CLI) runs in Marmota's tmux there and shows in the Sessions box with a cloud, named
-  `computer · title` until you rename it with `r`. You write to it, answer it and open it beside
-  Marmota as one on this computer. When the computer can't be reached, its sessions stay listed as
-  last seen, and `enter` on one logs in. See [Sessions on other computers](#sessions-on-other-computers).
+- **Sessions on other computers.** The Sessions box's Remote section lists your sessions on other
+  computers as the Claude app does (Remote Control ones), each with how it stands and what it waits
+  for; `enter` opens one in the Claude app, where you go on with it. Offline ones show greyed. A coding
+  agent can start one there with `y session start --on`. See
+  [Sessions on other computers](#sessions-on-other-computers).
 - **Ask box** (`K`): write to the selected session, or start a new one in the background in the
   folder you are in. `tab` picks Claude Code or Codex for a new session, `ctrl+o` and `ctrl+t` the
   model and effort. A new session starts as Claude Code, its default model, medium effort.
@@ -81,7 +81,7 @@ y
 
 | Key | What it does |
 | --- | --- |
-| `!` | Sessions box, on a session that needs you (again: the next one), else the first; `esc` goes back |
+| `!` | Sessions box, on a session that needs you or replied unread (again: the next one), else the first; `esc` goes back |
 | `]` · `[` | Sessions box, on the next · previous session (after `W`: the diff's next · previous change) |
 | `K` | Ask box: write to the selected session (or `n` in the Sessions box for a new one) |
 | `tab` · `ctrl+o` · `ctrl+t` · `shift+tab` | In the Ask box: Claude Code or Codex · model · effort · permission mode |
@@ -138,9 +138,11 @@ y session adopt --on "ssh me@192.168.1.20" <name>   # move it in; no name moves 
 Each one stops where it ran (its terminal goes back to its shell, or closes when it ran nothing else)
 and goes on with the same conversation, permission mode, model and Remote Control in Marmota's tmux.
 
-If a computer needs you to log in again, say when a sign-in expires, its sessions stay in the
-Sessions box, greyed, with "needs login": `enter` on one opens a pane beside Marmota where ssh (or the
-company CLI's login) asks what it asks, and Marmota reaches the computer again once you're done.
+The Sessions box lists them in its Remote section, from claude.ai, with the login Claude Code keeps
+(read from its credentials, never written): every 15 seconds while the dock shows, in the background.
+`enter` on one opens it in the Claude app (on claude.ai without the app). When claude.ai can't be
+reached the last list stays, greyed, with why; "login expired: run claude" means running `claude`
+once renews the login.
 
 ## Configuration
 

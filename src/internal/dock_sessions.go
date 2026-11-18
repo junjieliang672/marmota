@@ -65,19 +65,20 @@ func (m *model) sessionsShown() bool {
 	return m.focusPanel == dockSessionsFocus || m.focusPanel == dockAskFocus || m.viewerPinned()
 }
 
-// dockSessions is the sessions the box lists, in the list's order.
+// dockSessions is the sessions the box lists, in the list's order: this
+// computer's, then the Remote section's.
 func (m *model) dockSessions() []claudesession.Session {
 	groups, _ := m.sessionsGroups()
 	var out []claudesession.Session
 	for _, g := range groups {
 		out = append(out, g.Sessions...)
 	}
-	return out
+	return append(out, m.appSessions()...)
 }
 
-// dockPick is where ! lands: the first session below from that needs you,
-// round at the end, so ! again goes on to the next one; with from "" the
-// first that needs you. With none, the first session.
+// dockPick is where ! lands: the first session below from that needs you
+// or replied unread, round at the end, so ! again goes on to the next one;
+// with from "" the first of those. With none, the first session.
 func (m *model) dockPick(sessions []claudesession.Session, from string) string {
 	if len(sessions) == 0 {
 		return ""
@@ -85,7 +86,7 @@ func (m *model) dockPick(sessions []claudesession.Session, from string) string {
 	at := slices.IndexFunc(sessions, func(s claudesession.Session) bool { return s.ID == from }) // -1: the top
 	for i := 1; i <= len(sessions); i++ {
 		s := sessions[(at+i)%len(sessions)]
-		if m.sessionState(s) == sessionsui.NeedsYou {
+		if state := m.sessionState(s); state == sessionsui.NeedsYou || state == sessionsui.Unread {
 			return s.ID
 		}
 	}
@@ -197,6 +198,11 @@ func (m *model) dockSessionsKey(msg tea.KeyMsg) tea.Cmd {
 
 	if st := m.unlistedStart(list.SelectedID()); st != nil && m.startingSessionKey(st, key) {
 		return nil
+	}
+	if s, ok := m.appSessionByID(list.SelectedID()); ok {
+		if cmd, took := m.appKey(s, key); took {
+			return cmd
+		}
 	}
 	sessions := m.dockSessions()
 	at := slices.IndexFunc(sessions, func(s claudesession.Session) bool { return s.ID == list.SelectedID() })
@@ -340,6 +346,9 @@ func (m *model) dockSessionsRender() string {
 	if len(sessions) == 0 {
 		r.AddLines(dockDim(" No live sessions"), dockDim(" "+firstKey(common.Hotkeys.OpenAgentPrompt)+"claude or "+
 			firstKey(common.Hotkeys.OpenAgentPrompt)+"codex starts one"))
+		if m.app.err != nil {
+			r.AddLines(m.remoteSectionLines(inner)...)
+		}
 		return r.Render()
 	}
 	now := time.Now()
@@ -347,11 +356,17 @@ func (m *model) dockSessionsRender() string {
 	var lines []string
 	selLine := 0
 	for i, s := range sessions {
+		if s.App != nil && (i == 0 || sessions[i-1].App == nil) {
+			lines = append(lines, m.remoteSectionLines(inner)...)
+		}
 		selected := focused && s.ID == sel
 		if selected {
 			selLine = len(lines)
 		}
 		lines = append(lines, m.dockRow(i+1, s, selected, inner, now)...)
+	}
+	if m.app.err != nil && !slices.ContainsFunc(sessions, func(s claudesession.Session) bool { return s.App != nil }) {
+		lines = append(lines, m.remoteSectionLines(inner)...)
 	}
 	// Keep the selected session in view.
 	top := 0
@@ -360,6 +375,20 @@ func (m *model) dockSessionsRender() string {
 	}
 	r.AddLines(lines[top:min(len(lines), top+view)]...)
 	return r.Render()
+}
+
+// remoteSectionLines head the Remote section: its title across the box,
+// and why claude.ai can't be asked when it can't.
+func (m *model) remoteSectionLines(width int) []string {
+	base := lipgloss.NewStyle().Background(common.FilePanelBGColor).Foreground(common.FooterFGColor)
+	dim := base.Foreground(lipgloss.Color(common.Theme.FooterBorder))
+	title := " ── " + remoteSectionTitle + " "
+	lines := []string{dockFill(dim.Render(title+strings.Repeat("─", max(0, width-ansi.StringWidth(title)-1))),
+		width, base)}
+	if note := m.appSectionNote(); note != "" {
+		lines = append(lines, dockFill(dim.Render(ansi.Truncate("    "+note, width, "…")), width, base))
+	}
+	return lines
 }
 
 // claudeColor is the ✳ orange superfile uses for Claude.
@@ -389,7 +418,11 @@ func (m *model) dockRow(n int, s claudesession.Session, selected bool, width int
 	if s.RemoteControl {
 		age = common.RemoteControlMark(bg) + base.Render(" ") + age
 	}
-	if host := common.HostMark(s.Host, bg); host != "" {
+	host := s.Host
+	if s.App != nil {
+		host = remoteSectionTitle // another computer's
+	}
+	if host := common.HostMark(host, bg); host != "" {
 		age = host + base.Render(" ") + age
 	}
 
@@ -397,7 +430,7 @@ func (m *model) dockRow(n int, s claudesession.Session, selected bool, width int
 	if selected {
 		titleStyle = titleStyle.Bold(true)
 	}
-	if s.Unreachable != "" { // as last seen: its computer can't be reached
+	if s.App != nil && (s.App.Offline || m.app.err != nil) { // its computer is off, or as last listed
 		titleStyle = titleStyle.Foreground(lipgloss.Color(common.Theme.FooterBorder))
 	}
 	if state == sessionsui.NeedsYou {
@@ -427,13 +460,8 @@ func (m *model) dockRow(n int, s claudesession.Session, selected bool, width int
 
 // dockDoing is what a session is doing, in a few words.
 func (m *model) dockDoing(s claudesession.Session, state sessionsui.State) string {
-	switch {
-	case s.Unreachable == errLoggingIn.Error():
-		return "logging in to " + s.Host + "…"
-	case s.Unreachable != "" && s.NeedsLogin:
-		return "needs login · enter logs in"
-	case s.Unreachable != "":
-		return "can't reach " + s.Host + " · enter tries again"
+	if s.App != nil {
+		return s.App.Doing
 	}
 	switch state {
 	case sessionsui.NeedsYou:
@@ -490,6 +518,14 @@ func (m *model) dockStatusLine() string {
 		{Key: firstKey(common.Hotkeys.SessionStop), Description: "stop"},
 		{Key: firstKey(common.Hotkeys.GoTo), Description: "go to"},
 		{Key: firstKey(common.Hotkeys.OpenHelpMenu), Description: "help"},
+	}
+	if _, ok := m.appSessionByID(m.sessions.list.SelectedID()); ok {
+		keys = []statusline.Hotkey{
+			{Key: firstKey(common.Hotkeys.Confirm), Description: "open in the Claude app"},
+			{Key: "esc", Description: "files"},
+			{Key: firstKey(common.Hotkeys.GoTo), Description: "go to"},
+			{Key: firstKey(common.Hotkeys.OpenHelpMenu), Description: "help"},
+		}
 	}
 	switch {
 	case m.sessions.focus == sessionsFocusAnswer:

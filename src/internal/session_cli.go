@@ -172,7 +172,7 @@ func SessionList() ([]ListedSession, map[string]error) {
 	for _, s := range withoutTemporary(localCodexSessions()) {
 		add(s)
 	}
-	remote := listRemoteSessions(tracker, nil)
+	remote := listRemoteSessions(tracker)
 	for _, s := range remote.sessions {
 		add(s)
 	}

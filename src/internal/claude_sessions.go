@@ -138,19 +138,14 @@ type claudeSessionsSnapshotMsg struct {
 	starting []claudesession.Session
 }
 
-// claudeSessionsRefreshCmd lists sessions in the background: this
-// computer's, and each other computer's apart (see remoteSessionsRefreshCmd).
-// Only one refresh of this computer's runs at a time; the next one is
-// scheduled when its result arrives.
+// claudeSessionsRefreshCmd lists this computer's sessions in the
+// background. Only one refresh runs at a time; the next one is scheduled
+// when its result arrives.
 func (m *model) claudeSessionsRefreshCmd() tea.Cmd {
 	if !claudeSessionsAutoRefresh {
 		return nil
 	}
-	local := m.localSessionsRefreshCmd()
-	if remote := m.remoteSessionsRefreshCmd(); remote != nil {
-		return tea.Batch(local, remote)
-	}
-	return local
+	return m.localSessionsRefreshCmd()
 }
 
 func (m *model) localSessionsRefreshCmd() tea.Cmd {
@@ -243,7 +238,6 @@ func (m *model) applyClaudeSessionsSnapshot(msg claudeSessionsSnapshotMsg) tea.C
 		m.claude.panes = msg.panes
 	}
 	m.mergeCodexSessions(msg.codex)
-	m.mergeRemoteSessions(m.remoteListing())
 	for _, s := range withoutTemporary(msg.starting) {
 		if _, askStarted := m.ask.starts[s.ID]; !askStarted { // the Ask box shows its own
 			m.claude.snapshot.Live = append(m.claude.snapshot.Live, s)
@@ -456,9 +450,6 @@ func (m *model) openClaudeSession(id string) {
 // or a new pane resuming it, in bypass mode, when it has ended. With focus
 // the keyboard moves into it as well.
 func (m *model) jumpToClaudeSession(s claudesession.Session, focus bool) (string, error) {
-	if s.Unreachable != "" {
-		return m.reachHost(s)
-	}
 	if s.IsCodex() {
 		return m.jumpToCodexSession(s, focus)
 	}

@@ -41,16 +41,26 @@ const (
 
 // Session is one Claude Code session, live or past, or one of Codex's,
 // which package codexsession lists in the same form.
+// AppSession is what claude.ai says of a session on another computer.
+type AppSession struct {
+	// URL opens it in the Claude app (claude://claude.ai/code/session_…).
+	URL string
+	// Offline is set while its computer isn't connected.
+	Offline bool
+	// Unread is set when it has a reply you haven't looked at.
+	Unread bool
+	// Doing is what it waits for you to do, else where it works.
+	Doing string
+}
+
 type Session struct {
 	ID    string
 	Agent Agent
 	// Host is the computer it runs on, as Marmota names it; "" for this one.
 	Host string
-	// Unreachable says why its computer can't be reached now, when it
-	// can't: the session is as it was when last seen.
-	Unreachable string
-	// NeedsLogin is set when logging in to its computer would reach it.
-	NeedsLogin bool
+	// App is set for a session on another computer, listed from claude.ai:
+	// it is opened in the Claude app, not run from Marmota.
+	App *AppSession `json:",omitempty"`
 	// Named is set once it was given a name of its own (/rename).
 	Named bool
 	// Starting is set for one Claude Code doesn't list yet: Marmota knows

@@ -18,6 +18,7 @@ import (
 	"github.com/junjieliang672/marmota/src/internal/common"
 	"github.com/junjieliang672/marmota/src/internal/ui/processbar"
 	"github.com/junjieliang672/marmota/src/internal/utils"
+	"github.com/junjieliang672/marmota/src/pkg/claudecloud"
 	"github.com/junjieliang672/marmota/src/pkg/claudesession"
 	"github.com/junjieliang672/marmota/src/pkg/codexsession"
 )
@@ -76,11 +77,16 @@ func TestMain(m *testing.M) {
 	variable.AskHistoryFile = filepath.Join(testDir, "ask_history.json") //nolint:reassign // test isolation
 	//nolint:reassign // test isolation
 	variable.ClaudeSessionsOrderFile = filepath.Join(testDir, "claude_sessions_order.json")
-	variable.TmuxSinceFile = filepath.Join(testDir, "tmux_since")                //nolint:reassign // test isolation
-	variable.RemotesFile = filepath.Join(testDir, "remotes.json")                //nolint:reassign // test isolation
-	variable.RemoteSessionsFile = filepath.Join(testDir, "remote_sessions.json") //nolint:reassign // test isolation
+	variable.TmuxSinceFile = filepath.Join(testDir, "tmux_since") //nolint:reassign // test isolation
+	variable.RemotesFile = filepath.Join(testDir, "remotes.json") //nolint:reassign // test isolation
 	//nolint:reassign // test isolation
 	variable.TemporarySessionsFile = filepath.Join(testDir, "temporary_sessions.json")
+	// Nor ask claude.ai, or open the Claude app.
+	appSessionsAutoRefresh = false
+	listAppSessions = func(context.Context) ([]claudecloud.Session, error) {
+		return nil, errors.New("tests must not ask claude.ai")
+	}
+	openAppURL = func(string) error { return errors.New("tests must not open the Claude app") }
 	// Sessions start in WezTerm panes, unless a test starts them in a tmux
 	// of its own.
 	useTmuxSessions = func() bool { return false }

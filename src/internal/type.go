@@ -174,8 +174,8 @@ type model struct {
 	managedWeztermPaneID int
 	// tmux is this Marmota's side of the sessions it runs in tmux.
 	tmux tmuxState
-	// remote is this Marmota's side of the other computers' sessions.
-	remote remoteState
+	// app is the Sessions box's Remote section: claude.ai's sessions.
+	app appSessionsState
 	// editorPane is the WezTerm pane beside Marmota that the editor runs
 	// in (editor_beside), 0 when it has opened none.
 	editorPane int

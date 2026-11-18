@@ -30,8 +30,8 @@ func (m *model) visibleSessionID() string {
 func (m *model) sessionPlace(s claudesession.Session) string {
 	pane, ok := m.weztermPaneForSession(s)
 	switch {
-	case s.Unreachable != "":
-		return "can't reach " + s.Host
+	case s.App != nil:
+		return "in the Claude app"
 	case ok && m.isClaudeSessionVisible(s):
 		return "beside Marmota"
 	case ok && pane.Workspace == managedAgentHiddenWorkspace, ok && isTmuxPane(pane.PaneID):
@@ -248,8 +248,8 @@ func (m *model) renameClaudeSession(id, name string) tea.Cmd {
 	if name == s.DisplayTitle() {
 		return nil
 	}
-	if s.Unreachable != "" {
-		m.flashClaude("Can't reach " + s.Host + " to rename it: enter on its row reaches it")
+	if s.App != nil {
+		m.flashClaude(inTheClaudeApp)
 		return nil
 	}
 	if s.IsCodex() {
@@ -349,8 +349,8 @@ func (m *model) setClaudeSessionTitle(id, name string) {
 
 // confirmStopClaudeSession asks before stopping a running session.
 func (m *model) confirmStopClaudeSession(s claudesession.Session) {
-	if s.Unreachable != "" {
-		m.flashClaude("Can't reach " + s.Host + " to stop it: enter on its row reaches it")
+	if s.App != nil {
+		m.flashClaude(inTheClaudeApp)
 		return
 	}
 	if !s.Live {

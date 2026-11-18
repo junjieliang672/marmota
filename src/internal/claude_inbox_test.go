@@ -169,7 +169,7 @@ func TestInboxToastsEveryReplyYouHaventSeen(t *testing.T) {
 	require.True(t, m.claude.unread["hidden"])
 	view := ansi.Strip(m.View())
 	assert.Contains(t, view, "esc later")
-	assert.NotContains(t, view, "! open", "! goes only to a session that needs you, which this one doesn't")
+	assert.Contains(t, view, "! open", "! goes to a session that replied unread too")
 	m.claude.toast = nil
 
 	// Another reply while the first is still unread is news all the same.

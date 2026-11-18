@@ -1,11 +1,9 @@
 package internal
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -13,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	variable "github.com/junjieliang672/marmota/src/config"
 	"github.com/junjieliang672/marmota/src/pkg/claudesession"
 	"github.com/junjieliang672/marmota/src/pkg/sessionhost"
 )
@@ -267,56 +264,6 @@ func TestARestartedMarmotaTakesBackThePaneBesideIt(t *testing.T) {
 	assert.NotNil(t, wez.panes[33], "a pane of the tab that shows no view stays")
 }
 
-func TestAComputerThatCantBeReachedKeepsItsSessionsAsLastSeen(t *testing.T) {
-	m := newClaudeTestModel(t)
-	file, last := variable.RemotesFile, variable.RemoteSessionsFile
-	variable.RemotesFile = filepath.Join(t.TempDir(), "remotes.json")                //nolint:reassign // its own
-	variable.RemoteSessionsFile = filepath.Join(t.TempDir(), "remote_sessions.json") //nolint:reassign // its own
-	t.Cleanup(func() { variable.RemotesFile, variable.RemoteSessionsFile = file, last })
-	require.NoError(t, saveRemoteHosts([]sessionhost.Host{{Name: "nova", SSH: "me@nova"}}))
-
-	seen := claudesession.Session{ID: "r1", Host: "nova", Title: "Sweep", Live: true,
-		Status: claudesession.StatusIdle, TTY: remoteTTY("nova", "%1")}
-	m.mergeRemoteSessions(remoteListing{sessions: []claudesession.Session{seen}, failed: map[string]error{},
-		listed: map[string]bool{"nova": true}})
-	require.Len(t, m.claude.snapshot.Live, 1)
-
-	m.claude.snapshot.Live = nil // the next refresh
-	m.mergeRemoteSessions(remoteListing{failed: map[string]error{
-		"nova": &sessionhost.DialError{Output: "me@nova: Permission denied (publickey)."}}})
-	require.Len(t, m.claude.snapshot.Live, 1, "it stays, as last seen")
-	s := m.claude.snapshot.Live[0]
-	assert.Equal(t, "Sweep", s.Title)
-	assert.True(t, s.NeedsLogin)
-	assert.Contains(t, s.Unreachable, "Permission denied")
-	assert.Equal(t, "needs login · enter logs in", m.dockDoing(s, m.sessionState(s)))
-
-	m.dropSessionsOutsideMarmota()
-	assert.Len(t, m.claude.snapshot.Live, 1, "a session on another computer isn't taken for one outside Marmota")
-
-	_, err := m.sendAskTo(s, "hello")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "can't reach nova")
-
-	m.claude.snapshot.Live = nil
-	m.mergeRemoteSessions(remoteListing{failed: map[string]error{"nova": errors.New("network is unreachable")}})
-	assert.Equal(t, "can't reach nova · enter tries again", m.dockDoing(m.claude.snapshot.Live[0],
-		m.sessionState(m.claude.snapshot.Live[0])))
-
-	// Marmota starts again, and nova still can't be reached.
-	again := newClaudeTestModel(t)
-	again.mergeRemoteSessions(remoteListing{failed: map[string]error{
-		"nova": &sessionhost.DialError{Output: "Permission denied"}}})
-	require.Len(t, again.claude.snapshot.Live, 1, "its sessions as last seen came from the file")
-	assert.Equal(t, "Sweep", again.claude.snapshot.Live[0].Title)
-	assert.True(t, again.claude.snapshot.Live[0].NeedsLogin)
-
-	// nova is renamed in remotes.json: what was seen under its old name goes.
-	require.NoError(t, os.WriteFile(variable.RemotesFile, []byte(`[{"name":"nova-2","ssh":"me@nova"}]`), 0o600))
-	again.mergeRemoteSessions(remoteListing{})
-	assert.NotContains(t, loadLastRemoteSessions(), "nova")
-}
-
 func TestAFolderUnderThisHomeIsTheOtherComputersHome(t *testing.T) {
 	home, err := os.UserHomeDir()
 	require.NoError(t, err)
@@ -325,53 +272,4 @@ func TestAFolderUnderThisHomeIsTheOtherComputersHome(t *testing.T) {
 	assert.Equal(t, "~", remoteFolder("", "nova"))
 	assert.Equal(t, "/srv/app", remoteFolder("/srv/app", "nova"))
 	assert.Equal(t, home+"/proj", remoteFolder(home+"/proj", ""), "here a folder stays as it is")
-}
-
-// Each computer's sessions come in on their own: this computer's show
-// before another computer has answered, and a computer's listing takes the
-// place of its last one without waiting for the next of this computer's.
-func TestEachComputersSessionsComeInOnTheirOwn(t *testing.T) {
-	m := newClaudeTestModel(t)
-	file, last := variable.RemotesFile, variable.RemoteSessionsFile
-	variable.RemotesFile = filepath.Join(t.TempDir(), "remotes.json")                //nolint:reassign // its own
-	variable.RemoteSessionsFile = filepath.Join(t.TempDir(), "remote_sessions.json") //nolint:reassign // its own
-	t.Cleanup(func() { variable.RemotesFile, variable.RemoteSessionsFile = file, last })
-	require.NoError(t, saveRemoteHosts([]sessionhost.Host{{Name: "nova", SSH: "me@nova"},
-		{Name: "air", SSH: "me@air"}}))
-	ids := func() []string {
-		var out []string
-		for _, s := range m.claude.snapshot.Live {
-			out = append(out, s.ID)
-		}
-		return out
-	}
-	remote := func(host, id string) claudesession.Session {
-		return claudesession.Session{ID: id, Host: host, Title: id, Live: true, Status: claudesession.StatusIdle,
-			TTY: remoteTTY(host, "%1")}
-	}
-	here := claudesession.Snapshot{Live: []claudesession.Session{{ID: "here", Title: "here", Live: true}}}
-
-	// air answers before this computer's sessions are listed: it waits for them.
-	m.applyRemoteHostListed(remoteHostListedMsg{host: "air",
-		listing: hostListing{sessions: []claudesession.Session{remote("air", "a1")}}})
-	assert.Empty(t, ids())
-	m.applyClaudeSessionsSnapshot(claudeSessionsSnapshotMsg{snapshot: here, layoutGen: m.claude.layoutGen})
-	assert.ElementsMatch(t, []string{"here", "a1"}, ids(), "nova hasn't answered yet: the others show")
-
-	m.applyRemoteHostListed(remoteHostListedMsg{host: "nova",
-		listing: hostListing{sessions: []claudesession.Session{remote("nova", "n1")}}})
-	assert.ElementsMatch(t, []string{"here", "a1", "n1"}, ids(), "nova's show as soon as it answers")
-
-	m.applyRemoteHostListed(remoteHostListedMsg{host: "nova",
-		listing: hostListing{sessions: []claudesession.Session{remote("nova", "n2")}}})
-	assert.ElementsMatch(t, []string{"here", "a1", "n2"}, ids(), "its new listing takes the old one's place")
-
-	m.applyClaudeSessionsSnapshot(claudeSessionsSnapshotMsg{snapshot: here, layoutGen: m.claude.layoutGen})
-	assert.ElementsMatch(t, []string{"here", "a1", "n2"}, ids(), "this computer's next listing keeps theirs")
-
-	m.applyRemoteHostListed(remoteHostListedMsg{host: "nova", listing: hostListing{err: errors.New("timed out")}})
-	assert.ElementsMatch(t, []string{"here", "a1", "n2"}, ids())
-	s, ok := m.claude.snapshot.Find("n2")
-	require.True(t, ok)
-	assert.Contains(t, s.Unreachable, "timed out", "kept as last seen")
 }

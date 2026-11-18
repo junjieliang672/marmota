@@ -61,6 +61,8 @@ func (m *model) Init() tea.Cmd {
 		scheduleHeartbeat(),
 		m.macSampleCmd(),
 		m.claudeSessionsRefreshCmd(),
+		m.appSessionsRefreshCmd(),
+		scheduleAppSessionsTick(),
 		// Spec-006 T5: keep the recursive-search partial-result pump alive
 		// for the lifetime of the model. Each delivered partial msg is
 		// re-registered inside the Update handler so the pump stays active
@@ -237,15 +239,20 @@ func (m *model) handleOwnMsg(msg tea.Msg) (tea.Cmd, bool) {
 	case claudeSessionsSnapshotMsg:
 		return m.applyClaudeSessionsSnapshot(msg), true
 
-	case remoteHostListedMsg:
-		return m.applyRemoteHostListed(msg), true
-
 	case askDelegatedMsg:
 		m.applyAskDelegated(msg)
 		return nil, true
 
 	case diffDocMsg:
 		return m.applyDiffDoc(msg), true
+
+	case appSessionsTickMsg:
+		return m.applyAppSessionsTick(), true
+	case appSessionsMsg:
+		return m.applyAppSessions(msg), true
+	case appOpenedMsg:
+		m.applyAppOpened(msg)
+		return nil, true
 
 	case macTickMsg:
 		return m.applyMacTick(), true

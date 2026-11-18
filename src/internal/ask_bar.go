@@ -178,8 +178,8 @@ func (m *model) askSending() askui.Sending {
 	if s.IsCodex() {
 		return m.codexSending(s)
 	}
-	if s.Unreachable != "" {
-		return askui.Sending{Text: "can't reach " + s.Host + ": enter on its row reaches it", Fixed: true}
+	if s.App != nil {
+		return askui.Sending{Text: "on another computer: enter opens it in the Claude app", Fixed: true}
 	}
 	if _, inPane := m.weztermPaneForSession(s); !s.Live || !inPane {
 		return askui.Sending{Text: "can't reach it: it is no longer in a WezTerm pane", Fixed: true}
@@ -255,8 +255,8 @@ func (m *model) sendAsk() tea.Cmd {
 // sendAskTo types the question into a listed session.
 func (m *model) sendAskTo(s claudesession.Session, question string) (tea.Cmd, error) {
 	switch {
-	case s.Unreachable != "":
-		return nil, errors.New("can't reach " + s.Host + " (" + s.Unreachable + "): enter on its row reaches it")
+	case s.App != nil:
+		return nil, errors.New(s.DisplayTitle() + " is on another computer: enter opens it in the Claude app")
 	case !s.Live:
 		return nil, errors.New(s.DisplayTitle() + " has ended")
 	case s.Status == claudesession.StatusWaiting:
