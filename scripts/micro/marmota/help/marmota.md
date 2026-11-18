@@ -94,7 +94,7 @@ Brackets are ( ) [ ] { }, counted as written: one inside a string counts too.
 | Key | Does |
 |-----|------|
 | cmd+L | Ask the session about this file and the lines you selected: type the question, enter. Its reply shows on the right when its turn has ended |
-| cmd+shift+L | Pick the session questions go to, Claude Code's (cc) or Codex's (co), then ask it. The first two rows start a new one with your question: a Claude Code session, a Codex session |
+| cmd+shift+L | Pick the session questions go to, then ask it. Claude Code's rows start with ✳ in orange, Codex's with ◆ in teal; each says what the session does (working, idle, needs you), its title and its folder. The first two rows start a new one with your question: a Claude Code session, a Codex session |
 | cmd+K | Have the session change the selected lines, or with none the file, as you ask; cmd+Z takes the change back |
 | cmd+enter | Put the last reply at the cursor, or in place of what is selected |
 | cmd+J | Show the replies on the right, or put them away |
@@ -108,7 +108,8 @@ them itself.
 
 You needn't wait for a reply before you ask again, the same session or
 another: each question waits for its own reply, and the replies show under
-their questions as they come. The status line says whom questions go to and
+their questions as they come. What you asked is highlighted, under a line
+that says whom; the reply starts under the session's name. The status line says whom questions go to and
 how many replies are still awaited: "→ fix login  ✳ 2 asking". A session that
 stops to ask you something (a permission, or whether to trust its folder)
 says so in place of its reply: answer it from Marmota's Sessions box, or open

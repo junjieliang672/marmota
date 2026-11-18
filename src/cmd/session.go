@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -106,10 +107,40 @@ func sessionCommand() *cli.Command {
 			{
 				Name:  "list",
 				Usage: "List the sessions in Marmota's tmux and what each is doing",
-				Flags: []cli.Flag{&cli.BoolFlag{Name: "json", Usage: "print JSON"}},
+				Flags: []cli.Flag{
+					&cli.BoolFlag{Name: "json", Usage: "print JSON"},
+					&cli.BoolFlag{Name: "rows", Usage: "print rows for a picker such as fzf (--ansi, tab-delimited): " +
+						"the id, agent, host and title, then the row to show, in color"},
+					&cli.StringFlag{Name: "new-in", Usage: "with --rows: first a row for each agent that stands " +
+						"for a session not started yet, to start in this folder"},
+				},
 				Action: func(_ context.Context, c *cli.Command) error {
 					sessions, failed := internal.SessionList()
+					if c.Bool("rows") {
+						return internal.WriteSessionRows(os.Stdout, sessions, c.String("new-in"))
+					}
 					return internal.WriteSessionList(os.Stdout, sessions, failed, c.Bool("json"))
+				},
+			},
+			{
+				Name: "pick",
+				Usage: "Pick a session in fzf, each row in its agent's color, and print the row picked: the id, " +
+					"agent, host and title, tab-separated. Exits with 1 when none is picked",
+				Flags: []cli.Flag{
+					&cli.StringFlag{Name: "new-in", Usage: "first a row for each agent that stands for a session " +
+						"not started yet, to start in this folder: its id is new"},
+					&cli.StringFlag{Name: "prompt", Value: "Which session? ", Usage: "what the picker asks"},
+				},
+				Action: func(_ context.Context, c *cli.Command) error {
+					row, err := internal.SessionPick(c.String("new-in"), c.String("prompt"))
+					if errors.Is(err, internal.ErrNothingPicked) {
+						return cli.Exit("", 1)
+					}
+					if err != nil {
+						return cli.Exit("y session pick: "+err.Error(), 1)
+					}
+					fmt.Println(row)
+					return nil
 				},
 			},
 			{

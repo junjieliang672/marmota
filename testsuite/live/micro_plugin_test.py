@@ -112,12 +112,16 @@ class Micro:
         """What the replies' pane shows."""
         return "\n".join(line.split("|", 1)[1] for line in self.screen().splitlines() if "|" in line)
 
-    def drawn(self, line_with: str, word: str) -> str:
-        """The color word is drawn in, on the screen's line that has line_with: the escape sequence that
-        sets it, just before the word."""
+    def drawn(self, line_with: str, word: str, what: str = "") -> str:
+        """How word is drawn on the screen's line that has line_with: the escape sequence just before the
+        word, which sets its color; with what "48", the background set last before it."""
         for line in self.tmux("capture-pane", "-p", "-e", "-t", "t").splitlines():
             if line_with in re.sub(r"\x1b\[[0-9;]*m", "", line):
-                found = re.findall(r"\x1b\[(38;[0-9;]*)m" + re.escape(word), line)
+                if what:
+                    before = line.split(word, 1)[0]
+                    found = re.findall(r"\x1b\[(" + what + r";[0-9;]*)m", before)
+                else:
+                    found = re.findall(r"\x1b\[([0-9;]*)m" + re.escape(word), line)
                 return found[-1] if found else ""
         return ""
 
@@ -325,14 +329,17 @@ def main() -> int:
         m.press("cmd+down")
         m.type("typed while it works ")
         wait_for("the reply on the right", lambda: "Echo: make these shorter" in m.right())
-        assert "You → first" in m.right() and "┃ make these shorter" in m.right(), m.right()
+        assert "You → first" in m.right() and "make these shorter" in m.right(), m.right()
         assert "⏺ first" in m.right(), "the reply starts under the session's name: " + m.right()
-        asked, replied = m.drawn("┃ make these", "shorter"), m.drawn("Echo: make these", "shorter")
+        asked, replied = m.drawn("\u00a0make these", "shorter"), m.drawn("Echo: make these", "shorter")
         assert asked and replied and asked != replied, \
             f"what you asked is drawn in another color than the reply: {asked!r} and {replied!r}"
-        bar, name = m.drawn("You → first", "You"), m.drawn("⏺ first", "first")
-        assert bar and name and len({asked, replied, bar, name}) == 4, \
-            f"and so are the bar that says whom you asked and the name the reply starts under: {bar!r}, {name!r}"
+        lit, plain = m.drawn("\u00a0make these", "shorter", "48"), m.drawn("Echo: make these", "shorter", "48")
+        assert lit and plain and lit != plain, \
+            f"and on a background of its own, highlighted: {lit!r} and the reply's {plain!r}"
+        whom, name = m.drawn("You → first", "You"), m.drawn("⏺ first", "first")
+        assert whom and name and len({asked, replied, whom, name}) == 4, \
+            f"and so are the line that says whom you asked and the name the reply starts under: {whom!r}, {name!r}"
         wait_for("the question in the session", lambda: f"@{plan}#L3-4" in sent_to(socket, first))
         assert any("typed while it works" in line for line in m.left()), "typing went on meanwhile"
         m.press("cmd+enter")
@@ -350,12 +357,17 @@ def main() -> int:
 
         # 5. another session, picked from the list
         m.press("cmd+shift+l")
-        wait_for("the list of sessions", lambda: "New Claude Code session in project" in m.screen()
+        wait_for("the list of sessions", lambda: m.screen().count("+ New session in project") == 2
                  and "idle" in m.screen())
-        assert "New Codex session in project" in m.screen(), "a row to start each agent's session"
+        rows = [line for line in m.screen().splitlines() if "+ New session in project" in line]
+        assert "Claude Code" in rows[0] and "Codex" in rows[1], "a row to start each agent's session: " + m.screen()
         assert first not in m.screen(), "the ids stay out of sight"
-        assert any(line.split()[:3] == ["cc", "here", "idle"] for line in m.screen().splitlines()), \
-            "each session's row says who runs it: " + m.screen()
+        assert sum("Claude Code" in line and "○ idle" in line and "project" in line
+                   for line in m.screen().splitlines()) == 2, \
+            "each session's row says who runs it, what it does and where: " + m.screen()
+        claude, codex_color = m.drawn("✳ Claude Code  + New", "✳ Claude"), m.drawn("◆ Codex", "◆ Codex")
+        assert claude and codex_color and claude != codex_color, \
+            f"Claude Code's rows and Codex's are in a color each: {claude!r} and {codex_color!r}"
         m.press("down", "down", "down", "enter")  # the row of the second session, after the two that start one
         wait_for("the question's prompt", lambda: "Ask " in m.screen().splitlines()[-1])
         m.type("and you")
@@ -368,7 +380,7 @@ def main() -> int:
 
         # 6. a session the question starts
         m.press("cmd+shift+l")
-        wait_for("the list of sessions", lambda: "New Claude Code session in project" in m.screen())
+        wait_for("the list of sessions", lambda: m.screen().count("+ New session in project") == 2)
         m.press("enter")  # the first row: a Claude Code session
         wait_for("the question's prompt", lambda: "Ask new · project ›" in m.screen())
         m.type("start with this")

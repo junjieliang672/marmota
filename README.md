@@ -119,6 +119,7 @@ y session list                       # every session, here and there, who runs i
 y session send <id> "and add a test" # type into its prompt and send it
 y session read <id> --turns 3        # its last turns
 y session show <id>                  # its own window, in a pane under this one, to watch or answer it
+y session pick                       # pick one in fzf, Claude Code's and Codex's each in its color
 ```
 
 `--on` is how you would reach the computer from a terminal: `"ssh me@host"`, `"ssh -J jump me@host"`,

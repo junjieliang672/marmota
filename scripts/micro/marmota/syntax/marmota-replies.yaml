@@ -7,9 +7,10 @@ detect:
 
 rules:
     - include: "markdown"
-    # what you asked: a bar that says whom, then the question beside a rule
-    - statusline: "^ You → .* $"
-    - identifier: "^┃.*$"
+    # what you asked: a line that says whom, then the question, highlighted
+    # (its line starts with a no-break space)
+    - identifier: "^You → .*$"
+    - statusline: "^\\x{00A0}.*$"
     # the session's reply starts under its name
     - special: "^⏺ .*$"
     # between two questions

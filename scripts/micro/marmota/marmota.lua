@@ -535,10 +535,9 @@ local session = {
 
 -- newSession stands for a session not started yet: the next question
 -- starts one in this editor's folder, with the question as its first
--- message. agents are who can run it, and what each is called.
+-- message, run by the agent of the row picked: "cc" or "co".
 local newSession = "new"
 local codex = "co"
-local agents = { { "cc", "Claude Code" }, { codex, "Codex" } }
 
 -- asked holds each question of this editor, oldest first: who was asked,
 -- the question, and the reply once there is one. Several can wait for their
@@ -611,10 +610,13 @@ function keys(bp)
     return true
 end
 
--- Each question is a bar that says whom you asked, then the question
--- beside a rule down its left; the reply starts under the session's name;
--- a line parts one question from the next. syntax/marmota-replies.yaml
--- colors them by how these lines start.
+-- Each question is a line that says whom you asked, then the question,
+-- highlighted; the reply starts under the session's name; a line parts one
+-- question from the next. syntax/marmota-replies.yaml colors them by how
+-- these lines start: a question's by a no-break space, which shows as a
+-- space.
+local highlighted = "\194\160"
+
 local function repliesText()
     local out = {}
     for i, a in ipairs(asked) do
@@ -622,9 +624,9 @@ local function repliesText()
             table.insert(out, string.rep("─", 36))
             table.insert(out, "")
         end
-        table.insert(out, " You → " .. a.title .. " ")
+        table.insert(out, "You → " .. a.title)
         for line in (a.question .. "\n"):gmatch("(.-)\n") do
-            table.insert(out, "┃ " .. line)
+            table.insert(out, highlighted .. line .. " ")
         end
         table.insert(out, "")
         if a.reply ~= nil then
@@ -878,35 +880,32 @@ end
 -- pickSession lists Marmota's sessions to pick the one questions go to,
 -- then goes on with after.
 local function pickSession(bp, after)
-    -- the sessions, and first a row for one not started yet, by each agent
-    local dir = folder()
-    local rows = {}
-    for _, agent in ipairs(agents) do
-        table.insert(rows, newSession .. "  " .. agent[1] .. "  here  -  + New " .. agent[2] .. " session in "
-            .. filepath.Base(dir) .. "  " .. dir)
-    end
-    local list = "{ " .. shellQuote(marmota)
-        .. " session list 2>/dev/null || echo 'ID  AGENT  HOST  STATUS  TITLE  FOLDER'; }"
-        -- "\n" as two characters: awk makes the line break of it
-        .. " | awk -v rows=" .. shellQuote(table.concat(rows, "\\n")) .. " 'NR==1{print; print rows; next} {print}'"
-    -- the id stays out of sight: the title and the folder say which it is
-    local fzf = "fzf --header-lines=1 --with-nth=2.. --layout=reverse --prompt='Ask which session? ' --no-multi"
-    local cmd = "sh -c " .. shellQuote(list .. " | " .. fzf)
+    -- y shows the sessions in fzf, Claude Code's and Codex's each in its
+    -- color, and first a row for one not started yet, by each agent. It
+    -- runs fzf itself, since what fzf draws by itself shows without its
+    -- colors in micro's terminal pane, and prints the row picked: the id,
+    -- the agent, the host and the title.
+    local cmd = shellQuote(marmota) .. " session pick --prompt " .. shellQuote("Ask which session? ")
+        .. " --new-in " .. shellQuote(folder())
     local err = shell.RunTermEmulator(bp, cmd, false, true, function(output, args)
-        local line = strings.TrimSpace(output)
+        local line = output:gsub("^%s+", ""):gsub("[\r\n]+$", "")
         if line == "" then
             return
         end
-        -- ID  AGENT  HOST  STATUS  TITLE  FOLDER, two spaces or more apart
+        local failed = line:match("y session pick: (.*)$")
+        if failed ~= nil then
+            micro.InfoBar():Error(failed)
+            return
+        end
         local fields = {}
-        for field in (line .. "  "):gmatch("(.-)%s%s+") do
+        for field in (line .. "\t"):gmatch("(.-)\t") do
             table.insert(fields, field)
         end
-        if #fields < 5 then
+        if #fields < 4 then
             micro.InfoBar():Error("Couldn't read the session picked: " .. line)
             return
         end
-        session.id, session.agent, session.host, session.title = fields[1], fields[2], fields[3], fields[5]
+        session.id, session.agent, session.host, session.title = fields[1], fields[2], fields[3], fields[4]
         if session.id == newSession then
             session.title = "new · " .. filepath.Base(folder())
             if session.agent == codex then
