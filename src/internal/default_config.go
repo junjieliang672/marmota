@@ -570,6 +570,11 @@ func getHelpMenuData() []helpMenuModalData {
 			hotkeyWorkType: normalType,
 		},
 		{
+			hotkey:         common.Hotkeys.BackToEditor,
+			description:    "Back to the editor you put away (cmd+M in micro puts it away, its files as they are)",
+			hotkeyWorkType: normalType,
+		},
+		{
 			hotkey:         common.Hotkeys.OpenCurrentDirectoryWithEditor,
 			description:    "Open current directory with default editor (Finder highlights the selected items)",
 			hotkeyWorkType: normalType,

@@ -926,6 +926,9 @@ do
     { 'Enter', 'CMD', '\x1b\r' }, -- put the last reply at the cursor
     { 'j', 'CMD', '\x1bj' }, -- show the replies, or put them away
     { 'o', 'CMD', '\x1bOQ' }, -- open the session under the editor, to answer what it asks (F2)
+    -- put micro away, as it is, and go back to Marmota, where b brings it
+    -- back (F3); elsewhere cmd+M hides WezTerm's window, as it did
+    { 'm', 'CMD', '\x1bOR', wezterm.action.Hide },
     -- back to where the cursor was, and forward again; elsewhere these are
     -- WezTerm's own keys for a smaller font, which they stay
     { '-', 'CTRL', '\x1bh', wezterm.action.DecreaseFontSize },

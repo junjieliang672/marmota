@@ -169,6 +169,11 @@ type model struct {
 	// sudo password prompt). While it does, superfile has no business telling
 	// the input method what mode to be in.
 	externalProcessRunning bool
+	// editorAway is the editor that was put away, nil with none
+	// (editor_away.go). quitAfterEditor is set while it is continued to end
+	// for q, to whether Marmota then leaves its folder to the shell.
+	editorAway      *awayEditor
+	quitAfterEditor *bool
 
 	managedWeztermState  weztermPaneLayoutState
 	managedWeztermPaneID int

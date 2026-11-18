@@ -138,6 +138,9 @@ func (m *model) mainKey(msg string) tea.Cmd { //nolint:gocyclo,cyclop,funlen,mai
 	case slices.Contains(common.Hotkeys.OpenFileWithSecondEditor, msg):
 		return m.openFileWithSecondEditor()
 
+	case slices.Contains(common.Hotkeys.BackToEditor, msg):
+		return m.backToEditor()
+
 	case slices.Contains(common.Hotkeys.OpenCurrentDirectoryWithEditor, msg):
 		return m.openDirectoryWithEditor()
 

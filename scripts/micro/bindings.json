@@ -19,6 +19,7 @@
     "Alt-/": "lua:comment.comment",
     "F1": "lua:marmota.keys",
     "F2": "lua:marmota.openSession",
+    "F3": "lua:marmota.putAway",
     "Alt-l": "lua:marmota.ask",
     "Alt-L": "lua:marmota.askAnother",
     "Alt-Enter": "lua:marmota.insertReply",

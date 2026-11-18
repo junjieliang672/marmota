@@ -1025,3 +1025,74 @@ function toggleReplies(bp)
     end
     return true
 end
+
+-- holds counts the files micro holds and those of them that aren't saved, a
+-- file shown in two panes once. The replies' pane and the page of keys are
+-- no files.
+local function holds()
+    local seen, files, unsaved = {}, 0, 0
+    local tabs = micro.Tabs().List
+    for i = 1, #tabs do
+        local panes = tabs[i].Panes
+        for j = 1, #panes do
+            local b = panes[j].Buf
+            if b ~= nil and b.Type.Kind == buffer.BTDefault and not b.Type.Scratch then
+                local key = b.AbsPath
+                if key == "" then
+                    key = i .. ":" .. j -- not yet a file: each pane's own
+                end
+                if not seen[key] then
+                    seen[key] = true
+                    files = files + 1
+                    if b:Modified() then
+                        unsaved = unsaved + 1
+                    end
+                end
+            end
+        end
+    end
+    return files, unsaved
+end
+
+-- putAway is cmd+M: micro stops, with its files, tabs, undo history and the
+-- replies as they are, and Marmota, whose e opened it, takes the terminal
+-- back. b in Marmota continues it, and it goes on from here. Before it
+-- stops it writes what it holds for Marmota, in the file Marmota named; when
+-- it continues it reads what Marmota wants of it beside that file: "quit"
+-- when Marmota quits, or "say" and a line to show.
+--
+-- Only an editor Marmota's e opened is put away. Any other program that
+-- opened micro waits for it to end, and would wait for good.
+function putAway(bp)
+    local state = os.Getenv("MARMOTA_EDITOR_STATE")
+    if state == "" then
+        if os.Getenv("MARMOTA_EDITOR_AWAY") ~= "" then
+            micro.InfoBar():Message("An editor is put away already: close this one, then b in Marmota brings that one back")
+        else
+            micro.InfoBar():Message("Nothing to go back to here: cmd+M puts micro away where e in Marmota opened it")
+        end
+        return true
+    end
+    local files, unsaved = holds()
+    local f = io.open(state, "w")
+    if f ~= nil then
+        f:write(files .. " " .. unsaved .. "\n")
+        f:close()
+    end
+
+    bp:Suspend() -- comes back when Marmota continues micro
+
+    local order = ""
+    f = io.open(state .. ".do", "r")
+    if f ~= nil then
+        order = f:read("*l") or ""
+        f:close()
+        os.Remove(state .. ".do")
+    end
+    if order == "quit" then
+        bp:QuitAll()
+    elseif order:sub(1, 4) == "say " then
+        micro.InfoBar():Message(order:sub(5))
+    end
+    return true
+end

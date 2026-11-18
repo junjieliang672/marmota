@@ -168,6 +168,10 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case editorFinishedMsg:
 		updateCmd = m.applyEditorFinished(msg)
+	case editorAwayMsg:
+		updateCmd = m.applyEditorAway(msg)
+	case editorJobEndedMsg:
+		updateCmd = m.applyEditorJobEnded(msg)
 	case askDraftEditedMsg:
 		updateCmd = m.applyAskDraftEdited(msg)
 
@@ -857,6 +861,11 @@ func (m *model) regularKey(msg tea.KeyMsg) tea.Cmd {
 // quitIfAsked quits superfile when a quit key was pressed: it asks first
 // while processes still run, else quits at once.
 func (m *model) quitIfAsked(cmd tea.Cmd, cdOnQuit bool) tea.Cmd {
+	if m.modelQuitState == quitInitiated && m.editorAway != nil {
+		// Not with an editor put away: it ends first, or comes back.
+		m.modelQuitState = notQuitting
+		return tea.Batch(cmd, m.quitWithEditorAway(cdOnQuit))
+	}
 	if m.modelQuitState == quitInitiated {
 		if m.processBarModel.HasRunningProcesses() {
 			// Dont quit now, get a confirmation first.

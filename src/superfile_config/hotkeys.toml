@@ -70,6 +70,7 @@ diff_previous_change = ['[', '']
 pin_viewer = ['V', '']
 open_file_with_editor = ['e', '']
 open_file_with_second_editor = ['E', '']
+back_to_editor = ['b', '']
 
 #-- Other Actions
 change_panel_mode = ['ctrl+shift+m', '']

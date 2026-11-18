@@ -977,7 +977,9 @@ func editorCommand(configured, envEditor, goos string, paths []string) (string, 
 	return parts[0], append(parts[1:], paths...)
 }
 
-// inPlaceCommand runs an editor in Marmota's place. On a Mac it runs as the
+// inPlaceCommand runs an editor in Marmota's place, for the editors that
+// aren't put away: E's, and the one the Ask box's draft is written in (e's
+// is an editorJob). On a Mac it runs as the
 // terminal's foreground job, in a process group of its own, as a shell with
 // job control runs a program: a terminal asked what its pane runs then says
 // the editor, not Marmota, which is how WezTerm knows to send micro the
@@ -1022,6 +1024,9 @@ func (m *model) openPathsWithEditor(paths []string, recordRecent bool) tea.Cmd {
 	}
 
 	cmd, args := editorCommand(common.Config.Editor, os.Getenv("EDITOR"), runtime.GOOS, paths)
+	if putEditorsAway() {
+		return m.startEditorJob(cmd, args)
+	}
 	c := inPlaceCommand(cmd, args)
 	c.Env = append(os.Environ(), m.editorEnv()...)
 

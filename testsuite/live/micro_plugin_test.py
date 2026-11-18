@@ -25,6 +25,10 @@ block in ~/.wezterm.lua). Checks:
      the editor shows the change, and cmd+Z takes it back.
   7. A session on "another computer" (this one, through a command) gets the
      selected text itself, which it couldn't read from the file.
+  8. The real Marmota opens micro with e; cmd+M puts micro away, as it is,
+     and Marmota says so; e opens another micro, which says it can't be put
+     away too; b brings the first back with what was typed; q brings it
+     back while something isn't saved, and ends it and quits once it is.
 
 Nothing of yours is touched: micro's config, Marmota's state and the tmux
 servers are all the test's own, and everything is removed at the end.
@@ -59,7 +63,7 @@ KEY = {
     "cmd+l": b"\x1bl", "cmd+shift+l": b"\x1bL", "cmd+k": b"\x1bk",
     "cmd+enter": b"\x1b\r", "cmd+j": b"\x1bj", "enter": b"\r", "down": b"\x1b[B", "shift+down": b"\x1b[1;2B",
     "cmd+h": b"\x1bOP", "cmd+w": b"\x11", "cmd+/": b"\x1b/", "opt+n": b"\x1bn", "opt+]": b"\x1b]",
-    "opt+m": b"\x1bm", "opt+x": b"\x1bx", "cmd+o": b"\x1bOQ",
+    "opt+m": b"\x1bm", "opt+x": b"\x1bx", "cmd+o": b"\x1bOQ", "cmd+m": b"\x1bOR",
 }
 PLAN = "# Plan\n\nline three\nline four\nline five\n\nlast para one\nlast para two\n"
 BRACKETS = "# Plan\n\nline three\nsay (a [b] c) d\n\nlast para one\nlast para two\n"
@@ -127,6 +131,26 @@ class Micro:
 
     def quit(self) -> None:
         self.tmux("kill-server")
+
+
+class Marmota(Micro):
+    """The real Marmota in the tmux server, with micro as its editor: e opens it in Marmota's place."""
+
+    def __init__(self, server: str, cwd: Path, env: dict[str, str], config: Path, y: str) -> None:
+        self.server = server
+        self.tmux("kill-server")
+        words = ["env", "-u", "SSH_CONNECTION", "-u", "TMUX", "-u", "TMUX_PANE", "-u", "WEZTERM_PANE",
+                 *[f"{k}={v}" for k, v in env.items()], "EDITOR=micro", f"MICRO_CONFIG_HOME={config}",
+                 "MARMOTA_NO_IME_HOLD=1", y, str(cwd)]
+        command = " ".join("'" + w.replace("'", "'\\''") + "'" for w in words)
+        self.tmux("-f", "/dev/null", "new-session", "-d", "-s", "t", "-x", "150", "-y", "34", "-c", str(cwd),
+                  command + "; echo MARMOTA-ENDED; sleep 60")
+        wait_for("Marmota to start", lambda: "plan.md" in self.screen())
+        self.press("esc")  # the first key of a first run only puts the welcome away
+
+    def runs(self) -> str:
+        """The program tmux says the pane runs: the terminal's foreground job, as WezTerm asks it."""
+        return self.tmux("display", "-p", "-t", "t", "#{pane_current_command}").strip()
 
 
 def wait_for(what: str, check, timeout: float = 15.0):
@@ -441,6 +465,54 @@ def main() -> int:
         got = sent_to(remote_socket, remote_id)
         assert "From plan.md:" in got and "line three" in got and "@" + str(plan) not in got, got
         print(f"ok   a session on {host} was sent the selected text itself, and its reply came back")
+
+        # 8. The editor put away. A micro that Marmota's e didn't open, as
+        # this one, has nothing to go back to and says so.
+        m.press("cmd+m")
+        wait_for("micro to say it stays", lambda: "Nothing to go back to here" in m.screen())
+        m.quit()
+        for name in list(project.iterdir()):
+            if name != plan:
+                name.unlink()  # the file panel's cursor is on plan.md
+        plan.write_text(PLAN)
+        shutil.rmtree(config / "backups", ignore_errors=True)
+        m = Marmota(server, project, env, config, y)
+        m.type("e")
+        wait_for("micro in Marmota's place", lambda: "# Plan" in m.screen() and m.runs() == "micro")
+        m.type("DRAFT ")
+        wait_for("the typing", lambda: "DRAFT # Plan" in m.screen())
+        m.press("cmd+m")
+        away = "✎ micro · 1 file · 1 unsaved · b back"
+        wait_for("Marmota with the editor put away", lambda: away in m.screen())
+        assert m.runs() != "micro", m.runs()
+        assert plan.read_text() == PLAN, "nothing was saved"
+        print("ok   cmd+M put micro away: Marmota is back, and says an editor with unsaved text is put away")
+
+        m.type("e")  # e stays what it was: another editor
+        wait_for("a second micro", lambda: "# Plan" in m.screen() and "DRAFT" not in m.screen())
+        m.press("cmd+m")
+        wait_for("it to say one is put away", lambda: "An editor is put away already" in m.screen())
+        m.press("cmd+w")
+        wait_for("Marmota again", lambda: away in m.screen())
+        print("ok   e opened another micro meanwhile, which said one is put away already")
+
+        m.type("b")
+        wait_for("the first micro back", lambda: "DRAFT # Plan" in m.screen() and m.runs() == "micro")
+        print("ok   b brought it back with what was typed")
+
+        m.press("cmd+m")
+        wait_for("Marmota", lambda: away in m.screen())
+        m.type("q")
+        wait_for("micro back instead of quitting", lambda: "Marmota didn't quit" in m.screen())
+        assert "DRAFT # Plan" in m.screen(), m.screen()
+        m.press("cmd+s", "cmd+m")
+        wait_for("Marmota, the file saved", lambda: "✎ micro · 1 file · b back" in m.screen())
+        assert plan.read_text() == "DRAFT " + PLAN, plan.read_text()
+        m.type("q")
+        wait_for("Marmota to quit", lambda: "MARMOTA-ENDED" in m.screen())
+        left = subprocess.run(["pgrep", "-f", f"micro {plan}"], capture_output=True, text=True).stdout.split()
+        assert not left, f"micro still runs: {left}"
+        print("ok   q brought micro back while the file wasn't saved, and ended it and quit once it was")
         print("PASS")
         return 0
     except AssertionError:

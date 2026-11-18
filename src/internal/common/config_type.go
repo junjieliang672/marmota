@@ -181,6 +181,7 @@ type HotkeysType struct {
 
 	OpenFileWithEditor             []string `toml:"open_file_with_editor"              comment:"editor"`
 	OpenFileWithSecondEditor       []string `toml:"open_file_with_second_editor"`
+	BackToEditor                   []string `toml:"back_to_editor"`
 	OpenCurrentDirectoryWithEditor []string `toml:"open_current_directory_with_editor"`
 	SendToShelf                    []string `toml:"send_to_shelf"`
 	ShowSessionFiles               []string `toml:"show_session_files"`

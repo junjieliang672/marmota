@@ -63,6 +63,7 @@ compress_file = ['ctrl+a', '']
 #-- Editor Actions
 open_file_with_editor = ['e', '']
 open_file_with_second_editor = ['E', '']
+back_to_editor = ['b', '']
 open_current_directory_with_editor = ['ctrl+t', '']
 send_to_shelf = ['ctrl+y', '']
 show_session_files = ['W', '']

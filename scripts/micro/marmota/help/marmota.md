@@ -16,6 +16,7 @@ option key.
 | option+, / option+. | The tab before / after |
 | option+W | The next pane of a split |
 | cmd+H | This page, shown or put away |
+| cmd+M | Put micro away and go back to Marmota: micro stops with its files, tabs and replies as they are, and `b` in Marmota brings it back. Only where `e` in Marmota opened it |
 | option+X | The command bar (at the end of this page) |
 
 ## Edit

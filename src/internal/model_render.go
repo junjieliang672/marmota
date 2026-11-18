@@ -321,6 +321,9 @@ func (m *model) statusLineRender() string {
 	if ops := m.opsStatus(); ops != "" {
 		right = ops + sep + right
 	}
+	if away := m.editorAwayStatus(); away != "" {
+		right = away + sep + right
+	}
 	// The time ends the line, where the eye finds it: this computer's, in
 	// its time zone.
 	if right != "" {
