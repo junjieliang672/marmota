@@ -5,6 +5,7 @@ VERSION = "0.1.0"
 -- what you write. build.sh installs it with bindings.json, which names these
 -- functions.
 
+local micro = import("micro")
 local buffer = import("micro/buffer")
 local config = import("micro/config")
 local util = import("micro/util")
@@ -13,7 +14,7 @@ function init()
     -- "help marmota" (cmd+/): the keys Marmota sets up
     config.AddRuntimeFile("marmota", config.RTHelp, "help/marmota.md")
     -- $(marmota.status) in the status line (statusformatr in settings.json)
-    import("micro").SetStatusInfoFn("marmota.status")
+    micro.SetStatusInfoFn("marmota.status")
 end
 
 -- deleteToLineStart deletes from the cursor back to the start of the line,
@@ -131,6 +132,374 @@ function selectParagraphUp(bp)
     return true
 end
 
+-- Going to a place, and selecting up to one. cmd+G asks where, in the line
+-- at the foot: a line's number and enter, or one key, which goes there at
+-- once: t the file's top, b its bottom, p the next paragraph's start, P the
+-- one before, m the bracket that matches the one at the cursor (else the one
+-- that opens around it), n back to where the last of these left from.
+-- cmd+shift+G takes the same keys and selects instead: from the cursor, or
+-- the end of what is selected, to that place; m selects what the brackets
+-- hold. g keeps the line open for more of them, until esc.
+
+local function before(a, b)
+    return a.Y < b.Y or (a.Y == b.Y and a.X < b.X)
+end
+
+local function same(a, b)
+    return a.X == b.X and a.Y == b.Y
+end
+
+local function cursorLoc(bp)
+    return buffer.Loc(bp.Cursor.X, bp.Cursor.Y)
+end
+
+-- characters is a line as its characters: the one at X is characters[X + 1].
+local function characters(line)
+    local out = {}
+    for ch in line:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+        out[#out + 1] = ch
+    end
+    return out
+end
+
+-- leftFrom is where the jumps of each file left from, the last one last.
+local leftFrom = {}
+local leftFromMost = 50
+
+local function leftFromOf(bp)
+    local key = bp.Buf.AbsPath
+    if key == "" then
+        key = tostring(bp.Buf)
+    end
+    if leftFrom[key] == nil then
+        leftFrom[key] = {}
+    end
+    return leftFrom[key]
+end
+
+-- show brings the cursor into view: a place off the screen to its middle.
+local function show(bp)
+    local view = bp:GetView()
+    local y = bp.Cursor.Y
+    if y < view.StartLine.Line or y >= view.StartLine.Line + bp:BufView().Height then
+        bp:Center()
+    end
+    bp:Relocate()
+end
+
+-- go puts the cursor at loc, and remembers where it left from.
+local function go(bp, loc)
+    local from = cursorLoc(bp)
+    if same(from, loc) and not bp.Cursor:HasSelection() then
+        return
+    end
+    local stack = leftFromOf(bp)
+    if not same(from, loc) then
+        stack[#stack + 1] = from
+        if #stack > leftFromMost then
+            table.remove(stack, 1)
+        end
+    end
+    bp.Cursor:ResetSelection()
+    bp.Cursor:GotoLoc(loc)
+    show(bp)
+end
+
+-- selectTo selects from what is selected, or the cursor, to loc.
+local function selectTo(bp, loc)
+    local from, to = selection(bp.Cursor)
+    if from == nil then
+        from, to = cursorLoc(bp), cursorLoc(bp)
+    end
+    if before(loc, from) then
+        select(bp, loc, to, true)
+    elseif not same(loc, from) then
+        select(bp, from, loc, false)
+    end
+    show(bp)
+end
+
+local function fileEnd(buf)
+    return lineEnd(buf, buf:LinesNum() - 1)
+end
+
+-- nextParagraph is the start of the first paragraph after line y, else the
+-- file's end.
+local function nextParagraph(buf, y)
+    local last = buf:LinesNum() - 1
+    while y <= last and not blank(buf, y) do
+        y = y + 1
+    end
+    local top = paragraph(buf, y, 1)
+    if y > last or top == nil then
+        return fileEnd(buf)
+    end
+    return buffer.Loc(0, top)
+end
+
+-- paragraphStart is the start of the paragraph loc is in, and from there,
+-- or between two, of the one before; the file's start when there is none.
+local function paragraphStart(buf, loc)
+    local y = loc.Y
+    if not blank(buf, y) then
+        local top = paragraph(buf, y, -1)
+        if before(buffer.Loc(0, top), loc) then
+            return buffer.Loc(0, top)
+        end
+        y = top - 1
+    end
+    if y < 0 then
+        return buffer.Loc(0, 0)
+    end
+    local top = paragraph(buf, y, -1)
+    return buffer.Loc(0, top or 0)
+end
+
+-- paragraphEnd is the end of the paragraph loc is in, and from there, or
+-- between two, of the next one; the file's end when there is none.
+local function paragraphEnd(buf, loc)
+    local y = loc.Y
+    if not blank(buf, y) then
+        local _, bottom = paragraph(buf, y, 1)
+        if before(loc, lineEnd(buf, bottom)) then
+            return lineEnd(buf, bottom)
+        end
+        y = bottom + 1
+    end
+    if y > buf:LinesNum() - 1 then
+        return fileEnd(buf)
+    end
+    local _, bottom = paragraph(buf, y, 1)
+    if bottom == nil then
+        return fileEnd(buf)
+    end
+    return lineEnd(buf, bottom)
+end
+
+local opens = { ["("] = true, ["["] = true, ["{"] = true }
+local closes = { [")"] = true, ["]"] = true, ["}"] = true }
+
+-- bracketReach is how many lines back an opening bracket is looked for.
+local bracketReach = 5000
+
+-- opener is the bracket that opens around loc: the nearest one before it
+-- that nothing closes before loc. Brackets are counted as written: one in a
+-- string or a comment counts too.
+local function opener(buf, loc)
+    local depth = 0
+    for y = loc.Y, math.max(0, loc.Y - bracketReach), -1 do
+        local chars = characters(buf:Line(y))
+        local x = #chars
+        if y == loc.Y then
+            x = math.min(x, loc.X)
+        end
+        for i = x, 1, -1 do
+            if closes[chars[i]] then
+                depth = depth + 1
+            elseif opens[chars[i]] then
+                if depth == 0 then
+                    return buffer.Loc(i - 1, y)
+                end
+                depth = depth - 1
+            end
+        end
+    end
+    return nil
+end
+
+-- brackets is the pair around from..to: where it opens and where it closes.
+local function brackets(buf, from, to)
+    local at = from
+    while true do
+        local open = opener(buf, at)
+        if open == nil then
+            return nil
+        end
+        local close, _, found = buf:FindMatchingBrace(open)
+        if found and not before(close, to) then
+            return open, buffer.Loc(close.X, close.Y)
+        end
+        at = open
+    end
+end
+
+-- toBracket goes to the bracket that matches the one at the cursor, else to
+-- the one that opens around the cursor.
+local function toBracket(bp)
+    local buf = bp.Buf
+    local at = cursorLoc(bp)
+    local match, left, found = buf:FindMatchingBrace(at)
+    if found and not left then
+        go(bp, buffer.Loc(match.X, match.Y))
+        return true
+    end
+    local open = opener(buf, at)
+    if open == nil then
+        return false
+    end
+    go(bp, open)
+    return true
+end
+
+-- selectBrackets selects what the brackets around the cursor hold; with
+-- that selected, the brackets too; then what the pair around those holds.
+local function selectBrackets(bp)
+    local buf = bp.Buf
+    local from, to = selection(bp.Cursor)
+    if from == nil then
+        from, to = cursorLoc(bp), cursorLoc(bp)
+        -- on an opening bracket, it is that one's
+        if opens[characters(buf:Line(from.Y))[from.X + 1]] then
+            from = buffer.Loc(from.X + 1, from.Y)
+            to = from
+        end
+    end
+    local open, close = brackets(buf, from, to)
+    if open == nil then
+        return false
+    end
+    local inside = buffer.Loc(open.X + 1, open.Y)
+    if same(from, inside) and same(to, close) then
+        select(bp, open, buffer.Loc(close.X + 1, close.Y), false)
+    else
+        select(bp, inside, close, false)
+    end
+    show(bp)
+    return true
+end
+
+-- toLine goes to line number, or selects up to it: through its end when
+-- it is below, from its start when above.
+local function toLine(bp, number, selecting)
+    local buf = bp.Buf
+    local y = math.max(0, math.min(number, buf:LinesNum()) - 1)
+    if not selecting then
+        go(bp, buffer.Loc(0, y))
+        return
+    end
+    local from = selection(bp.Cursor) or cursorLoc(bp)
+    if y < from.Y then
+        selectTo(bp, buffer.Loc(0, y))
+    else
+        selectTo(bp, lineEnd(buf, y))
+    end
+end
+
+-- jumpKey does what key asks. It reports whether there is such a key.
+local function jumpKey(bp, key, selecting)
+    local buf = bp.Buf
+    local move = selecting and selectTo or go
+    local from, to = selection(bp.Cursor)
+    if key == "t" then
+        move(bp, buffer.Loc(0, 0))
+    elseif key == "b" then
+        move(bp, fileEnd(buf))
+    elseif key == "p" and selecting then
+        selectTo(bp, paragraphEnd(buf, to or cursorLoc(bp)))
+    elseif key == "P" and selecting then
+        selectTo(bp, paragraphStart(buf, from or cursorLoc(bp)))
+    elseif key == "p" then
+        go(bp, nextParagraph(buf, bp.Cursor.Y))
+    elseif key == "P" then
+        go(bp, paragraphStart(buf, cursorLoc(bp)))
+    elseif key == "m" then
+        local found
+        if selecting then
+            found = selectBrackets(bp)
+        else
+            found = toBracket(bp)
+        end
+        if not found then
+            micro.InfoBar():Message("No brackets around the cursor")
+        end
+    elseif key == "n" then
+        local stack = leftFromOf(bp)
+        local back = stack[#stack]
+        if back == nil then
+            micro.InfoBar():Message("No jump to go back from")
+        elseif selecting then
+            selectTo(bp, back)
+        else
+            table.remove(stack)
+            bp.Cursor:ResetSelection()
+            bp.Cursor:GotoLoc(back)
+            show(bp)
+        end
+    else
+        return false
+    end
+    return true
+end
+
+local jumpKeys = "line⏎  t top  b bottom  p/P paragraph  m bracket  n back"
+
+-- askWhere opens the line that takes a jump's key. staying keeps it open
+-- after each, until esc.
+local function askWhere(bp, selecting, staying)
+    local label = selecting and "Select to" or "Go to"
+    if staying then
+        label = label .. " (esc ends)"
+    end
+    local keys = jumpKeys
+    if not staying then
+        keys = keys .. "  g stay"
+    end
+    local taken = false -- a key closed the line, not esc
+    micro.InfoBar():Prompt(label .. ": " .. keys .. " › ", "", "MarmotaJump", function(typed)
+        if taken or typed == "" or typed:match("^%d+$") then
+            return
+        end
+        taken = true
+        micro.InfoBar():DonePrompt(true)
+        local key = typed:sub(-1)
+        if key == "g" then
+            staying = true
+        elseif not jumpKey(bp, key, selecting) then
+            micro.InfoBar():Message("No such place: " .. jumpKeys)
+        end
+        if staying then
+            askWhere(bp, selecting, true)
+        end
+    end, function(typed, canceled)
+        if taken or canceled then
+            return
+        end
+        if typed:match("^%d+$") then
+            toLine(bp, tonumber(typed), selecting)
+            if staying then
+                askWhere(bp, selecting, true)
+            end
+        end
+    end)
+end
+
+function jump(bp)
+    askWhere(bp, false, false)
+    return true
+end
+
+function jumpSelect(bp)
+    askWhere(bp, true, false)
+    return true
+end
+
+-- drag is the left button held and moved: it selects up to the pointer.
+-- The wheel turned meanwhile comes here too, as a move that goes nowhere
+-- (micro's terminal library takes it for one): what the terminal sent says
+-- which it was, and the wheel scrolls first, so a selection goes on past
+-- what the screen showed.
+function drag(bp, event)
+    local button = tonumber(event:EscSeq():match("^\27%[<(%d+);"))
+    if button ~= nil and button >= 64 and button < 128 then
+        if button % 4 == 0 then
+            bp:ScrollUpAction()
+        elseif button % 4 == 1 then
+            bp:ScrollDownAction()
+        end
+    end
+    return bp:MouseDrag(event)
+end
+
 -- Asking a session while you write. cmd+L asks the session this editor
 -- writes to: your question goes to it with the file, and the lines you
 -- selected, named after it, so it reads them itself. You go on writing; its
@@ -141,7 +510,6 @@ end
 -- All of it goes through `y session`: list for the sessions to pick from,
 -- ask to send a question and wait for its reply.
 
-local micro = import("micro")
 local shell = import("micro/shell")
 local os = import("os")
 local strings = import("strings")

@@ -8,17 +8,22 @@ sent as the bytes WezTerm sends micro for them (setup-macos-hotkeys.sh's
 block in ~/.wezterm.lua). Checks:
 
   1. The Mac keys: line and word moves, selecting by word, line and
-     paragraph, delete to the line's start, undo and redo, go to a line.
-  2. cmd+L asks the session the editor was opened for, about the file and
+     paragraph, delete to the line's start, undo and redo.
+  2. cmd+G goes to a line, the file's top and bottom, the paragraph after
+     and before, a bracket's match, and back; g keeps it open until esc;
+     cmd+shift+G selects up to the same places, and what brackets hold.
+     The wheel, turned while the left button drags, scrolls and the
+     selection goes on.
+  3. cmd+L asks the session the editor was opened for, about the file and
      the selected lines; typing goes on; the reply shows on the right;
      cmd+enter puts it at the cursor and cmd+Z takes it back.
-  3. cmd+shift+L lists the sessions; a second session is asked too, and
+  4. cmd+shift+L lists the sessions; a second session is asked too, and
      both replies show under their questions.
-  4. The list's first row starts a session with the question; the next
+  5. The list's first row starts a session with the question; the next
      question goes on with it.
-  5. cmd+K has the session change the selected lines in the file itself:
+  6. cmd+K has the session change the selected lines in the file itself:
      the editor shows the change, and cmd+Z takes it back.
-  6. A session on "another computer" (this one, through a command) gets the
+  7. A session on "another computer" (this one, through a command) gets the
      selected text itself, which it couldn't read from the file.
 
 Nothing of yours is touched: micro's config, Marmota's state and the tmux
@@ -49,10 +54,13 @@ KEY = {
     "opt+right": b"\x1bf", "shift+opt+right": b"\x1b[1;4C", "shift+opt+left": b"\x1b[1;4D",
     "shift+cmd+right": b"\x1b[1;6C", "shift+cmd+left": b"\x1b[1;6D", "cmd+down": b"\x1b[1;5B",
     "shift+opt+down": b"\x1b[1;4B", "cmd+a": b"\x1ba", "cmd+z": b"\x1a", "cmd+shift+z": b"\x19",
-    "cmd+g": b"\x0c", "cmd+l": b"\x1bl", "cmd+shift+l": b"\x1bL", "cmd+k": b"\x1bk",
+    "cmd+g": b"\x1bg", "cmd+shift+g": b"\x1bG", "cmd+s": b"\x13", "esc": b"\x1b", "right": b"\x1b[C",
+    "cmd+l": b"\x1bl", "cmd+shift+l": b"\x1bL", "cmd+k": b"\x1bk",
     "cmd+enter": b"\x1b\r", "cmd+j": b"\x1bj", "enter": b"\r", "down": b"\x1b[B", "shift+down": b"\x1b[1;2B",
 }
 PLAN = "# Plan\n\nline three\nline four\nline five\n\nlast para one\nlast para two\n"
+BRACKETS = "# Plan\n\nline three\nsay (a [b] c) d\n\nlast para one\nlast para two\n"
+ROWS = "".join(f"row {n}\n" for n in range(1, 61))
 
 
 class Micro:
@@ -74,6 +82,13 @@ class Micro:
         for name in names:
             self.tmux("send-keys", "-t", "t", "-H", *[f"{b:02x}" for b in KEY[name]])
             time.sleep(0.15)
+
+    def mouse(self, button: int, x: int, y: int, release: bool = False) -> None:
+        """A mouse event as a terminal reports it (SGR): 0 the left button, +32 moved while held, 64 and 65
+        the wheel up and down; x and y count from 1."""
+        report = f"\x1b[<{button};{x};{y}{'m' if release else 'M'}".encode()
+        self.tmux("send-keys", "-t", "t", "-H", *[f"{b:02x}" for b in report])
+        time.sleep(0.15)
 
     def type(self, text: str) -> None:
         self.tmux("send-keys", "-t", "t", "-l", text)
@@ -160,8 +175,8 @@ def main() -> int:
     (config / "settings.json").write_text(json.dumps(settings))
     shutil.copytree(REPO / "scripts/micro/marmota", config / "plug/marmota")
 
-    def editor(session_id: str = "", title: str = "", host: str = "") -> Micro:
-        plan.write_text(PLAN)
+    def editor(session_id: str = "", title: str = "", host: str = "", text: str = PLAN) -> Micro:
+        plan.write_text(text)
         shutil.rmtree(config / "backups", ignore_errors=True)
         shutil.rmtree(config / "buffers", ignore_errors=True)
         return Micro(server, project, {**env, "MARMOTA_BIN": y, "MARMOTA_SESSION": session_id,
@@ -171,8 +186,8 @@ def main() -> int:
     m = None
     try:
         # 1. the Mac keys
-        def after(*steps: str | bytes) -> list[str]:
-            ed = editor()
+        def after(*steps: str, text: str = PLAN) -> list[str]:
+            ed = editor(text=text)
             for step in steps:
                 if step in KEY:
                     ed.press(step)
@@ -195,17 +210,68 @@ def main() -> int:
         assert after("cmd+a", "X")[0] == "X", "cmd+A selects all"
         assert after("zzz", "cmd+z")[0] == "# Plan", "cmd+Z undoes"
         assert after("zzz", "cmd+z", "cmd+shift+z")[0] == "zzz# Plan", "cmd+shift+Z redoes"
-        assert after("cmd+g", "4", "enter", "!")[3] == "!line four", "cmd+G goes to a line"
         assert after("cmd+down", "END")[-1].endswith("END") or "END" in "".join(after("cmd+down", "END")), \
             "cmd+down goes to the file's end"
-        print("ok   the Mac keys move, select and delete as in a text field; undo, redo and go to a line work")
+        print("ok   the Mac keys move, select and delete as in a text field; undo and redo work")
+
+        # 2. cmd+G goes to a place, cmd+shift+G selects up to it
+        assert after("cmd+g", "4", "enter", "!")[3] == "!line four", "cmd+G, a number: that line"
+        assert after("cmd+g", "b", "!")[8] == "!", "b: the file's bottom"
+        assert after("cmd+g", "b", "cmd+g", "t", "!")[0] == "!# Plan", "t: its top"
+        assert after("cmd+g", "p", "!")[2] == "!line three", "p: the next paragraph's start"
+        assert after("cmd+g", "p", "cmd+g", "p", "cmd+g", "P", "!")[2] == "!line three", "P: the one before"
+        assert after("down", "down", "down", "cmd+g", "P", "!")[2] == "!line three", "P inside one: its own start"
+        assert after("cmd+g", "g", "p", "p", "P", "esc", "!")[2] == "!line three", \
+            "g keeps the line open for more keys, until esc"
+        assert after("cmd+g", "g", "p", "p", "n", "esc", "!")[2] == "!line three", "n: back to where a jump left from"
+        assert after("cmd+g", "g", "p", "9", "enter", "4", "enter", "esc", "!")[3] == "!line four", \
+            "numbers too while it stays open"
+        inside = ["down"] * 3 + ["right"] * 8  # on the b of "say (a [b] c) d"
+        assert after(*inside, "cmd+g", "m", "!", text=BRACKETS)[3] == "say (a ![b] c) d", \
+            "m: the bracket that opens around the cursor"
+        assert after(*inside, "cmd+g", "g", "m", "m", "esc", "!", text=BRACKETS)[3] == "say (a [b!] c) d", \
+            "m on a bracket: its match"
+        assert after("down", "down", "cmd+shift+g", "4", "enter", "X")[2:4] == ["X", "line five"], \
+            "cmd+shift+G, a number: selects through that line"
+        assert after("down", "down", "cmd+shift+g", "t", "X")[0] == "Xline three", "t selects to the top"
+        assert after("down", "down", "cmd+shift+g", "b", "X")[2:4] == ["X", ""], "b to the bottom"
+        assert after("down", "down", "right", "cmd+shift+g", "p", "X")[2:4] == ["lX", ""], \
+            "p to the paragraph's end"
+        assert after("down", "down", "right", "cmd+shift+g", "g", "p", "p", "esc", "X")[2:4] == ["lX", ""], \
+            "again, the next one's"
+        assert after("down", "down", "down", "right", "cmd+shift+g", "P", "X")[2] == "Xine four", \
+            "P to the paragraph's start"
+        assert after(*inside, "cmd+shift+g", "m", "X", text=BRACKETS)[3] == "say (a [X] c) d", \
+            "m selects what the brackets hold"
+        assert after(*inside, "cmd+shift+g", "g", "m", "m", "esc", "X", text=BRACKETS)[3] == "say (a X c) d", \
+            "again, the brackets too"
+        assert after(*inside, "cmd+shift+g", "g", "m", "m", "m", "esc", "X", text=BRACKETS)[3] == "say (X) d", \
+            "and again, what the pair around them holds"
+        # the wheel while the left button drags: twelve lines down, four back up
+        m = editor(text=ROWS)
+        m.mouse(0, 12, 3)
+        m.mouse(32, 12, 4)
+        for _ in range(6):
+            m.mouse(65, 12, 4)
+        for _ in range(2):
+            m.mouse(64, 12, 4)
+        m.mouse(0, 12, 4, release=True)
+        m.type("X")
+        m.press("cmd+s")
+        wait_for("the file saved", lambda: "row 3X\n" in plan.read_text())
+        assert plan.read_text().startswith("row 1\nrow 2\nrow 3X\nrow 13\n"), \
+            "the wheel scrolled while dragging, and the selection went on to the pointer: " + plan.read_text()[:40]
+        m.quit()
+        m = None
+        print("ok   cmd+G went to lines, the top and bottom, paragraphs, brackets and back, staying open after g; "
+              "cmd+shift+G selected up to them; the wheel scrolled a drag's selection on")
 
         # two sessions to ask
         first = session("start", "--cwd", str(project), "--", "hello").split()[1]
         second = session("start", "--cwd", str(project), "--", "second").split()[1]
         wait_for("the sessions", lambda: session("list").count(" idle ") == 2)
 
-        # 2. cmd+L asks the editor's session about the file and the selected lines
+        # 3. cmd+L asks the editor's session about the file and the selected lines
         m = editor(first, "first", "here")
         assert "→ first" in m.screen().splitlines()[-2], "the status line says whom questions go to"
         m.press("down", "down", "shift+down", "shift+down", "cmd+l")
@@ -226,7 +292,7 @@ def main() -> int:
         print("ok   cmd+L asked the session about the file and lines 3-4 while typing went on; its reply showed "
               "on the right; cmd+enter put it at the cursor and cmd+Z took it back")
 
-        # 3. another session, picked from the list
+        # 4. another session, picked from the list
         m.press("cmd+shift+l")
         wait_for("the list of sessions", lambda: "New session in project" in m.screen() and "idle" in m.screen())
         assert first not in m.screen(), "the ids stay out of sight"
@@ -240,7 +306,7 @@ def main() -> int:
         print("ok   cmd+shift+L listed the sessions and a new one; the second was asked too, and both replies "
               "show under their questions")
 
-        # 4. a session the question starts
+        # 5. a session the question starts
         m.press("cmd+shift+l")
         wait_for("the list of sessions", lambda: "New session in project" in m.screen())
         m.press("enter")  # the first row
@@ -260,7 +326,7 @@ def main() -> int:
               "with it")
         m.quit()
 
-        # 5. cmd+K: the session changes the lines in the file
+        # 6. cmd+K: the session changes the lines in the file
         m = editor(first, "first", "here")
         m.press("down", "down", "shift+down", "shift+down", "cmd+k")
         wait_for("the change's prompt", lambda: "first, change these lines ›" in m.screen())
@@ -279,7 +345,7 @@ def main() -> int:
               "the change back")
         m.quit()
 
-        # 6. a session on another computer gets the text itself
+        # 7. a session on another computer gets the text itself
         remote_socket = socket + "-remote"
         on = f"env MARMOTA_TMUX_SOCKET={remote_socket} /bin/sh -c"
         out = session("start", "--on", on, "--cwd", str(project), "--", "far away")

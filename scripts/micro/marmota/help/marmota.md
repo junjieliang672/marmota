@@ -37,11 +37,27 @@ for cmd+enter to put in.
 | cmd+shift+F | Search every file under the folder (asks where, then what) |
 | cmd+P | Open a file by name |
 | cmd+shift+O | Jump to a heading or a function of this file |
-| cmd+G | Go to a line: type its number |
+| cmd+G | Go to a place: a line's number and enter, or one key (below) |
+| cmd+shift+G | Select up to a place: the same keys |
 | ctrl+- | Back to where the cursor was before a jump; ctrl+shift+- forward again |
 | cmd+↑ / cmd+↓ | Start / end of the file |
 | cmd+← / cmd+→ | Start / end of the line |
 | option+← / option+→ | A word left / right |
+
+After cmd+G, one key goes there at once; after cmd+shift+G it selects, from
+the cursor or the end of what is selected:
+
+| Key | cmd+G goes to | cmd+shift+G selects |
+|-----|---------------|---------------------|
+| a number, enter | That line | Through that line; from its start when it is above |
+| t / b | The file's top / bottom | To the top / bottom |
+| p | The next paragraph's start | To the paragraph's end; again, the next one's |
+| P | The paragraph's start; from there, the one before | To the paragraph's start; again, the one before |
+| m | The bracket that matches the one at the cursor, else the one that opens around it | What the brackets around the cursor hold; again, the brackets too; again, what the pair around them holds |
+| n | Back to where the last of these jumps left from; again, the one before | To that place |
+| g | Keeps the line open: each key goes on from the last, until esc | The same |
+
+Brackets are ( ) [ ] { }, counted as written: one inside a string counts too.
 
 ## Select and copy
 
@@ -53,7 +69,7 @@ for cmd+enter to put in.
 | cmd+C | Copy what is selected; with nothing selected, the line |
 | cmd+X | Cut what is selected; with nothing selected, the line |
 | cmd+V | Paste |
-| the mouse | Click puts the cursor, drag selects, double click a word, triple click a line |
+| the mouse | Click puts the cursor, drag selects, double click a word, triple click a line. The wheel, turned while you drag, scrolls and the selection goes on |
 
 ## Edit
 

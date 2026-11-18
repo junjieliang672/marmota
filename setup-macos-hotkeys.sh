@@ -901,7 +901,8 @@ do
     { 'x', 'CMD', '\x18' }, -- cut
     { 'a', 'CMD', '\x1ba' }, -- select all
     { 'f', 'CMD', '\x06' }, -- find
-    { 'g', 'CMD', '\x0c' }, -- go to a line
+    { 'g', 'CMD', '\x1bg' }, -- go to a line or a place
+    { 'g', 'CMD|SHIFT', '\x1bG' }, -- select up to one
     { 'UpArrow', 'CMD', '\x1b[1;5A' }, -- start of the file
     { 'DownArrow', 'CMD', '\x1b[1;5B' }, -- end of the file
     { 'LeftArrow', 'CMD|SHIFT', '\x1b[1;6D' }, -- select to the start of the line
