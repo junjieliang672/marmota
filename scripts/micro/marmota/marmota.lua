@@ -5,7 +5,13 @@ VERSION = "0.1.0"
 -- which names these functions.
 
 local buffer = import("micro/buffer")
+local config = import("micro/config")
 local util = import("micro/util")
+
+function init()
+    -- "help marmota" (cmd+/): the keys Marmota sets up
+    config.AddRuntimeFile("marmota", config.RTHelp, "help/marmota.md")
+end
 
 -- deleteToLineStart deletes from the cursor back to the start of the line,
 -- as cmd+backspace does in a Mac text field; at the start of a line it joins

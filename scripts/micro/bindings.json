@@ -13,5 +13,6 @@
     "Alt-h": "command:OmniPreviousHistory",
     "Alt-H": "command:OmniNextHistory",
     "AltShiftUp": "lua:marmota.selectParagraphUp",
-    "AltShiftDown": "lua:marmota.selectParagraphDown"
+    "AltShiftDown": "lua:marmota.selectParagraphDown",
+    "Alt-/": "command:help marmota"
 }

@@ -892,7 +892,7 @@ do
   -- In micro, the editor Marmota opens files in, the Mac keys do what they
   -- do in a text field: each sends micro the key it knows for that. In any
   -- other program a key does what it did before: your own binding above,
-  -- or nothing.
+  -- WezTerm's own, or nothing.
   local editor_keys = {
     { 's', 'CMD', '\x13' }, -- save
     { 'z', 'CMD', '\x1a' }, -- undo
@@ -913,8 +913,11 @@ do
     { 'f', 'CMD|SHIFT', '\x1bF' }, -- search every file
     { 'f', 'CMD|OPT', '\x1br' }, -- fuzzy search in this file
     { 'o', 'CMD|SHIFT', '\x1bo' }, -- go to a heading or function
-    { '-', 'CTRL', '\x1bh' }, -- back to where the cursor was
-    { '-', 'CTRL|SHIFT', '\x1bH' }, -- and forward again
+    { '/', 'CMD', '\x1b/' }, -- Marmota's keys for micro
+    -- back to where the cursor was, and forward again; elsewhere these are
+    -- WezTerm's own keys for a smaller font, which they stay
+    { '-', 'CTRL', '\x1bh', wezterm.action.DecreaseFontSize },
+    { '-', 'CTRL|SHIFT', '\x1bH', wezterm.action.DecreaseFontSize },
   }
   local function mods_of(mods)
     local set = {}
@@ -930,7 +933,7 @@ do
   end
   config.keys = config.keys or {}
   for _, k in ipairs(editor_keys) do
-    local otherwise
+    local otherwise = k[4] -- what WezTerm does with the key by itself
     for i, bound in ipairs(config.keys) do
       if bound.key == k[1] and mods_of(bound.mods) == mods_of(k[2]) then
         otherwise = bound.action
