@@ -90,15 +90,12 @@ func Collect(o Options) ([]claudesession.Session, error) {
 	var out []claudesession.Session
 	listed := map[string]bool{}
 	for _, id := range loaded.Data {
-		var read struct {
-			Thread thread `json:"thread"`
-		}
-		if c.Call("thread/read", map[string]any{"threadId": id}, &read) != nil || !wanted(read.Thread) ||
-			listed[read.Thread.ID] {
+		t, err := readThread(c, id)
+		if err != nil || !wanted(t) || listed[t.ID] {
 			continue
 		}
-		listed[read.Thread.ID] = true
-		out = append(out, toSession(read.Thread, o.Tracker))
+		listed[t.ID] = true
+		out = append(out, toSession(t, o.Tracker))
 	}
 
 	var recent struct {
@@ -140,13 +137,39 @@ func Read(home, id string, tracker *Tracker) (claudesession.Session, error) {
 	}
 	defer cancel()
 	defer c.Close()
-	var read struct {
-		Thread thread `json:"thread"`
-	}
-	if err := c.Call("thread/read", map[string]any{"threadId": id}, &read); err != nil {
+	t, err := readThread(c, id)
+	if err != nil {
 		return claudesession.Session{}, err
 	}
-	return toSession(read.Thread, tracker), nil
+	return toSession(t, tracker), nil
+}
+
+// A session's first message has Codex start its rollout, and until the
+// rollout's first line is written the server can't read the session
+// ("failed to read session metadata"): for 45 ms, measured on Codex 0.160.
+// It is loaded all the same, so a read that fails is tried again rather than
+// the session taken for gone.
+const (
+	readTries = 5
+	readPause = 40 * time.Millisecond
+)
+
+// readThread reads one session from the server, again after a moment when
+// the server can't just then.
+func readThread(c *Client, id string) (thread, error) {
+	var err error
+	for try := range readTries {
+		if try > 0 {
+			time.Sleep(readPause)
+		}
+		var read struct {
+			Thread thread `json:"thread"`
+		}
+		if err = c.Call("thread/read", map[string]any{"threadId": id}, &read); err == nil {
+			return read.Thread, nil
+		}
+	}
+	return thread{}, err
 }
 
 // withRemoteControl marks every session when the server has Remote Control

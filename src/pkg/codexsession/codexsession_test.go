@@ -30,6 +30,9 @@ type fakeServer struct {
 	mu      sync.Mutex
 	answers map[string]any
 	calls   []call
+	// failing is how many more times a method answers with an error
+	// before it answers.
+	failing map[string]int
 }
 
 type call struct {
@@ -88,6 +91,10 @@ func (f *fakeServer) serve(conn net.Conn) {
 		f.mu.Lock()
 		f.calls = append(f.calls, call{msg.Method, msg.Params})
 		answer, ok := f.answers[msg.Method]
+		fails := f.failing[msg.Method] > 0
+		if fails {
+			f.failing[msg.Method]--
+		}
 		f.mu.Unlock()
 		writeServerFrame(conn, wsOpPing, []byte("hi"))
 		writeServerFrame(conn, wsOpText, []byte(`{"method":"account/updated","params":{}}`))
@@ -100,6 +107,9 @@ func (f *fakeServer) serve(conn net.Conn) {
 		case strings.HasPrefix(msg.Method, "remoteControl/") && !experimental:
 			reply = map[string]any{"id": *msg.ID, "error": map[string]any{"code": -32600,
 				"message": msg.Method + " requires experimentalApi capability"}}
+		case fails:
+			reply = map[string]any{"id": *msg.ID, "error": map[string]any{"code": -32603,
+				"message": "failed to read thread: thread-store internal error: failed to read session metadata"}}
 		case !ok:
 			reply = map[string]any{"id": *msg.ID, "error": map[string]any{"code": -1, "message": "unknown " + msg.Method}}
 		}
@@ -365,6 +375,43 @@ func TestReadIsOneSessionNow(t *testing.T) {
 	assert.Equal(t, claudesession.StatusWaiting, s.Status)
 	assert.Equal(t, rollout, s.TranscriptPath)
 	assert.False(t, s.LastTurnEnd.IsZero(), "with what its rollout says")
+}
+
+// A session's first message has Codex start its rollout, and for a moment
+// the server can't read the session. It is loaded all the same: it stays
+// listed, and is read, once the server can.
+func TestASessionTheServerCantReadForAMomentStaysListed(t *testing.T) {
+	answers := map[string]any{
+		"thread/loaded/list": map[string]any{"data": []string{"t1"}},
+		"thread/read": map[string]any{"thread": map[string]any{
+			"id": "t1", "cwd": "/w/repo", "createdAt": time.Now().Unix(), "status": map[string]any{"type": "active"},
+		}},
+		"thread/list": map[string]any{"data": []map[string]any{}},
+	}
+	home, srv := startFakeServer(t, answers)
+	srv.failing = map[string]int{"thread/read": 2}
+
+	sessions, err := Collect(Options{Home: home})
+	require.NoError(t, err)
+	require.Len(t, sessions, 1, "listed, though the server couldn't read it at first")
+	assert.Equal(t, claudesession.StatusWorking, sessions[0].Status)
+
+	srv.mu.Lock()
+	srv.failing["thread/read"] = 2
+	srv.mu.Unlock()
+	s, err := Read(home, "t1", nil)
+	require.NoError(t, err)
+	assert.Equal(t, "t1", s.ID)
+
+	// One it can't read at all is left out, and said so when asked for.
+	srv.mu.Lock()
+	srv.failing["thread/read"] = 100
+	srv.mu.Unlock()
+	sessions, err = Collect(Options{Home: home})
+	require.NoError(t, err)
+	assert.Empty(t, sessions)
+	_, err = Read(home, "t1", nil)
+	assert.ErrorContains(t, err, "failed to read session metadata")
 }
 
 func TestCollectWithoutAServer(t *testing.T) {
