@@ -122,7 +122,7 @@ func TestFilePanelNavigation(t *testing.T) {
 			}
 			m.getFocusedFilePanel().render = tt.startRender
 			for _, s := range tt.keyInput {
-				TeaUpdate(m, utils.TeaRuneKeyMsg(s))
+				TeaUpdate(m, utils.TeaKeyMsg(s))
 			}
 			if tt.cdTo != "" {
 				_, _ = m.logAndExecuteAction(common.CDCurrentPanelAction{Location: tt.cdTo})

@@ -323,7 +323,7 @@ func TestChooserFile(t *testing.T) {
 				require.NoError(t, err)
 			}
 			variable.SetChooserFile(tt.chooserFile)
-			cmd := TeaUpdate(m, utils.TeaRuneKeyMsg(tt.hotkey))
+			cmd := TeaUpdate(m, utils.TeaKeyMsg(tt.hotkey))
 
 			if tt.expectedQuit {
 				assert.Equal(t, quitDone, m.modelQuitState)

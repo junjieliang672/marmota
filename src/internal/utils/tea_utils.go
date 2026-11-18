@@ -78,9 +78,35 @@ func TeaKeyMsg(hotkey string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeyPgDown}
 	}
 
+	// Any other key Bubble Tea has a name for, such as shift+tab or f2, and
+	// with alt held.
+	if t, ok := namedKeys[lowerHotkey]; ok {
+		return tea.KeyMsg{Type: t}
+	}
+	if name, ok := strings.CutPrefix(lowerHotkey, "alt+"); ok {
+		if t, ok := namedKeys[name]; ok {
+			return tea.KeyMsg{Type: t, Alt: true}
+		}
+	}
+
 	// Default: treat as rune key (preserve original case)
 	return tea.KeyMsg{
 		Type:  tea.KeyRunes,
 		Runes: []rune(originalHotkey),
 	}
 }
+
+// namedKeys are the keys Bubble Tea names, by the name it gives them.
+var namedKeys = func() map[string]tea.KeyType { //nolint:gochecknoglobals // a table, built once
+	const first, last = -200, 127 // Bubble Tea's key types lie between these
+	names := map[string]tea.KeyType{}
+	for t := tea.KeyType(first); t <= last; t++ {
+		if t == tea.KeyRunes {
+			continue
+		}
+		if name := (tea.KeyMsg{Type: t}).String(); name != "" {
+			names[name] = t
+		}
+	}
+	return names
+}()
