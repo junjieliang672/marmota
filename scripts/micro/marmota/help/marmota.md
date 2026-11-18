@@ -95,11 +95,12 @@ Brackets are ( ) [ ] { }, counted as written: one inside a string counts too.
 
 | Key | Does |
 |-----|------|
-| cmd+L | Ask the session about this file and the lines you selected: type the question, enter. Its reply shows on the right when its turn has ended |
-| cmd+shift+L | Pick the session questions go to, then ask it. Claude Code's rows start with ✳ in orange, Codex's with ◆ in teal; each says what the session does (working, idle, needs you), its title and its folder. The first two rows start a new one with your question: a Claude Code session, a Codex session |
-| cmd+K | Have the session change the selected lines, or with none the file, as you ask; cmd+Z takes the change back |
+| cmd+L | Ask the session about this file and the lines you selected: the cursor goes to the box at the foot of the column on the right. Write the question; enter sends it and the cursor is back in the file. The reply shows above the box when the session's turn has ended. From the box, cmd+L goes back to the file |
+| cmd+shift+L | Pick the session questions go to: this computer's sessions are listed above the box, Claude Code's rows starting with ✳ and Codex's with ◆, each in its color, with what the session does (working, idle, needs you), its title and its folder. What you type in the box filters them, a row staying when it has each word; ↑ ↓ move the mark, enter picks, esc leaves the list. The first two rows start a new session with your question: a Claude Code session, a Codex session |
+| cmd+K | Have the session change the selected lines, or with none the file: the box takes what it is to change; cmd+Z takes the change back |
+| enter, shift+enter, esc (in the box) | Send, or pick the marked session; a new line; back to the file, with what is written kept |
 | cmd+enter | Put the last reply at the cursor, or in place of what is selected |
-| cmd+J | Show the replies on the right, or put them away |
+| cmd+J | Show the column, or put it away: what was asked and what the box holds are there again |
 | cmd+O | Open the session in a pane under the editor: the one that stopped to ask you something, else the one questions go to. Answer it there, or watch it work; closing the pane leaves it running |
 
 The session is the one Marmota's Ask box wrote to when it opened the editor,
@@ -117,9 +118,13 @@ stops to ask you something (a permission, or whether to trust its folder)
 says so in place of its reply: answer it from Marmota's Sessions box, or open
 it with cmd+O, and the reply, or the change, comes. While a session changes the file, what you type
 into it may give way to its change when that comes in: cmd+Z brings yours
-back. A session on another computer can't read or change the file: it is
-sent the selected text itself, and after cmd+K replies with the new text
-for cmd+enter to put in.
+back. The sessions listed are this computer's: one on another computer is
+asked from a terminal, with `y session ask`.
+
+The column shows in the tab you ask from: asked from another tab, it comes
+along, with what was asked. The line over the box names the box's keys, and
+the one under it whom the question goes to and what it is about: "Ask fix
+login · plan.md L3-4".
 
 A Codex session is asked through Codex's own server, and its reply is its
 answer, without what it said as it worked. A new one starts with full

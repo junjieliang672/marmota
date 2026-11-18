@@ -113,9 +113,10 @@ func sessionCommand() *cli.Command {
 						"the id, agent, host and title, then the row to show, in color"},
 					&cli.StringFlag{Name: "new-in", Usage: "with --rows: first a row for each agent that stands " +
 						"for a session not started yet, to start in this folder"},
+					&cli.BoolFlag{Name: "local", Usage: "only this computer's sessions, without asking the others"},
 				},
 				Action: func(_ context.Context, c *cli.Command) error {
-					sessions, failed := internal.SessionList()
+					sessions, failed := internal.SessionList(c.Bool("local"))
 					if c.Bool("rows") {
 						return internal.WriteSessionRows(os.Stdout, sessions, c.String("new-in"))
 					}

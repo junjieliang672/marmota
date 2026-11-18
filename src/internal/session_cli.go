@@ -152,7 +152,9 @@ type ListedSession struct {
 // SessionList lists the sessions running in Marmota's tmux, here and on
 // every computer it remembers: Claude Code's, then Codex's, which run here.
 // Computers it can't reach come back as errors beside what could be listed.
-func SessionList() ([]ListedSession, map[string]error) {
+// With local, only this computer's are listed, which is the quick part: the
+// editor's list of sessions to ask is that.
+func SessionList(local bool) ([]ListedSession, map[string]error) {
 	tracker := claudesession.NewTracker()
 	var out []ListedSession
 	add := func(s claudesession.Session) {
@@ -171,6 +173,9 @@ func SessionList() ([]ListedSession, map[string]error) {
 	}
 	for _, s := range withoutTemporary(localCodexSessions()) {
 		add(s)
+	}
+	if local {
+		return out, nil
 	}
 	remote := listRemoteSessions(tracker)
 	for _, s := range remote.sessions {

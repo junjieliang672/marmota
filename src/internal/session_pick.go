@@ -48,7 +48,7 @@ func SessionPick(newIn, prompt string) (string, error) {
 	if err != nil {
 		return "", errors.New("fzf isn't installed: brew install fzf")
 	}
-	sessions, _ := SessionList()
+	sessions, _ := SessionList(false)
 	var rows bytes.Buffer
 	if err := WriteSessionRows(&rows, sessions, newIn); err != nil {
 		return "", err

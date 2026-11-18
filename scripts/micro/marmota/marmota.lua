@@ -13,7 +13,7 @@ local util = import("micro/util")
 function init()
     -- "help marmota" (cmd+H): the keys worth knowing, Marmota's and micro's
     config.AddRuntimeFile("marmota", config.RTHelp, "help/marmota.md")
-    -- how the pane of questions and replies is drawn (showReplies)
+    -- how the column of questions, replies and sessions is drawn (render)
     config.AddRuntimeFile("marmota", config.RTSyntax, "syntax/marmota-replies.yaml")
     -- $(marmota.status) in the status line (statusformatr in settings.json)
     micro.SetStatusInfoFn("marmota.status")
@@ -502,15 +502,21 @@ function drag(bp, event)
     return bp:MouseDrag(event)
 end
 
--- Asking a session while you write. cmd+L asks the session this editor
--- writes to: your question goes to it with the file, and the lines you
--- selected, named after it, so it reads them itself. You go on writing; its
--- reply shows in a pane on the right when its turn has ended. cmd+enter puts
--- the last reply at the cursor, or in place of what is selected. The session
--- is one of Marmota's: what you ask here shows in its Sessions box too.
+-- Asking a session while you write, in a column on the right: above, what
+-- was asked and replied, or the sessions to pick from; under it the box
+-- everything is written in. The cursor is in the file or in that box. cmd+L
+-- puts it in the box for a question to the session this editor writes to:
+-- enter sends it with the file, and the lines you selected, named after it,
+-- so the session reads them itself, and the cursor goes back to the file.
+-- You go on writing; the reply shows above the box when the session's turn
+-- has ended. cmd+enter puts the last reply at the cursor, or in place of
+-- what is selected. cmd+shift+L lists the sessions above the box, which then
+-- filters them, and cmd+K has the box take what the session is to change in
+-- the file. The session is one of Marmota's: what you ask here shows in its
+-- Sessions box too.
 --
 -- All of it goes through `y session`: list for the sessions to pick from,
--- ask to send a question and wait for its reply.
+-- this computer's, ask to send a question and wait for its reply.
 
 local shell = import("micro/shell")
 local os = import("os")
@@ -575,27 +581,19 @@ local function folder()
     return dir
 end
 
-local function shellQuote(s)
-    return "'" .. s:gsub("'", "'\\''") .. "'"
-end
-
 -- paneNamed is the pane that shows the buffer of that name, when one does.
 local function paneNamed(name)
     local tabs = micro.Tabs().List
     for i = 1, #tabs do
         local panes = tabs[i].Panes
         for j = 1, #panes do
-            if panes[j].Buf:GetName() == name then
+            local buf = panes[j].Buf -- a terminal's pane has none
+            if buf ~= nil and buf:GetName() == name then
                 return panes[j], tabs[i], j - 1
             end
         end
     end
     return nil
-end
-
--- repliesPane is the pane that shows the replies, when one does.
-local function repliesPane()
-    return paneNamed(repliesName)
 end
 
 -- keys is cmd+H: the page of keys ("help marmota"), shown below the file or
@@ -643,32 +641,247 @@ local function repliesText()
     return table.concat(out, "\n")
 end
 
--- showReplies draws the questions and replies in their pane on the right,
--- opening it beside bp when it isn't there; the keyboard stays where it is.
-local function showReplies(bp)
-    local pane = repliesPane()
-    if pane == nil then
-        local tab = bp:Tab()
-        local at = tab:GetPane(bp:ID())
-        local buf = buffer.NewBuffer(repliesText(), repliesName)
-        buf.Type.Scratch = true
-        buf:SetOptionNative("softwrap", true)
-        buf:SetOptionNative("wordwrap", true)
-        buf:SetOptionNative("filetype", "marmota-replies")
-        buf:SetOptionNative("ruler", false)
-        pane = bp:VSplitIndex(buf, true)
-        tab:SetActive(at)
-    else
-        pane.Buf:Replace(pane.Buf:Start(), pane.Buf:End(), repliesText())
-    end
-    pane.Cursor:GotoLoc(pane.Buf:End())
-    pane:Relocate()
+-- The column. Its upper pane, the replies' (repliesName), shows what was
+-- asked and replied, or the sessions while one is picked; its lower one is
+-- the box (boxName). Each has its status line say what it is for: the upper
+-- one's, between the two, the keys; the box's, at the foot, whom the
+-- question goes to and what it is about.
+local boxName = "Marmota ask"
+local boxRows = 4
+local columnShare = 0.4 -- of the width of the pane it opens beside
+
+-- side is the column's state. mode is what the box is for: "ask" a
+-- question, "edit" what the session is to change in the file, "pick" the
+-- session, after which it is for after again. While a session is picked the
+-- box filters rows, the sessions listed, to shown, sel of them marked;
+-- listing is set while they are listed, to the listing's number. held is
+-- what the box held before it became the filter, draft what it held when
+-- the column was put away. file is the pane a question is about, and about
+-- says so: "plan.md L3-4".
+local side = {
+    mode = "ask",
+    after = "ask",
+    rows = {},
+    shown = {},
+    sel = 1,
+    filter = "",
+    listing = 0,
+    listed = 0,
+    held = "",
+    draft = "",
+    file = nil,
+    about = "",
+}
+
+-- inColumn reports a pane of the column.
+local function inColumn(bp)
+    local name = bp.Buf:GetName()
+    return name == repliesName or name == boxName
 end
 
--- remote reports a session on another computer, which can't read this
--- one's files.
-local function remote()
-    return session.host ~= "" and session.host ~= "here"
+-- written is what a pane's buffer holds.
+local function written(pane)
+    return util.String(pane.Buf:Bytes())
+end
+
+-- write puts text in the box, the cursor after it.
+local function write(box, text)
+    box.Buf:Replace(box.Buf:Start(), box.Buf:End(), text)
+    box.Cursor:GotoLoc(box.Buf:End())
+    box:Relocate()
+end
+
+-- aboutOf says what a question from this pane is about: its file, and the
+-- lines selected.
+local function aboutOf(bp)
+    if bp.Buf.Path == "" then
+        return ""
+    end
+    local name = filepath.Base(bp.Buf.AbsPath)
+    local from, to = selection(bp.Cursor)
+    if from == nil then
+        return name
+    end
+    local last = to.Y
+    if to.X == 0 and to.Y > from.Y then
+        last = to.Y - 1 -- the selection ends before this line's first character
+    end
+    if last > from.Y then
+        return name .. " L" .. (from.Y + 1) .. "-" .. (last + 1)
+    end
+    return name .. " L" .. (from.Y + 1)
+end
+
+-- label is the box's status line.
+local function label()
+    if side.mode == "pick" then
+        return "Pick a session · type to filter"
+    end
+    if side.mode == "edit" then
+        return session.title .. " changes " .. (side.about ~= "" and side.about or "the file")
+    end
+    if side.about ~= "" then
+        return "Ask " .. session.title .. " · " .. side.about
+    end
+    return "Ask " .. session.title
+end
+
+-- sessionsText is the list of sessions, those the box's words leave: a row
+-- stays when it has each of them. The marked row starts with an arrow.
+local function sessionsText()
+    local words = {}
+    for word in side.filter:lower():gmatch("%S+") do
+        table.insert(words, word)
+    end
+    side.shown = {}
+    for _, row in ipairs(side.rows) do
+        local text, has = row.text:lower(), true
+        for _, word in ipairs(words) do
+            if not text:find(word, 1, true) then
+                has = false
+                break
+            end
+        end
+        if has then
+            table.insert(side.shown, row)
+        end
+    end
+    side.sel = math.max(1, math.min(side.sel, #side.shown))
+    local out = { "Ask which session?", "" }
+    for i, row in ipairs(side.shown) do
+        table.insert(out, (i == side.sel and "▶ " or "  ") .. row.text)
+    end
+    if side.listing > 0 then
+        table.insert(out, "  listing sessions…")
+    elseif #side.shown == 0 then
+        table.insert(out, "  no session has that")
+    end
+    return table.concat(out, "\n")
+end
+
+-- render draws the column, when it is there: the questions and replies, the
+-- last in view, or the sessions; and what each status line says.
+local function render()
+    local show = paneNamed(repliesName)
+    if show == nil then
+        return
+    end
+    local picking = side.mode == "pick"
+    show.Buf.Type.Readonly = false
+    show.Buf:Replace(show.Buf:Start(), show.Buf:End(), picking and sessionsText() or repliesText())
+    show.Buf.Type.Readonly = true
+    show.Buf:SetOptionNative("softwrap", not picking) -- a session's row is one line, cut at the edge
+    if picking then
+        show.Cursor:GotoLoc(buffer.Loc(0, side.sel + 1)) -- the marked row, under the two lines above the rows
+    else
+        show.Cursor:GotoLoc(show.Buf:End())
+    end
+    show:Relocate()
+    show.Buf:SetOptionNative("statusformatl",
+        picking and "↑↓ · enter picks · esc cancels" or "enter sends · shift+enter a new line · esc back")
+    local box = paneNamed(boxName)
+    if box ~= nil then
+        box.Buf:SetOptionNative("statusformatl", label())
+    end
+end
+
+-- closeColumn puts the column away. What the box holds is kept for when it
+-- is back, and so is all that was asked.
+local function closeColumn()
+    local box = paneNamed(boxName)
+    if box ~= nil then
+        side.draft = side.mode == "pick" and side.held or written(box)
+        box:Quit()
+    end
+    if side.mode == "pick" then
+        side.mode, side.held = side.after, ""
+    end
+    local show = paneNamed(repliesName)
+    if show ~= nil then
+        show:Quit()
+    end
+end
+
+-- openColumn shows the column beside bp, a file's pane, when it isn't in
+-- bp's tab: one that is in another tab goes where you are. The keyboard
+-- stays where it is.
+local function openColumn(bp)
+    local tab = bp:Tab()
+    local _, at = paneNamed(repliesName)
+    if at ~= nil then
+        local panes = tab.Panes
+        for j = 1, #panes do
+            local buf = panes[j].Buf
+            if buf ~= nil and buf:GetName() == repliesName then
+                return
+            end
+        end
+        closeColumn()
+    end
+    local active = tab:GetPane(bp:ID())
+    local view = bp:GetView()
+    local width, height = view.Width, view.Height
+
+    local shown = buffer.NewBuffer("", repliesName)
+    shown.Type.Scratch = true
+    shown:SetOptionNative("softwrap", true)
+    shown:SetOptionNative("wordwrap", true)
+    shown:SetOptionNative("filetype", "marmota-replies")
+    shown:SetOptionNative("ruler", false)
+    shown:SetOptionNative("statusformatr", "")
+    local show = bp:VSplitIndex(shown, true)
+    bp:ResizePane(math.floor(width * (1 - columnShare)))
+
+    local text = buffer.NewBuffer(side.draft, boxName)
+    text.Type.Scratch = true
+    text:SetOptionNative("softwrap", true)
+    text:SetOptionNative("wordwrap", true)
+    text:SetOptionNative("ruler", false)
+    text:SetOptionNative("statusformatr", "")
+    local box = show:HSplitIndex(text, true)
+    show:ResizePane(height - boxRows - 1)
+    box.Cursor:GotoLoc(text:End())
+    shown.Type.Readonly = true
+
+    tab:SetActive(active)
+    render()
+end
+
+-- toBox gives the box the keyboard.
+local function toBox()
+    local box, tab, index = paneNamed(boxName)
+    if box ~= nil then
+        tab:SetActive(index)
+    end
+end
+
+-- filePane is the pane a question is about, while it is still open beside
+-- the column.
+local function filePane()
+    local _, tab = paneNamed(repliesName)
+    if tab == nil or side.file == nil then
+        return nil
+    end
+    local panes = tab.Panes
+    for j = 1, #panes do
+        if panes[j]:ID() == side.file:ID() then
+            return panes[j], tab, j - 1
+        end
+    end
+    return nil
+end
+
+-- toFile gives the keyboard back to the file.
+local function toFile()
+    local pane, tab, index = filePane()
+    if pane ~= nil then
+        tab:SetActive(index)
+        return
+    end
+    local _, beside = paneNamed(repliesName)
+    if beside ~= nil then
+        beside:SetActive(0)
+    end
 end
 
 -- mention names the file to a session, with the selected lines, as Claude
@@ -703,25 +916,9 @@ local function mention(bp)
     return out .. "#L" .. (from.Y + 1), true
 end
 
--- excerpt is the selected text, or the file's, for a session that can't
--- read the file itself.
-local function excerpt(bp)
-    local text
-    if bp.Cursor:HasSelection() then
-        text = util.String(bp.Cursor:GetSelection())
-    else
-        text = util.String(bp.Buf:Bytes())
-    end
-    return "From " .. filepath.Base(bp.Buf.AbsPath) .. ":\n\n" .. text
-end
-
 -- reference is what a question says of what it is about: the file and the
--- selected lines by name, for the session to read; their text itself for a
--- session on another computer.
+-- selected lines by name, for the session to read.
 local function reference(bp)
-    if remote() then
-        return excerpt(bp)
-    end
     local name = mention(bp)
     if session.agent == codex then
         return "This is about " .. name .. "."
@@ -730,13 +927,8 @@ local function reference(bp)
 end
 
 -- editRequest is what cmd+K adds to what you ask for: that the change is
--- made in the file itself, which this editor shows as soon as it is. A
--- session on another computer can't reach the file: it replies with the new
--- text, for cmd+enter to put in.
+-- made in the file itself, which this editor shows as soon as it is.
 local function editRequest(bp)
-    if remote() then
-        return "Reply with only the new text, nothing before or after it, for this:\n\n" .. excerpt(bp)
-    end
     local name, lines = mention(bp)
     if lines then
         return "Do this by editing the file in place: " .. name .. " (those lines only, unless it needs more). "
@@ -764,16 +956,16 @@ end
 local onReply
 
 -- wait has entry's reply waited for: its message is the session's already.
-local function wait(index, bp)
+local function wait(index)
     local entry = asked[index]
     shell.JobSpawn(marmota, { "session", "ask", "--sent", "--keep-waiting", entry.session, entry.message },
-        nil, nil, onReply, index, bp)
+        nil, nil, onReply, index)
 end
 
 onReply = function(output, args)
     -- its place in asked, not the entry: a table handed to a job comes
     -- back a copy
-    local entry, bp = asked[args[1]], args[2]
+    local entry = asked[args[1]]
     output = strings.TrimSpace(output)
     local failed = output:match("y session ask: (.*)$")
     if failed ~= nil and failed:find("it stopped to ask you", 1, true) and entry.needsYou == nil then
@@ -781,8 +973,8 @@ onReply = function(output, args)
         -- is this editor's to say (cmd+O), not y's.
         entry.needsYou = failed:gsub("%s*%(.*%)$", "")
         micro.InfoBar():Error(entry.title .. " stopped to ask you something: cmd+O opens it to answer")
-        wait(args[1], bp)
-        showReplies(bp)
+        wait(args[1])
+        render()
         return
     end
     if failed ~= nil then
@@ -804,20 +996,20 @@ onReply = function(output, args)
     end
     arrived = arrived + 1
     entry.arrived = arrived
-    showReplies(bp)
+    render()
 end
 
 -- onStarted has the session a question started: the question is its first
 -- message, and its reply is waited for as any other.
 local function onStarted(output, args)
-    local entry, bp = asked[args[1]], args[2]
+    local entry = asked[args[1]]
     local id = output:match("started (%S+)")
     if id == nil then
         entry.reply = "⚠ " .. strings.TrimSpace(output)
         arrived = arrived + 1
         entry.arrived = arrived
         micro.InfoBar():Error("Couldn't start a session: " .. strings.TrimSpace(output))
-        showReplies(bp)
+        render()
         return
     end
     entry.starting = false
@@ -826,23 +1018,26 @@ local function onStarted(output, args)
         -- the next questions go on with it
         session.id, session.title, session.host = id, entry.title, "here"
     end
-    shell.JobSpawn(marmota, { "session", "ask", "--sent", id, entry.message }, nil, nil, onReply, args[1], bp)
-    showReplies(bp)
+    shell.JobSpawn(marmota, { "session", "ask", "--sent", id, entry.message }, nil, nil, onReply, args[1])
+    render()
 end
 
 -- send asks the session: question, and about it either what it is about
--- (cmd+L) or, with edit, that it changes the file itself (cmd+K).
+-- (cmd+L) or, with edit, that it changes the file itself (cmd+K). bp is the
+-- file's pane, nil when it has been closed since: the question then goes by
+-- itself.
 local function send(bp, question, edit)
-    if bp.Buf.Path ~= "" and bp.Buf:Modified() then
+    local file = bp ~= nil and bp.Buf.Path ~= ""
+    if file and bp.Buf:Modified() then
         bp:Save()
     end
     local message = question
-    if bp.Buf.Path ~= "" then
+    if file then
         message = question .. "\n\n" .. (edit and editRequest(bp) or reference(bp))
     end
     local entry = { title = session.title, question = question, message = message, session = session.id,
         agent = session.agent }
-    if edit and bp.Buf.Path ~= "" and not remote() then
+    if edit and file then
         entry.edits = bp.Buf.AbsPath
     end
     table.insert(asked, entry)
@@ -851,74 +1046,248 @@ local function send(bp, question, edit)
         -- a session of this editor's own: Marmota's Sessions box leaves it
         -- out, and it closes when the editor does
         shell.JobSpawn(marmota, { "session", "start", "--temporary", "--agent", session.agent, "--cwd", folder(),
-            "--", message }, nil, nil, onStarted, #asked, bp)
+            "--", message }, nil, nil, onStarted, #asked)
     else
-        shell.JobSpawn(marmota, { "session", "ask", session.id, message }, nil, nil, onReply, #asked, bp)
+        shell.JobSpawn(marmota, { "session", "ask", session.id, message }, nil, nil, onReply, #asked)
     end
-    showReplies(bp)
+    render()
     micro.InfoBar():Message("Asked " .. session.title .. "; go on writing")
 end
 
-local function promptQuestion(bp)
-    micro.InfoBar():Prompt("Ask " .. session.title .. " › ", "", "MarmotaAsk", nil, function(resp, canceled)
-        if not canceled and strings.TrimSpace(resp) ~= "" then
-            send(bp, strings.TrimSpace(resp), false)
-        end
-    end)
+-- padded is text with spaces after it, up to width characters.
+local function padded(text, width)
+    return text .. string.rep(" ", width - util.CharacterCountInString(text))
 end
 
-local function promptEdit(bp)
-    local what = bp.Cursor:HasSelection() and "these lines" or "this file"
-    micro.InfoBar():Prompt(session.title .. ", change " .. what .. " › ", "", "MarmotaEdit", nil,
-        function(resp, canceled)
-            if not canceled and strings.TrimSpace(resp) ~= "" then
-                send(bp, strings.TrimSpace(resp), true)
-            end
-        end)
+-- rowText is a row of the list: who runs the session, what it does, its
+-- title and its folder. A long one is cut at the column's edge.
+local function rowText(agent, does, title, where)
+    local out = padded(agent, 13) .. "  " .. padded(does, 11) .. " " .. title
+    if where ~= nil and where ~= "" then
+        out = out .. "  " .. where
+    end
+    return out
 end
 
--- pickSession lists Marmota's sessions to pick the one questions go to,
--- then goes on with after.
-local function pickSession(bp, after)
-    -- y shows the sessions in fzf, Claude Code's and Codex's each in its
-    -- color, and first a row for one not started yet, by each agent. It
-    -- runs fzf itself, since what fzf draws by itself shows without its
-    -- colors in micro's terminal pane, and prints the row picked: the id,
-    -- the agent, the host and the title.
-    local cmd = shellQuote(marmota) .. " session pick --prompt " .. shellQuote("Ask which session? ")
-        .. " --new-in " .. shellQuote(folder())
-    local err = shell.RunTermEmulator(bp, cmd, false, true, function(output, args)
-        local line = output:gsub("^%s+", ""):gsub("[\r\n]+$", "")
-        if line == "" then
-            return
-        end
-        local failed = line:match("y session pick: (.*)$")
-        if failed ~= nil then
-            micro.InfoBar():Error(failed)
-            return
-        end
+-- newRows are the list's first rows: a session not started yet, by each
+-- agent. They are there at once; the sessions that run follow when y has
+-- listed them.
+local function newRows()
+    local name = filepath.Base(folder())
+    return {
+        { id = newSession, agent = "cc", host = "here", title = "new · " .. name,
+            text = padded("✳ Claude Code", 13) .. "  + New session in " .. name },
+        { id = newSession, agent = codex, host = "here", title = "new Codex · " .. name,
+            text = padded("◆ Codex", 13) .. "  + New session in " .. name },
+    }
+end
+
+-- onListed has the sessions y listed: a line each, tab-separated, the id,
+-- the agent, the host, the title and the row to show. That row is written
+-- for a picker as wide as a terminal, in colors of its own: its parts, which
+-- two spaces or more part, are put together again for the column, and
+-- syntax/marmota-replies.yaml colors them here.
+local function onListed(output, args)
+    if args[1] ~= side.listing then
+        return -- an earlier listing: the list was opened again since
+    end
+    side.listing = 0
+    local rows = newRows()
+    for line in (output .. "\n"):gmatch("(.-)\r?\n") do
         local fields = {}
         for field in (line .. "\t"):gmatch("(.-)\t") do
             table.insert(fields, field)
         end
-        if #fields < 4 then
-            micro.InfoBar():Error("Couldn't read the session picked: " .. line)
-            return
+        if #fields >= 5 then
+            local text = fields[5]:gsub("\27%[[%d;]*m", "")
+            local parts = {}
+            for part in (text .. "  "):gmatch("(.-)%s%s+") do
+                if part ~= "" then
+                    table.insert(parts, part)
+                end
+            end
+            if #parts >= 3 then
+                text = rowText(parts[1], parts[2], parts[3], parts[4])
+            end
+            table.insert(rows, { id = fields[1], agent = fields[2], host = fields[3], title = fields[4],
+                text = text })
         end
-        session.id, session.agent, session.host, session.title = fields[1], fields[2], fields[3], fields[4]
-        if session.id == newSession then
-            session.title = "new · " .. filepath.Base(folder())
-            if session.agent == codex then
-                session.title = "new Codex · " .. filepath.Base(folder())
+    end
+    local failed = output:match("y session list: ([^\r\n]*)")
+    if failed ~= nil then
+        micro.InfoBar():Error("Couldn't list the sessions: " .. failed)
+    end
+    side.rows = rows
+    if side.mode ~= "pick" then
+        return
+    end
+    if side.filter == "" and side.sel == 1 then
+        -- the mark starts on the session questions go to now
+        for i, row in ipairs(rows) do
+            if row.id == session.id and row.id ~= newSession then
+                side.sel = i
             end
         end
-        micro.InfoBar():Message("Questions go to " .. session.title)
-        if after ~= nil then
-            after(args[1])
+    end
+    render()
+end
+
+-- pick has the column list the sessions, for the box to filter and enter to
+-- pick one; the box is then for after again, "ask" or "edit", with what it
+-- held.
+local function pick(after)
+    local box = paneNamed(boxName)
+    if side.mode ~= "pick" then
+        side.after = after
+        side.held = box ~= nil and written(box) or ""
+        side.mode = "pick"
+    end
+    if box ~= nil then
+        write(box, "")
+    end
+    side.filter, side.sel = "", 1
+    side.rows = newRows()
+    side.listed = side.listed + 1
+    side.listing = side.listed
+    -- this computer's only: asking the others takes a second and more
+    shell.JobSpawn(marmota, { "session", "list", "--rows", "--local" }, nil, nil, onListed, side.listing)
+    render()
+end
+
+-- endPick goes back to what the box was for, with what it held.
+local function endPick()
+    side.mode = side.after
+    local box = paneNamed(boxName)
+    if box ~= nil then
+        write(box, side.held)
+    end
+    side.held = ""
+    render()
+end
+
+-- enter in the box: the marked session is picked, or what is written is
+-- sent and the cursor goes back to the file.
+local function submit(box)
+    if side.mode == "pick" then
+        local row = side.shown[side.sel]
+        if row == nil then
+            return
         end
-    end, { bp })
-    if err ~= nil then
-        micro.InfoBar():Error(err)
+        session.id, session.agent, session.host, session.title = row.id, row.agent, row.host, row.title
+        micro.InfoBar():Message("Questions go to " .. session.title)
+        endPick()
+        return
+    end
+    if session.id == "" then
+        pick(side.mode) -- nobody to ask yet
+        return
+    end
+    local text = strings.TrimSpace(written(box))
+    if text == "" then
+        return
+    end
+    local file = filePane()
+    local edit = side.mode == "edit"
+    if edit and (file == nil or file.Buf.Path == "") then
+        micro.InfoBar():Error("The file to change is closed: cmd+K in a file asks again")
+        return
+    end
+    write(box, "")
+    side.mode = "ask"
+    send(file, text, edit)
+    toFile()
+end
+
+-- The box's keys. micro asks a plugin before it does what a key is bound
+-- to, by the action's name, and leaves it when the plugin says false.
+
+-- enter in the box sends, or picks.
+function preInsertNewline(bp)
+    if bp.Buf:GetName() ~= boxName then
+        return true
+    end
+    submit(bp)
+    return false
+end
+
+-- newLine is shift+enter (WezTerm sends a line feed for it, ctrl+J): a new
+-- line in the box. Elsewhere it is what micro has ctrl+J do.
+function newLine(bp)
+    if bp.Buf:GetName() ~= boxName then
+        return bp:PlayMacro()
+    end
+    if side.mode ~= "pick" then
+        bp:InsertNewline()
+    end
+    return true
+end
+
+-- up and down in the box move the mark while a session is picked.
+local function mark(bp, step)
+    if bp.Buf:GetName() ~= boxName or side.mode ~= "pick" then
+        return true
+    end
+    side.sel = math.max(1, math.min(#side.shown, side.sel + step))
+    render()
+    return false
+end
+
+function preCursorUp(bp)
+    return mark(bp, -1)
+end
+
+function preCursorDown(bp)
+    return mark(bp, 1)
+end
+
+-- escape is esc. In the column it goes back to the file; while a session
+-- is picked it leaves the list first, for the box with what it held when
+-- there is a session to ask. Elsewhere it is all that micro has esc do. It
+-- is bound to the key itself, not asked before micro's own: micro goes on
+-- with the rest of what esc does, which takes the selection off the pane
+-- that has the keyboard, by then the file's, the lines a question is about.
+function escape(bp)
+    if not inColumn(bp) then
+        bp:Escape()
+        bp:Deselect()
+        bp:ClearInfo()
+        bp:RemoveAllMultiCursors()
+        bp:UnhighlightSearch()
+        return true
+    end
+    if side.mode == "pick" then
+        endPick()
+        if session.id ~= "" and bp.Buf:GetName() == boxName then
+            return true
+        end
+    end
+    toFile()
+    return true
+end
+
+-- Closing one of the column's panes (cmd+W) puts the column away.
+function preQuit(bp)
+    if not inColumn(bp) then
+        return true
+    end
+    closeColumn()
+    return false
+end
+
+-- What is typed in the box filters the sessions while one is picked. micro
+-- says when anything happened, not what: the box is read again.
+function onAnyEvent()
+    if side.mode ~= "pick" then
+        return
+    end
+    local box = paneNamed(boxName)
+    if box == nil then
+        return
+    end
+    local filter = written(box)
+    if filter ~= side.filter then
+        side.filter, side.sel = filter, 1
+        render()
     end
 end
 
@@ -963,35 +1332,71 @@ function copyReference(bp)
     return true
 end
 
--- ask is cmd+L: a question to the session, about this file.
-function ask(bp)
-    if session.id == "" then
-        pickSession(bp, promptQuestion)
-    else
-        promptQuestion(bp)
+-- from has the column open beside the pane a key was pressed in, which a
+-- question is then about. A key pressed in the column leaves that as it is.
+local function from(bp)
+    if not inColumn(bp) then
+        side.file, side.about = bp, aboutOf(bp)
+        openColumn(bp)
     end
+end
+
+-- boxFor has the box be for mode, "ask" or "edit": after a session is
+-- picked, when there is none yet to ask.
+local function boxFor(mode)
+    if session.id == "" then
+        pick(mode)
+        return
+    end
+    if side.mode == "pick" then
+        side.after = mode
+        endPick()
+        return
+    end
+    side.mode = mode
+    render()
+end
+
+-- ask is cmd+L: the cursor goes to the box, for a question to the session
+-- about this file. From the box, it goes back to the file.
+function ask(bp)
+    if bp.Buf:GetName() == boxName then
+        if side.mode == "pick" then
+            endPick()
+        end
+        toFile()
+        return true
+    end
+    from(bp)
+    boxFor("ask")
+    toBox()
     return true
 end
 
--- askAnother is cmd+shift+L: pick the session, then ask it.
+-- askAnother is cmd+shift+L: the sessions are listed above the box, to pick
+-- the one questions go to.
 function askAnother(bp)
-    pickSession(bp, promptQuestion)
+    from(bp)
+    pick(side.mode == "edit" and "edit" or "ask")
+    toBox()
     return true
 end
 
--- edit is cmd+K: the session changes the selected lines, or the file, in
--- the file itself, as you ask; this editor shows the change when it is
--- made, and cmd+Z takes it back.
+-- edit is cmd+K: the box takes what the session is to change in the
+-- selected lines, or the file, which it changes in the file itself; this
+-- editor shows the change when it is made, and cmd+Z takes it back.
 function edit(bp)
-    if bp.Buf.Path == "" then
+    local file = bp
+    if inColumn(bp) then
+        file = filePane()
+    end
+    if file == nil or file.Buf.Path == "" then
         micro.InfoBar():Message("Save the file first: the session changes it on disk")
         return true
     end
-    if session.id == "" then
-        pickSession(bp, promptEdit)
-    else
-        promptEdit(bp)
-    end
+    from(bp)
+    boxFor("edit")
+    toBox()
     return true
 end
 
@@ -1009,7 +1414,7 @@ function insertReply(bp)
         micro.InfoBar():Message("No reply yet")
         return true
     end
-    if bp.Buf:GetName() == repliesName then
+    if inColumn(bp) then
         micro.InfoBar():Message("Put the cursor where the reply goes first")
         return true
     end
@@ -1054,15 +1459,13 @@ function openSession(bp)
     return true
 end
 
--- toggleReplies is cmd+J: the replies' pane, shown or put away.
+-- toggleReplies is cmd+J: the column, shown or put away. What was asked,
+-- and what the box holds, is there again when it is shown.
 function toggleReplies(bp)
-    local pane = repliesPane()
-    if pane ~= nil then
-        pane:Quit()
-    elseif #asked > 0 then
-        showReplies(bp)
+    if paneNamed(repliesName) ~= nil then
+        closeColumn()
     else
-        micro.InfoBar():Message("Nothing asked yet: cmd+L asks a session")
+        from(bp)
     end
     return true
 end

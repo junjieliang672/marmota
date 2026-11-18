@@ -242,3 +242,21 @@ func TestShowOpensASessionsWindowUnderThePane(t *testing.T) {
 	_, err = SessionShow("abcd1234")
 	assert.ErrorContains(t, err, "this isn't a WezTerm pane")
 }
+
+// The editor's list of sessions is this computer's only, since asking the
+// others takes a second and more: a computer Marmota remembers isn't asked.
+func TestListingThisComputersSessionsAsksNoOther(t *testing.T) {
+	ownTmux(t)
+	asked := filepath.Join(t.TempDir(), "asked")
+	require.NoError(t, saveRemoteHosts([]sessionhost.Host{{Name: "far",
+		Command: []string{"/bin/sh", "-c", "touch " + asked + "; exit 1", "sh"}}}))
+	t.Cleanup(func() { _ = os.Remove(variable.RemotesFile) })
+
+	_, failed := SessionList(true)
+	assert.Nil(t, failed)
+	assert.NoFileExists(t, asked)
+
+	_, failed = SessionList(false)
+	assert.FileExists(t, asked, "listing every computer's asks it")
+	assert.Contains(t, failed, "far")
+}

@@ -23,6 +23,8 @@
     "Alt-l": "lua:marmota.ask",
     "Alt-L": "lua:marmota.askAnother",
     "Alt-Enter": "lua:marmota.insertReply",
+    "Ctrl-j": "lua:marmota.newLine",
+    "Esc": "lua:marmota.escape",
     "Alt-j": "lua:marmota.toggleReplies",
     "Alt-k": "lua:marmota.edit",
     "Alt-C": "lua:marmota.copyReference",

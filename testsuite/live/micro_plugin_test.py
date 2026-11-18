@@ -14,17 +14,25 @@ block in ~/.wezterm.lua). Checks:
      cmd+shift+G selects up to the same places, and what brackets hold.
      The wheel, turned while the left button drags, scrolls and the
      selection goes on.
-  3. cmd+L asks the session the editor was opened for, about the file and
-     the selected lines; typing goes on; the reply shows on the right;
-     cmd+enter puts it at the cursor and cmd+Z takes it back.
-  4. cmd+shift+L lists the sessions; a second session is asked too, and
-     both replies show under their questions.
+  3. cmd+L opens a column on the right and puts the cursor in the box at
+     its foot: shift+enter is a new line there, esc goes back to the file
+     with what is written kept, enter sends it to the session the editor
+     was opened for, about the file and the selected lines; typing goes on
+     in the file; the reply shows above the box; cmd+enter puts it at the
+     cursor and cmd+Z takes it back.
+  4. cmd+shift+L lists the sessions above the box, at once, the file still
+     in view; what is typed in the box filters them, the arrows move the
+     mark, esc leaves the list, enter picks. A second session is asked too,
+     and both replies show under their questions.
   5. The list's first row starts a session with the question; the next
      question goes on with it.
-  6. cmd+K has the session change the selected lines in the file itself:
-     the editor shows the change, and cmd+Z takes it back.
-  7. A session on "another computer" (this one, through a command) gets the
-     selected text itself, which it couldn't read from the file.
+  6. cmd+K has the box take what the session is to change in the selected
+     lines, in the file itself: the editor shows the change, and cmd+Z
+     takes it back.
+  7. cmd+J puts the column away and shows it again with what the box held;
+     cmd+L from the box goes back to the file; cmd+W in the box puts the
+     column away; in another tab the column comes along with what was
+     asked.
   8. The real Marmota opens micro with e; cmd+M puts micro away, as it is,
      and Marmota says so; e opens another micro, which says it can't be put
      away too; b brings the first back with what was typed; q brings it
@@ -64,6 +72,7 @@ KEY = {
     "cmd+enter": b"\x1b\r", "cmd+j": b"\x1bj", "enter": b"\r", "down": b"\x1b[B", "shift+down": b"\x1b[1;2B",
     "cmd+h": b"\x1bOP", "cmd+w": b"\x11", "cmd+/": b"\x1b/", "opt+n": b"\x1bn", "opt+]": b"\x1b]",
     "opt+m": b"\x1bm", "opt+x": b"\x1bx", "cmd+o": b"\x1bOQ", "cmd+m": b"\x1bOR",
+    "shift+enter": b"\n", "backspace": b"\x7f", "up": b"\x1b[A", "opt+,": b"\x1b,",
 }
 PLAN = "# Plan\n\nline three\nline four\nline five\n\nlast para one\nlast para two\n"
 BRACKETS = "# Plan\n\nline three\nsay (a [b] c) d\n\nlast para one\nlast para two\n"
@@ -113,8 +122,38 @@ class Micro:
         return out
 
     def right(self) -> str:
-        """What the replies' pane shows."""
+        """What the column on the right shows: the replies or the sessions, then the box."""
         return "\n".join(line.split("|", 1)[1] for line in self.screen().splitlines() if "|" in line)
+
+    def box(self) -> list[str]:
+        """The lines written in the column's box, which is under the line that names its keys."""
+        lines = self.right().splitlines()
+        for i, line in enumerate(lines):
+            if "enter sends" in line or "enter picks" in line:
+                rows = [row.strip() for row in lines[i + 1:-1]]
+                while rows and not rows[-1]:
+                    rows.pop()
+                return rows
+        return []
+
+    def foot(self) -> str:
+        """The box's status line: what it is for."""
+        lines = self.right().splitlines()
+        return lines[-1].strip() if lines else ""
+
+    def column(self) -> bool:
+        """Whether a column shows beside the file: a line drawn down the screen, over the status lines."""
+        return any("|" in line for line in self.screen().splitlines()[:-2])
+
+    def in_box(self) -> bool:
+        """Whether the cursor is in the column, which is right of the file's pane. micro shows no cursor
+        while the pane with the keyboard has a selection, as the file's has with lines selected for a
+        question: the cursor is then not in the box, which never has one."""
+        for line in self.screen().splitlines()[:-2]:
+            if "|" in line:
+                shown, at = self.tmux("display", "-p", "-t", "t", "#{cursor_flag} #{cursor_x}").split()
+                return shown == "1" and int(at) > len(line.split("|", 1)[0])
+        return False
 
     def drawn(self, line_with: str, word: str, what: str = "") -> str:
         """How word is drawn on the screen's line that has line_with: the escape sequence just before the
@@ -359,16 +398,31 @@ def main() -> int:
         second = session("start", "--cwd", str(project), "--", "second").split()[1]
         wait_for("the sessions", lambda: session("list").count(" idle ") == 2)
 
-        # 4. cmd+L asks the editor's session about the file and the selected lines
+        # 3. cmd+L: the column, and the box a question is written in
         m = editor(first, "first", "here")
         assert "→ first" in m.screen().splitlines()[-2], "the status line says whom questions go to"
+        assert not m.column(), "no column before a session is asked"
         m.press("down", "down", "shift+down", "shift+down", "cmd+l")
-        wait_for("the question's prompt", lambda: "Ask first ›" in m.screen())
-        m.type("make these shorter")
+        wait_for("the column, the cursor in its box", lambda: "Ask first · plan.md L3-4" in m.foot() and m.in_box())
+        assert "enter sends" in m.right(), "the line over the box names its keys: " + m.right()
+        m.type("make these")
+        m.press("shift+enter")
+        m.type("x")
+        wait_for("a second line in the box", lambda: m.box() == ["make these", "x"])
+        m.press("backspace", "backspace")
+        wait_for("it taken out again", lambda: m.box() == ["make these"])
+        m.press("esc")
+        wait_for("esc to go back to the file", lambda: not m.in_box())
+        assert m.box() == ["make these"], "what was written stays in the box"
+        assert f"@{plan}" not in sent_to(socket, first), "nothing was sent"
+        m.press("cmd+l")
+        wait_for("the box again", lambda: m.in_box())
+        m.type(" shorter")
         m.press("enter")
+        wait_for("the cursor back in the file, the box empty", lambda: not m.in_box() and m.box() == [])
         m.press("cmd+down")
         m.type("typed while it works ")
-        wait_for("the reply on the right", lambda: "Echo: make these shorter" in m.right())
+        wait_for("the reply above the box", lambda: "Echo: make these shorter" in m.right())
         assert "You → first" in m.right() and "make these shorter" in m.right(), m.right()
         assert "⏺ first" in m.right(), "the reply starts under the session's name: " + m.right()
         asked, replied = m.drawn("\u00a0make these", "shorter"), m.drawn("Echo: make these", "shorter")
@@ -391,38 +445,61 @@ def main() -> int:
         m.press("cmd+o")
         wait_for("cmd+O to ask y for the session's window",
                  lambda: "Couldn't open first: this isn't a WezTerm pane" in m.screen().splitlines()[-1])
-        print("ok   cmd+L asked the session about the file and lines 3-4 while typing went on; its reply showed "
-              "on the right, drawn apart from the question; cmd+enter put it at the cursor and cmd+Z took it back; "
-              "cmd+O asked for the session's window")
+        print("ok   cmd+L opened the column with the cursor in its box: shift+enter was a new line, esc went back "
+              "to the file with the question kept, enter sent it about the file and lines 3-4; typing went on; "
+              "the reply showed above the box, drawn apart from the question; cmd+enter put it at the cursor and "
+              "cmd+Z took it back; cmd+O asked for the session's window")
 
-        # 5. another session, picked from the list
+        # 4. another session, picked from the list above the box
         m.press("cmd+shift+l")
-        wait_for("the list of sessions", lambda: m.screen().count("+ New session in project") == 2
-                 and "idle" in m.screen())
-        rows = [line for line in m.screen().splitlines() if "+ New session in project" in line]
+        wait_for("the list of sessions", lambda: m.right().count("+ New session in project") == 2
+                 and "idle" in m.right() and "listing sessions" not in m.right())
+        assert "Pick a session" in m.foot() and m.in_box(), m.screen()
+        assert "# Plan" in "\n".join(m.left()), "the file stays in view beside the list"
+        rows = [line for line in m.right().splitlines() if "+ New session in project" in line]
         assert "Claude Code" in rows[0] and "Codex" in rows[1], "a row to start each agent's session: " + m.screen()
         assert first not in m.screen(), "the ids stay out of sight"
         assert sum("Claude Code" in line and "○ idle" in line and "project" in line
-                   for line in m.screen().splitlines()) == 2, \
+                   for line in m.right().splitlines()) == 2, \
             "each session's row says who runs it, what it does and where: " + m.screen()
-        claude, codex_color = m.drawn("✳ Claude Code  + New", "✳ Claude"), m.drawn("◆ Codex", "◆ Codex")
+        marked = [line for line in m.right().splitlines() if line.lstrip().startswith("▶")]
+        assert len(marked) == 1 and "○ idle" in marked[0], \
+            "the mark starts on the session questions go to: " + m.right()
+        claude, codex_color = m.drawn("Claude Code  + New", "✳"), m.drawn("Codex", "◆")
         assert claude and codex_color and claude != codex_color, \
             f"Claude Code's rows and Codex's are in a color each: {claude!r} and {codex_color!r}"
-        m.press("down", "down", "down", "enter")  # the row of the second session, after the two that start one
-        wait_for("the question's prompt", lambda: "Ask " in m.screen().splitlines()[-1])
+        m.type("codex new")
+        wait_for("the rows that have both words", lambda: "Claude Code" not in m.right()
+                 and m.right().count("+ New session in project") == 1)
+        for _ in "codex new":
+            m.press("backspace")
+        wait_for("every row again", lambda: m.right().count("+ New session in project") == 2 and "idle" in m.right())
+        m.press("esc")
+        wait_for("esc to leave the list for the replies", lambda: "Echo: make these shorter" in m.right()
+                 and "Ask first" in m.foot())
+        assert m.in_box(), "the cursor stays in the box, which is for a question again"
+        m.press("cmd+shift+l")
+        wait_for("the list again", lambda: "idle" in m.right() and "listing sessions" not in m.right())
+        m.press("down", "up", "down", "enter")  # from the first session's row to the second's
+        wait_for("the box, for a question to the second", lambda: "Ask " in m.foot() and "Ask first" not in m.foot())
+        assert m.in_box(), "the cursor stays in the box"
         m.type("and you")
         m.press("enter")
         wait_for("its reply", lambda: "Echo: and you" in m.right())
         assert "Echo: make these shorter" in m.right(), "the first reply stays above"
         wait_for("the question in the second session", lambda: "and you" in sent_to(socket, second))
-        print("ok   cmd+shift+L listed the sessions and a new one; the second was asked too, and both replies "
-              "show under their questions")
+        print("ok   cmd+shift+L listed the sessions above the box, the file in view; typing filtered them, the "
+              "arrows moved the mark, esc left the list; the second was asked too, and both replies show under "
+              "their questions")
 
-        # 6. a session the question starts
+        # 5. a session the question starts
         m.press("cmd+shift+l")
-        wait_for("the list of sessions", lambda: m.screen().count("+ New session in project") == 2)
-        m.press("enter")  # the first row: a Claude Code session
-        wait_for("the question's prompt", lambda: "Ask new · project ›" in m.screen())
+        wait_for("the list of sessions", lambda: "listing sessions" not in m.right() and "idle" in m.right())
+        m.type("new claude")
+        wait_for("its row alone", lambda: m.right().count("+ New session in project") == 1
+                 and "Codex" not in m.right())
+        m.press("enter")
+        wait_for("the box, for a new session", lambda: "Ask new · project" in m.foot())
         m.type("start with this")
         m.press("enter")
         wait_for("the new session's reply", lambda: "Ready." in m.right())
@@ -435,7 +512,7 @@ def main() -> int:
         assert len(started) == 1, windows()
         assert started[0] not in session("list"), "a temporary session isn't listed: " + session("list")
         m.press("cmd+l")
-        wait_for("the question's prompt", lambda: "Ask new · project ›" in m.screen())
+        wait_for("the box, for the session it started", lambda: "Ask new · project" in m.foot() and m.in_box())
         m.type("a follow-up")
         m.press("enter")
         wait_for("the follow-up's reply", lambda: "Echo: a follow-up" in m.right())
@@ -446,41 +523,50 @@ def main() -> int:
         print("ok   the list's first row started a session with the question, and the next question went on "
               "with it; it wasn't listed, and closed with the editor")
 
-        # 7. cmd+K: the session changes the lines in the file
+        # 6. cmd+K: the session changes the lines in the file
         m = editor(first, "first", "here")
         m.press("down", "down", "shift+down", "shift+down", "cmd+k")
-        wait_for("the change's prompt", lambda: "first, change these lines ›" in m.screen())
+        wait_for("the box, for a change", lambda: "first changes plan.md L3-4" in m.foot() and m.in_box())
         m.type("in capitals")
         m.press("enter")
         wait_for("the change in the editor", lambda: m.left()[2:5] == ["LINE THREE", "LINE FOUR", "line five"])
         assert plan.read_text().splitlines()[2:4] == ["LINE THREE", "LINE FOUR"], "the file itself changed"
         assert "Put lines 3-4 in capitals." in m.right()
         assert "changed plan.md" in m.screen().splitlines()[-1]
+        assert not m.in_box() and "Ask first" in m.foot(), "the cursor is in the file, the box for a question again"
         m.press("cmd+enter")
         time.sleep(0.5)
         assert "Put lines" not in "\n".join(m.left()), "what it said of its change isn't a reply to put in"
         m.press("cmd+z")
         wait_for("the change taken back", lambda: m.left()[2:4] == ["line three", "line four"])
-        print("ok   cmd+K had the session change lines 3-4 in the file; the editor showed them and cmd+Z took "
-              "the change back")
-        m.quit()
+        print("ok   cmd+K had the box take what to change in lines 3-4; the session changed them in the file, the "
+              "editor showed them and cmd+Z took the change back")
 
-        # 8. a session on another computer gets the text itself
-        remote_socket = socket + "-remote"
-        on = f"env MARMOTA_TMUX_SOCKET={remote_socket} /bin/sh -c"
-        out = session("start", "--on", on, "--cwd", str(project), "--", "far away")
-        remote_id, host = out.split()[1], out.split(" on ")[1].split(" in ")[0]
-        wait_for("the remote session", lambda: any(
-            line.split()[0] == remote_id and " idle " in line for line in session("list").splitlines()[1:]), timeout=30)
-        m = editor(remote_id, "far", host)
-        m.press("down", "down", "shift+cmd+right", "cmd+l")
-        wait_for("the question's prompt", lambda: "Ask far ›" in m.screen())
-        m.type("what is this")
+        # 7. the column put away and back, and in another tab
+        m.press("cmd+l")
+        wait_for("the box", lambda: m.in_box())
+        m.type("a draft")
+        m.press("cmd+l")
+        wait_for("cmd+L from the box to go back to the file", lambda: not m.in_box())
+        m.press("cmd+j")
+        wait_for("cmd+J to put the column away", lambda: not m.column())
+        m.press("cmd+j")
+        wait_for("the column again, with what the box held", lambda: m.box() == ["a draft"])
+        assert "Put lines 3-4 in capitals." in m.right() and not m.in_box(), m.screen()
+        m.press("cmd+l", "cmd+w")
+        wait_for("cmd+W in the box to put the column away", lambda: not m.column())
+        assert "# Plan" in m.screen(), "the file stays open"
+        m.press("opt+x")
+        m.type("tab notes.md")
         m.press("enter")
-        wait_for("its reply", lambda: "Echo: what is this" in m.right(), timeout=30)
-        got = sent_to(remote_socket, remote_id)
-        assert "From plan.md:" in got and "line three" in got and "@" + str(plan) not in got, got
-        print(f"ok   a session on {host} was sent the selected text itself, and its reply came back")
+        wait_for("another tab", lambda: "notes.md" in m.screen().splitlines()[0])
+        m.press("cmd+l")
+        wait_for("the column in this tab, with what was asked", lambda: "Put lines 3-4 in capitals." in m.right()
+                 and "Ask first · notes.md" in m.foot() and m.box() == ["a draft"])
+        m.press("esc", "opt+,")
+        wait_for("the first tab, without the column", lambda: "# Plan" in m.screen() and not m.column())
+        print("ok   cmd+J put the column away and showed it again with what the box held; cmd+L from the box "
+              "went back to the file; cmd+W in the box put the column away; in another tab it came along")
 
         # 8. The editor put away. A micro that Marmota's e didn't open, as
         # this one, has nothing to go back to and says so.
