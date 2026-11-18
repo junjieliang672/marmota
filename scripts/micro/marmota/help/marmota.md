@@ -92,6 +92,8 @@ Brackets are ( ) [ ] { }, counted as written: one inside a string counts too.
 | option+W | The next pane of a split |
 | option+X | micro's command bar: `help keybindings` lists every key, `help commands` every command |
 
-In Marmota, e opens a file here and E in a new tab. The keys are set in
+In Marmota, e opens a file here, in Marmota's place until you close it
+(ctrl+Q), and E in a new tab. Claude Code's ctrl+G opens its prompt here too
+($EDITOR, set in ~/.zshenv). The keys are set in
 ~/.config/micro/bindings.json; the cmd keys are sent by Marmota's block in
 ~/.wezterm.lua, only while micro is the pane's program.

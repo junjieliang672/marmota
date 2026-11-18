@@ -1,0 +1,21 @@
+#!/bin/sh
+# micro, for a program that opens an editor in its own place, as Claude Code
+# does on ctrl+G: EDITOR names this file (setup-macos-hotkeys.sh writes it in
+# ~/.zshenv). It runs micro as the terminal's foreground job, in a process
+# group of its own, as a shell with job control runs a program. A terminal
+# asked what its pane runs then says micro, not the program that opened it,
+# which is how WezTerm knows to send micro the Mac's keys; tmux says the
+# same of a session's window. When micro ends the terminal goes back to the
+# program that opened it, and this ends as micro did.
+micro=micro
+if ! command -v micro > /dev/null 2>&1; then
+    # a program started with a short PATH: where Homebrew puts it
+    for at in /opt/homebrew/bin/micro /usr/local/bin/micro; do
+        if [ -x "$at" ]; then
+            micro="$at"
+            break
+        fi
+    done
+fi
+set -m
+"$micro" "$@"

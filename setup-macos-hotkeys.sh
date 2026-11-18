@@ -69,8 +69,9 @@ Options:
   --micro           Only make micro Marmota's editor: installs micro and the
                     tools its searches use, Marmota's settings, keys and plugin
                     for it in ~/.config/micro (yours are backed up), the keys
-                    block in ~/.wezterm.lua, and sets editor = "micro",
-                    editor_beside = true in Marmota's config
+                    block in ~/.wezterm.lua, and sets editor = "micro" in
+                    Marmota's config and $EDITOR to micro in ~/.zshenv, for
+                    Claude Code's ctrl+G
   --all             Configure everything (default)
   --no-color        Disable colored output
   -h, --help        Show this help message
@@ -933,8 +934,46 @@ do
     table.sort(set)
     return table.concat(set, '|')
   end
+  -- A pane that shows tmux, as the one beside Marmota shows a session: tmux
+  -- says what runs in the window each of its clients shows, and the client
+  -- on this pane's terminal is this pane's.
+  local function tmux_shows_editor(pane)
+    local found, info, tty = pcall(function()
+      return pane:get_foreground_process_info(), pane:get_tty_name()
+    end)
+    if not found or not info or not tty then
+      return false
+    end
+    local ask = { info.executable or 'tmux' }
+    local argv = info.argv or {}
+    for i, word in ipairs(argv) do
+      if (word == '-L' or word == '-S') and argv[i + 1] then -- the server it is a client of
+        ask[#ask + 1] = word
+        ask[#ask + 1] = argv[i + 1]
+        break
+      end
+    end
+    for _, word in ipairs({ 'list-clients', '-F', '#{client_tty} #{pane_current_command}' }) do
+      ask[#ask + 1] = word
+    end
+    local ran, ok, out = pcall(wezterm.run_child_process, ask)
+    if not ran or not ok then
+      return false
+    end
+    for line in (out or ''):gmatch('[^\n]+') do
+      local client, program = line:match('^(%S+) (.*)$')
+      if client == tty then
+        return program == 'micro'
+      end
+    end
+    return false
+  end
+  -- micro is the pane's program when it runs as the terminal's foreground
+  -- job: by itself in a pane, or started by Marmota (e) or through
+  -- ~/.config/micro/plug/marmota/edit (Claude Code's ctrl+G), which run it so.
   local function in_editor(pane)
-    return (pane:get_foreground_process_name() or ''):match('[^/\\]+$') == 'micro'
+    local name = (pane:get_foreground_process_name() or ''):match('[^/\\]+$')
+    return name == 'micro' or (name == 'tmux' and tmux_shows_editor(pane))
   end
   config.keys = config.keys or {}
   for _, k in ipairs(editor_keys) do
@@ -1023,10 +1062,10 @@ ensure_wezterm_look() {
 # Marmota's settings and keys for micro come from scripts/micro and are
 # merged into yours: a setting or key of your own that Marmota doesn't set
 # stays; one it does set is Marmota's, the file backed up first when that
-# changes it. Marmota's config gets editor = "micro" and editor_beside = true
-# while its editor is still the nvim it started with, and E micro in a new
-# tab while it is still nvim in one; an editor you chose yourself is left
-# alone.
+# changes it. Marmota's config gets editor = "micro" while its editor is still
+# the nvim it started with, and E micro in a new tab while it is still nvim
+# in one; an editor you chose yourself is left alone. $EDITOR becomes micro
+# too (configure_shell_editor).
 configure_micro() {
     if [[ $CONFIGURE_MICRO == false ]]; then
         return
@@ -1121,12 +1160,10 @@ configure_micro() {
             ;;
         "" | nvim)
             backup_file "$spf_config_file"
-            sed -i.tmp -e 's/^editor[[:space:]]*=.*/editor = "micro"/' \
-                -e 's/^editor_beside[[:space:]]*=.*/editor_beside = true/' "$spf_config_file"
+            sed -i.tmp -e 's/^editor[[:space:]]*=.*/editor = "micro"/' "$spf_config_file"
             rm -f "$spf_config_file.tmp"
             grep -q '^editor[[:space:]]*=' "$spf_config_file" || printf '\neditor = "micro"\n' >> "$spf_config_file"
-            grep -q '^editor_beside' "$spf_config_file" || printf '\neditor_beside = true\n' >> "$spf_config_file"
-            log_success "Marmota opens files in micro, in a pane on its right (e)"
+            log_success "Marmota opens files in micro, in its own place (e)"
             ;;
         *)
             log_info "Marmota's editor is $editor, as you set it: micro is ready when you want it (editor = \"micro\")"
@@ -1138,6 +1175,74 @@ configure_micro() {
         sed -i.tmp -e 's/^second_editor[[:space:]]*=.*/second_editor = "wezterm cli spawn -- micro"/' "$spf_config_file"
         rm -f "$spf_config_file.tmp"
         log_success "E opens files in micro in a new tab"
+    fi
+
+    configure_shell_editor "$micro_dir/plug/marmota/edit"
+}
+
+# configure_shell_editor makes micro the editor of programs that open
+# $EDITOR in their own place, as Claude Code does on ctrl+G: EDITOR names
+# $1, which runs micro so that WezTerm sees it as the pane's program and
+# sends it the Mac's keys. It goes in ~/.zshenv, not .zshrc: the sessions
+# Marmota starts run through "zsh -c", which reads only that. An EDITOR you
+# set there yourself stays, unless it is nvim, what Marmota set before.
+configure_shell_editor() {
+    local edit="$1"
+    local zshenv="$HOME/.zshenv"
+    local shown="${edit/#$HOME/\$HOME}"
+    local begin="# >>> marmota editor >>>" end="# <<< marmota editor <<<"
+    local block
+    block="$(printf '%s\n%s\n%s\n%s\n%s' "$begin" \
+        "# micro for programs that open an editor, such as Claude Code (ctrl+G) and git:" \
+        "# written by Marmota's setup-macos-hotkeys.sh --micro" \
+        "export EDITOR=\"$shown\"" "$end")"
+
+    local theirs=""
+    if [[ -f "$zshenv" ]]; then
+        theirs="$(awk -v begin="$begin" -v end="$end" '
+            $0 == begin { skip = 1; next }
+            $0 == end { skip = 0; next }
+            !skip && /^[[:space:]]*export[[:space:]]+EDITOR=/ { print }
+        ' "$zshenv" | tail -n 1 | sed -e 's/^[[:space:]]*export[[:space:]]*EDITOR=//' -e "s/[\"']//g")"
+    fi
+    if [[ -n "$theirs" && "$theirs" != "nvim" ]]; then
+        log_info "\$EDITOR is $theirs in $zshenv, as you set it: micro for Claude Code is EDITOR=\"$shown\""
+        return
+    fi
+
+    local new
+    new="$(mktemp)"
+    if [[ -f "$zshenv" ]]; then
+        # without the old block, and without the nvim Marmota set before
+        awk -v begin="$begin" -v end="$end" '
+            $0 == begin { skip = 1; next }
+            $0 == end { skip = 0; next }
+            skip { next }
+            /^[[:space:]]*export[[:space:]]+EDITOR=["\047]?nvim["\047]?[[:space:]]*$/ { next }
+            { print }
+        ' "$zshenv" > "$new"
+        # one empty line before the block, none doubled at the end
+        printf '%s\n' "$(cat "$new")" > "$new.trimmed" && mv "$new.trimmed" "$new"
+        [[ -s "$new" && "$(cat "$new")" != "" ]] && printf '\n' >> "$new"
+        [[ "$(cat "$new")" == "" ]] && : > "$new"
+    fi
+    printf '%s\n' "$block" >> "$new"
+    if [[ -f "$zshenv" ]] && cmp -s "$new" "$zshenv"; then
+        rm -f "$new"
+        log_success "\$EDITOR is micro for Claude Code and other programs"
+        return
+    fi
+    if [[ $DRY_RUN == true ]]; then
+        rm -f "$new"
+        log_info "[DRY RUN] Would set \$EDITOR to micro in $zshenv"
+        return
+    fi
+    backup_file "$zshenv"
+    cat "$new" > "$zshenv"
+    rm -f "$new"
+    log_success "\$EDITOR is micro in $zshenv: Claude Code's ctrl+G opens it, in sessions started from now on"
+    if [[ "$(basename "${SHELL:-zsh}")" != "zsh" ]]; then
+        log_info "Your shell is ${SHELL}: set EDITOR=\"$shown\" where it reads its environment too"
     fi
 }
 

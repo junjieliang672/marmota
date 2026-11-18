@@ -12,11 +12,13 @@
 ###############################################################################
 
 #-- File Editor (e key)
-# Default: $EDITOR environment variable, or:
-#   - macOS: "open -a TextEdit"
+# micro: an editor without modes; on a Mac ./build.sh installs it with the
+# Mac's keys (cmd+S, cmd+Z, cmd+G ...). Where the editor named here isn't
+# installed, or with none named: the $EDITOR environment variable, or:
+#   - macOS: "nvim"
 #   - Windows: "notepad"
 #   - Linux: "nano"
-editor = "nvim"
+editor = "micro"
 
 #-- Editor beside Marmota
 # Open the editor (e key) in a pane on Marmota's right in WezTerm, so Marmota
@@ -26,7 +28,7 @@ editor_beside = false
 
 #-- Second Editor (E key)
 # Leave blank to use the same as 'editor'
-second_editor = "neovide"
+second_editor = "wezterm cli spawn -- micro"
 
 #-- Directory Editor
 # Default:

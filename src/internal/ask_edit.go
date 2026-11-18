@@ -3,7 +3,6 @@ package internal
 import (
 	"log/slog"
 	"os"
-	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
@@ -22,7 +21,7 @@ import (
 // runAskEditor runs the editor on the file at path and reports how it ended.
 var runAskEditor = func(path string, env []string, done func(error) tea.Msg) tea.Cmd { //nolint:gochecknoglobals // test seam
 	name, args := editorCommand(common.Config.Editor, os.Getenv("EDITOR"), runtime.GOOS, []string{path})
-	c := exec.Command(name, args...) //nolint:gosec // the editor you configured
+	c := inPlaceCommand(name, args)
 	c.Env = append(os.Environ(), env...)
 	return tea.ExecProcess(c, done)
 }

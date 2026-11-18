@@ -82,6 +82,7 @@ func TestMain(m *testing.M) {
 	// Sessions start in WezTerm panes, unless a test starts them in a tmux
 	// of its own.
 	useTmuxSessions = func() bool { return false }
+	editorInstalled = func(string) bool { return true } // whatever this computer has
 	writeClipboard = func(string) error { return errors.New("tests must not write the clipboard") }
 	runShelfCommand = func(string, ...string) ([]byte, error) { return nil, errors.New("tests must not open apps") }
 	weztermSendText = func(int, string) error { return errors.New("tests must not type into WezTerm") }

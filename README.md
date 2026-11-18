@@ -88,7 +88,7 @@ y
 | `shift+enter` | In the Ask box: a new line (the WezTerm setup sends it as `ctrl+j`, which works as well) |
 | `ctrl+g` | In the Ask box: write the question in your editor, as in Claude Code; closing it brings what you wrote back, unsent. A long question shows folded, `[first words… +11 lines]` |
 | drag | In the session preview: select text; letting go copies it |
-| `e` | Open the file in your editor; with `editor_beside = true`, in a pane on Marmota's right. On a Mac `./build.sh` sets up micro for it, an editor without modes where the Mac's keys (cmd+S, cmd+Z, cmd+←, shift+option+→ …) work as in a text field; `E` opens it in a new tab |
+| `e` | Open the file in the editor, in Marmota's place until you close it; with `editor_beside = true`, in a pane on Marmota's right instead. The editor is micro, one without modes where the Mac's keys (cmd+S, cmd+Z, cmd+←, shift+option+→ …) work as in a text field: on a Mac `./build.sh` installs and sets it up, also as `$EDITOR`, so Claude Code's ctrl+G opens it too; `E` opens it in a new tab |
 | cmd+L (in micro) | Ask a session about the file you are writing, with the lines you selected: its reply shows on the right, cmd+enter puts it at the cursor. cmd+shift+L picks another session or starts one; cmd+K has the session change the selected lines in the file. cmd+/ lists every key |
 | cmd+G (in micro) | Go to a place: a line's number and enter, or one key: `t` top, `b` bottom, `p`/`P` the next paragraph or the one before, `m` the matching bracket, `n` back. `g` keeps it open for more, until esc. cmd+shift+G selects up to the same places, and with `m` what the brackets hold |
 | `>` | Agent mode: `claude`, `claude rc`, `codex` |

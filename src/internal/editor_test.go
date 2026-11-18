@@ -32,6 +32,27 @@ func TestEditorCommand(t *testing.T) {
 	}
 }
 
+// An editor that isn't installed, as micro on a computer the setup script
+// never ran on, gives way to $EDITOR.
+func TestEditorCommandWithoutTheConfiguredEditor(t *testing.T) {
+	setForTest(t, &editorInstalled, func(command string) bool { return command != "micro" })
+	cmd, args := editorCommand("micro", "vi", utils.OsDarwin, []string{"/d/a.txt"})
+	assert.Equal(t, "vi", cmd)
+	assert.Equal(t, []string{"/d/a.txt"}, args)
+}
+
+// On a Mac the editor runs as the terminal's foreground job, so WezTerm
+// sees the editor as the pane's program; elsewhere, as it is.
+func TestTheEditorRunsAsTheForegroundJobOnAMac(t *testing.T) {
+	cmd, args := foregroundJob(utils.OsDarwin, "micro", []string{"a b.txt"})
+	assert.Equal(t, "/bin/sh", cmd)
+	assert.Equal(t, []string{"-c", `set -m; "$@"`, "sh", "micro", "a b.txt"}, args)
+
+	cmd, args = foregroundJob("linux", "nano", []string{"a.txt"})
+	assert.Equal(t, "nano", cmd)
+	assert.Equal(t, []string{"a.txt"}, args)
+}
+
 func setupSelectedEdit(t *testing.T) (*model, string, string, string) {
 	t.Helper()
 	root := filepath.Join(t.TempDir(), "root")

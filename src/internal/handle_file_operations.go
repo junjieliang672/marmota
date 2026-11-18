@@ -835,7 +835,7 @@ func (m *model) openFileWithSecondEditor() tea.Cmd {
 	//nolint:gocritic // appendAssign: intentionally creating a new slice
 	args := append(parts[1:], filePath)
 
-	c := exec.Command(cmd, args...) //nolint:gosec // the editor you configured, on the file you chose
+	c := inPlaceCommand(cmd, args)
 
 	// The child owns the terminal from here until editorFinishedMsg
 	// arrives; stop driving the input method's mode in the meantime.
@@ -940,10 +940,26 @@ func (m *model) openSelectedWithEditor() tea.Cmd {
 	return m.openPathsWithEditor(files, true)
 }
 
+// editorInstalled reports whether the program an editor command starts with
+// can be run.
+var editorInstalled = func(command string) bool { //nolint:gochecknoglobals // test seam
+	parts := strings.Fields(command)
+	if len(parts) == 0 {
+		return false
+	}
+	_, err := exec.LookPath(parts[0])
+	return err == nil
+}
+
 // editorCommand is the command that opens paths in the editor: the
-// configured one, else $EDITOR, else the platform's default.
+// configured one when it is installed, else $EDITOR, else the platform's
+// default.
 func editorCommand(configured, envEditor, goos string, paths []string) (string, []string) {
 	editor := configured
+	if editor != "" && !editorInstalled(editor) {
+		slog.Warn("The configured editor isn't installed: using $EDITOR or the default", "editor", editor)
+		editor = ""
+	}
 	if editor == "" {
 		editor = envEditor
 	}
@@ -959,6 +975,24 @@ func editorCommand(configured, envEditor, goos string, paths []string) (string, 
 	}
 	parts := strings.Fields(editor)
 	return parts[0], append(parts[1:], paths...)
+}
+
+// inPlaceCommand runs an editor in Marmota's place. On a Mac it runs as the
+// terminal's foreground job, in a process group of its own, as a shell with
+// job control runs a program: a terminal asked what its pane runs then says
+// the editor, not Marmota, which is how WezTerm knows to send micro the
+// Mac's keys (the keys block in ~/.wezterm.lua). The shell takes the
+// terminal back when the editor ends, and ends as the editor did.
+func inPlaceCommand(name string, args []string) *exec.Cmd {
+	cmd, args := foregroundJob(runtime.GOOS, name, args)
+	return exec.Command(cmd, args...) //nolint:gosec // the editor you configured, on the files you chose
+}
+
+func foregroundJob(goos, name string, args []string) (string, []string) {
+	if goos != utils.OsDarwin {
+		return name, args
+	}
+	return "/bin/sh", append([]string{"-c", `set -m; "$@"`, "sh", name}, args...)
 }
 
 // openPathsWithEditor runs the editor on paths, all in one process.
@@ -988,7 +1022,7 @@ func (m *model) openPathsWithEditor(paths []string, recordRecent bool) tea.Cmd {
 	}
 
 	cmd, args := editorCommand(common.Config.Editor, os.Getenv("EDITOR"), runtime.GOOS, paths)
-	c := exec.Command(cmd, args...) //nolint:gosec // the editor you configured, on the files you chose
+	c := inPlaceCommand(cmd, args)
 	c.Env = append(os.Environ(), m.editorEnv()...)
 
 	// The child owns the terminal from here until editorFinishedMsg
