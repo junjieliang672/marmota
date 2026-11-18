@@ -39,6 +39,12 @@ func (m *model) sessionPaneViewOf(s claudesession.Session, convo sessionsConvers
 	if s.Name != "" && s.Name != title {
 		title = s.Name + " · " + title
 	}
+	if s.App != nil {
+		// claude.ai says only how it is: its conversation is in the app.
+		return askui.Session{Glyph: sessionsui.Symbol(state), GlyphColor: sessionsui.StateColor(state),
+			Title: title, State: m.sessionStateWords(s, state), Now: s.App.Doing,
+			Place: "on another computer · " + firstKey(common.Hotkeys.Confirm) + " opens it in the Claude app"}
+	}
 	v := askui.Session{
 		Glyph:      sessionsui.Symbol(state),
 		GlyphColor: sessionsui.StateColor(state),

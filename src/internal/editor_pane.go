@@ -125,7 +125,7 @@ func (m *model) editorEnv() []string {
 	if exe, err := os.Executable(); err == nil {
 		env = append(env, "MARMOTA_BIN="+exe)
 	}
-	if s, ok := m.claude.snapshot.Find(m.dockAskTarget()); ok && s.Live && s.Unreachable == "" {
+	if s, ok := m.claude.snapshot.Find(m.dockAskTarget()); ok && s.Live && s.App == nil {
 		host := s.Host
 		if host == "" {
 			host = "here" // as `y session list` says it

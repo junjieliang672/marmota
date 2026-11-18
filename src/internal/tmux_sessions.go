@@ -453,46 +453,6 @@ func (m *model) adoptTmuxViewer(self int, panes []weztermPane) {
 			}
 		}
 	}
-	m.adoptRemoteViewer(self, panes, view)
-}
-
-// adoptRemoteViewer takes back a pane beside Marmota that shows another
-// computer's tmux. Its tmux client runs over there, so its terminal can't
-// say which pane it is: the window that computer's view of this Marmota
-// shows does, by its title, which the pane carries. Each computer's last
-// listing says which window that is: asking it here would hold up the
-// screen as long as the computer takes to answer.
-func (m *model) adoptRemoteViewer(self int, panes []weztermPane, view string) {
-	hosts := make([]string, 0, len(m.remote.listed))
-	for name, l := range m.remote.listed {
-		if l.err == nil && l.view != "" {
-			hosts = append(hosts, name)
-		}
-	}
-	slices.Sort(hosts)
-	for _, host := range hosts {
-		window := m.remote.listed[host].view
-		title := ""
-		for _, p := range m.claude.panes {
-			if ref, ok := tmuxPanes.ref(p.PaneID); ok && ref.host == host && ref.window == window {
-				title = p.Title
-			}
-		}
-		if title == "" {
-			continue
-		}
-		for _, p := range panes {
-			if p.PaneID != self && p.Title == title && !isViewerPane(p) {
-				m.tmux.viewer, m.tmux.viewerHost = p.PaneID, host
-				go func() {
-					if c, err := hostClient(host); err == nil {
-						attachViewerAnew(c, view)
-					}
-				}()
-				return
-			}
-		}
-	}
 }
 
 // attachViewerAnew attaches the pane beside Marmota it took back anew, to
@@ -699,24 +659,15 @@ func (m *model) settleTmuxShown() {
 		m.markTmuxShown(0)
 		return
 	}
-	if host := m.tmux.viewerHost; host != "" {
-		// Another computer's last listing says: asking it here would hold
-		// up the screen as long as it takes to answer. One that began
-		// before the pane last changed windows is older than what it shows.
-		if l, ok := m.remote.listed[host]; ok && l.err == nil && l.view != "" && !l.at.Before(m.tmux.shownAt) {
-			m.tmux.viewWindow = l.view
-		}
-	} else {
-		self, err := currentWeztermPaneID()
-		if err != nil {
-			return
-		}
-		c, err := localTmux()
-		if err != nil {
-			return
-		}
-		m.tmux.viewWindow = c.ViewWindow(tmuxView(self))
+	self, err := currentWeztermPaneID()
+	if err != nil {
+		return
 	}
+	c, err := localTmux()
+	if err != nil {
+		return
+	}
+	m.tmux.viewWindow = c.ViewWindow(tmuxView(self))
 	for _, p := range m.claude.panes {
 		if ref, ok := tmuxPanes.ref(p.PaneID); ok && isTmuxPane(p.PaneID) && ref.host == m.tmux.viewerHost &&
 			ref.window == m.tmux.viewWindow {

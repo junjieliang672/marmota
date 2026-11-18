@@ -104,9 +104,7 @@ func (m *model) sessionsHere() string {
 func (m *model) sessionsGroups() ([]claudeSessionsGroup, string) {
 	var shown []claudesession.Session
 	for _, s := range m.claude.snapshot.Live {
-		// One whose computer can't be reached has no pane now: it shows as
-		// last seen.
-		if _, ok := m.weztermPaneForSession(s); ok || s.Unreachable != "" {
+		if _, ok := m.weztermPaneForSession(s); ok {
 			shown = append(shown, s)
 		}
 	}
@@ -126,6 +124,13 @@ func (m *model) refreshSessionsList() {
 		group := sessionsui.Group{Folder: g.Folder}
 		for _, s := range g.Sessions {
 			group.Rows = append(group.Rows, sessionsui.Row{ID: s.ID, Name: s.Name, Summary: s.DisplayTitle()})
+		}
+		out = append(out, group)
+	}
+	if apps := m.appSessions(); len(apps) > 0 {
+		group := sessionsui.Group{Folder: remoteSectionTitle}
+		for _, s := range apps {
+			group.Rows = append(group.Rows, sessionsui.Row{ID: s.ID, Summary: s.DisplayTitle()})
 		}
 		out = append(out, group)
 	}
@@ -173,6 +178,14 @@ func folderName(folder string) string {
 
 func (m *model) sessionState(s claudesession.Session) sessionsui.State {
 	switch {
+	case s.App != nil && s.Status == claudesession.StatusWaiting:
+		return sessionsui.NeedsYou
+	case s.App != nil && s.Status == claudesession.StatusWorking:
+		return sessionsui.Working
+	case s.App != nil && s.App.Unread:
+		return sessionsui.Unread
+	case s.App != nil:
+		return sessionsui.Idle
 	case !s.Live:
 		return sessionsui.Ended
 	case s.Status == claudesession.StatusWaiting:
@@ -197,6 +210,9 @@ func (m *model) findSession(id string) (claudesession.Session, bool) {
 		return claudesession.Session{}, false
 	}
 	if s, ok := m.claude.snapshot.Find(id); ok {
+		return s, true
+	}
+	if s, ok := m.appSessionByID(id); ok {
 		return s, true
 	}
 	return m.startingSession(m.ask.starts[id])

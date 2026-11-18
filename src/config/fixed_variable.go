@@ -107,9 +107,6 @@ var (
 	// RemotesFile holds the other computers sessions were started on, and
 	// how to reach them.
 	RemotesFile = filepath.Join(SuperFileStateDir, "remotes.json")
-	// RemoteSessionsFile holds each computer's sessions as last seen, so a
-	// Marmota that starts while one can't be reached still lists them.
-	RemoteSessionsFile = filepath.Join(SuperFileStateDir, "remote_sessions.json")
 	// RemoteTranscriptsDir holds copies of the transcripts of sessions on
 	// other computers, read a piece at a time.
 	RemoteTranscriptsDir = filepath.Join(SuperFileCacheDir, "remote-transcripts")

@@ -263,7 +263,7 @@ func (m *model) renderClaudeToast(t claudeToast) string {
 	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(common.Theme.Hint)).Background(bg).Bold(true)
 	dim := lipgloss.NewStyle().Foreground(lipgloss.Color(common.GitUntrackedColor)).Background(bg)
 	keys := keyStyle.Render("esc") + dim.Render(" later")
-	if m.dockPick(m.dockSessions(), "") == t.id { // where ! goes: one that needs you
+	if m.dockPick(m.dockSessions(), "") == t.id { // where ! goes: one that needs you or replied unread
 		keys = keyStyle.Render(firstKey(common.Hotkeys.JumpToUnreadSession)) + dim.Render(" open  ") + keys
 	}
 
