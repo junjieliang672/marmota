@@ -6,12 +6,12 @@ cmd+/ opens this page, ctrl+q closes it (and any file or tab).
 
 | Key | Does |
 |-----|------|
-| cmd+F | Find in this file (a regular expression). enter, then cmd+G for the next match, cmd+shift+G the one before; esc ends it |
+| cmd+F | Find in this file (a regular expression). enter, then ctrl+N for the next match, ctrl+P the one before; esc ends it |
 | cmd+option+F | Fuzzy search the lines of this file, with a preview |
 | cmd+shift+F | Search every file under the folder (asks where, then what) |
 | cmd+P | Open a file by name |
 | cmd+shift+O | Jump to a heading or a function of this file |
-| ctrl+L | Go to a line: type its number |
+| cmd+G | Go to a line: type its number |
 | ctrl+- | Back to where the cursor was before a jump; ctrl+shift+- forward again |
 | cmd+↑ / cmd+↓ | Start / end of the file |
 | cmd+← / cmd+→ | Start / end of the line |
