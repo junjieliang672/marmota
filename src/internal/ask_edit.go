@@ -20,9 +20,11 @@ import (
 // the question as it was.
 
 // runAskEditor runs the editor on the file at path and reports how it ended.
-var runAskEditor = func(path string, done func(error) tea.Msg) tea.Cmd { //nolint:gochecknoglobals // test seam
+var runAskEditor = func(path string, env []string, done func(error) tea.Msg) tea.Cmd { //nolint:gochecknoglobals // test seam
 	name, args := editorCommand(common.Config.Editor, os.Getenv("EDITOR"), runtime.GOOS, []string{path})
-	return tea.ExecProcess(exec.Command(name, args...), done) //nolint:gosec // the editor you configured
+	c := exec.Command(name, args...) //nolint:gosec // the editor you configured
+	c.Env = append(os.Environ(), env...)
+	return tea.ExecProcess(c, done)
 }
 
 // editAskDraft opens the question in the editor.
@@ -42,7 +44,7 @@ func (m *model) editAskDraft() tea.Cmd {
 	// The editor owns the terminal until askDraftEditedMsg arrives; stop
 	// driving the input method's mode in the meantime.
 	m.externalProcessRunning = true
-	return runAskEditor(path, func(err error) tea.Msg { return askDraftEditedMsg{path: path, err: err} })
+	return runAskEditor(path, m.editorEnv(), func(err error) tea.Msg { return askDraftEditedMsg{path: path, err: err} })
 }
 
 // applyAskDraftEdited takes what the editor left as the question.

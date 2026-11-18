@@ -2,6 +2,19 @@
 
 cmd+/ opens this page, ctrl+q closes it (and any file or tab).
 
+## Ask a session
+
+| Key | Does |
+|-----|------|
+| cmd+L | Ask the session this editor writes to, about this file: type the question, enter. The file is saved, and named to the session with the lines you selected, so it reads them itself. Go on writing: its reply shows on the right when its turn has ended |
+| cmd+shift+L | Pick the session questions go to, then ask it |
+| cmd+enter | Put the last reply at the cursor, or in place of what is selected; cmd+Z takes it back |
+| cmd+J | Show the replies on the right, or put them away |
+
+The session is the one Marmota's Ask box wrote to when it opened the editor,
+until you pick another. It is one of Marmota's sessions: what you ask here
+shows in its Sessions box, where you can go on with it.
+
 ## Find and jump
 
 | Key | Does |

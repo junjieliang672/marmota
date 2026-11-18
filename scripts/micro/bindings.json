@@ -14,5 +14,9 @@
     "Alt-H": "command:OmniNextHistory",
     "AltShiftUp": "lua:marmota.selectParagraphUp",
     "AltShiftDown": "lua:marmota.selectParagraphDown",
-    "Alt-/": "command:help marmota"
+    "Alt-/": "command:help marmota",
+    "Alt-l": "lua:marmota.ask",
+    "Alt-L": "lua:marmota.askAnother",
+    "Alt-Enter": "lua:marmota.insertReply",
+    "Alt-j": "lua:marmota.toggleReplies"
 }

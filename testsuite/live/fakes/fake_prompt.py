@@ -7,17 +7,20 @@ dim placeholder when nothing is), a rule. It takes typing, a paste (a long one
 shows as "[Pasted text #1 +N lines]"), ctrl+s (stash, or bring the stash back
 into an empty box), ctrl+_ (undo the last paste) and enter, which sends what is
 typed, shows it above the box, and brings back a stashed prompt. A line feed
-typed starts a new line in the box, as in Claude Code.
+typed starts a new line in the box, as in Claude Code. What is sent is
+written to the session's transcript as a turn, with a reply and its end.
 
     fake_prompt.py TITLE
 """
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import signal
 import sys
 import termios
+import time
 import tty
 
 PASTE_START, PASTE_END = b"\x1b[200~", b"\x1b[201~"
@@ -43,6 +46,30 @@ class Prompt:
         else:
             self.shown += text
 
+    def record(self, text: str) -> None:
+        """Writes the turn a sent message makes to the session's transcript,
+        as Claude Code does: the message, a reply ("Echo: " and its first
+        line), and the turn's end."""
+        reg = os.environ.get("FAKE_CLAUDE_REG", "")
+        try:
+            transcript = open(os.path.join(reg, self.title + ".transcript")).read().strip()
+        except OSError:
+            return
+        now = time.time()
+
+        def stamp(after_ms: int) -> str:
+            t = now + after_ms / 1000
+            return time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(t)) + ".%03dZ" % int(t % 1 * 1000)
+
+        reply = "Echo: " + (text.strip().splitlines() or [""])[0]
+        with open(transcript, "a") as f:
+            f.write(json.dumps({"type": "user", "message": {"role": "user", "content": text},
+                                "timestamp": stamp(0), "sessionId": self.title}) + "\n")
+            f.write(json.dumps({"type": "assistant", "timestamp": stamp(1), "message": {
+                "role": "assistant", "content": [{"type": "text", "text": reply}]}}) + "\n")
+            f.write(json.dumps({"type": "system", "subtype": "turn_duration", "durationMs": 2,
+                                "timestamp": stamp(2)}) + "\n")
+
     def key(self, key: bytes) -> None:
         if key == STASH:
             if self.text.strip() == "" and self.stash is not None:
@@ -53,6 +80,7 @@ class Prompt:
             self.text, self.shown = self.undo.pop()
         elif key == ENTER and self.text:
             self.sent.append(self.text)
+            self.record(self.text)
             self.text, self.shown, self.undo = "", "", []
             if self.stash is not None:
                 (self.text, self.shown), self.stash = self.stash, None

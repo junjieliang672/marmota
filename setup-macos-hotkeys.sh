@@ -913,6 +913,10 @@ do
     { 'f', 'CMD|OPT', '\x1br' }, -- fuzzy search in this file
     { 'o', 'CMD|SHIFT', '\x1bo' }, -- go to a heading or function
     { '/', 'CMD', '\x1b/' }, -- Marmota's keys for micro
+    { 'l', 'CMD', '\x1bl' }, -- ask a session about this file
+    { 'l', 'CMD|SHIFT', '\x1bL' }, -- pick the session, then ask
+    { 'Enter', 'CMD', '\x1b\r' }, -- put the last reply at the cursor
+    { 'j', 'CMD', '\x1bj' }, -- show the replies, or put them away
     -- back to where the cursor was, and forward again; elsewhere these are
     -- WezTerm's own keys for a smaller font, which they stay
     { '-', 'CTRL', '\x1bh', wezterm.action.DecreaseFontSize },

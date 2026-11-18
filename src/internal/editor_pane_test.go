@@ -45,7 +45,10 @@ func TestEOpensTheEditorBesideMarmota(t *testing.T) {
 	require.NotZero(t, m.editorPane)
 	split := wez.commands[len(wez.commands)-2]
 	assert.Contains(t, split, "split-pane --pane-id 10 --right --percent 60 --cwd "+shellQuote(dir)+" -- ")
-	assert.Contains(t, split, "exec micro a.md", "the file by its path from the folder")
+	assert.Contains(t, split, " micro a.md'", "the file by its path from the folder")
+	assert.Contains(t, split, "exec env ", "told of Marmota")
+	assert.Contains(t, split, "MARMOTA_BIN=")
+	assert.NotContains(t, split, "MARMOTA_SESSION", "no session to write to")
 	assert.Equal(t, m.editorPane, wez.active, "the editor has the keyboard")
 	assert.Empty(t, *typed)
 
@@ -82,4 +85,22 @@ func TestMicroQuote(t *testing.T) {
 	assert.Equal(t, "'plain.md'", microQuote("plain.md"))
 	assert.Equal(t, `'it'\''s.md'`, microQuote("it's.md"))
 	assert.True(t, strings.HasPrefix(microCommandBar, "\x1b"))
+}
+
+// The editor is told which session the Ask box writes to: questions asked
+// from it go there. A Codex session isn't told: `y session` can't reach one.
+func TestTheEditorIsToldTheSessionTheAskBoxWritesTo(t *testing.T) {
+	m := dockTestModel(t)
+	bang(m)
+	require.True(t, m.sessions.list.Select("s50"))
+
+	env := strings.Join(m.editorEnv(), "\n")
+	assert.Contains(t, env, "MARMOTA_SESSION=s50")
+	assert.Contains(t, env, "MARMOTA_SESSION_TITLE=ime hold tests")
+	assert.Contains(t, env, "MARMOTA_SESSION_HOST=here")
+
+	for i := range m.claude.snapshot.Live {
+		m.claude.snapshot.Live[i].Agent = "codex"
+	}
+	assert.NotContains(t, strings.Join(m.editorEnv(), "\n"), "MARMOTA_SESSION=")
 }

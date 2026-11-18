@@ -87,7 +87,11 @@ func (m *model) openEditorBeside(paths []string) error {
 	if viewer, shown := m.tmuxViewerPane(); shown {
 		anchor, where = viewer.PaneID, fmt.Sprintf("--top --percent %d", editorOverViewerPercent)
 	}
-	words := []string{shellQuote(name)}
+	words := []string{"env"}
+	for _, v := range m.editorEnv() {
+		words = append(words, shellQuote(v))
+	}
+	words = append(words, shellQuote(name))
 	for _, a := range args {
 		words = append(words, shellQuote(a))
 	}
@@ -110,4 +114,25 @@ func (m *model) openEditorBeside(paths []string) error {
 // typed as a shell does.
 func microQuote(path string) string {
 	return "'" + strings.ReplaceAll(path, "'", `'\''`) + "'"
+}
+
+// editorEnv is what the editor is told of Marmota, for Marmota's plugin for
+// micro (scripts/micro/marmota): the y to ask sessions through, and the
+// session the Ask box writes to now, which is the one a question from the
+// editor goes to until another is picked there. A Codex session isn't one:
+// `y session` reaches Claude Code's.
+func (m *model) editorEnv() []string {
+	env := []string{}
+	if exe, err := os.Executable(); err == nil {
+		env = append(env, "MARMOTA_BIN="+exe)
+	}
+	if s, ok := m.claude.snapshot.Find(m.dockAskTarget()); ok && s.Live && !s.IsCodex() && s.Unreachable == "" {
+		host := s.Host
+		if host == "" {
+			host = "here" // as `y session list` says it
+		}
+		env = append(env, "MARMOTA_SESSION="+s.ID, "MARMOTA_SESSION_TITLE="+s.DisplayTitle(),
+			"MARMOTA_SESSION_HOST="+host)
+	}
+	return env
 }

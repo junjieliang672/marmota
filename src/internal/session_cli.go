@@ -223,35 +223,46 @@ func SessionSend(id, text string) error {
 	return err
 }
 
-// SessionRead writes the last turns of a session's conversation.
-func SessionRead(w io.Writer, id string, turns int) error {
-	host, pane, err := findTmuxSession(id)
+// sessionByID finds a session by its id, or the start of it: where
+// it runs, its pane, its whole id, and how to read its transcript, which for
+// another computer brings the copy here up to date first.
+func sessionByID(id string) (host string, pane int, full string, transcript func() (string, error), err error) {
+	host, pane, err = findTmuxSession(id)
 	if err != nil {
-		return err
+		return "", 0, "", nil, err
 	}
 	ref, _ := tmuxPanes.ref(pane)
 	c, err := hostClient(host)
 	if err != nil {
-		return err
+		return "", 0, "", nil, err
 	}
 	windows, err := c.Windows()
 	if err != nil {
-		return err
+		return "", 0, "", nil, err
 	}
-	full := ""
 	for _, win := range windows {
 		if win.ID == ref.window {
 			_, full, _ = sessionhost.SessionOf(win.Name)
 		}
 	}
-	var path string
-	if host == "" {
-		path = findLocalTranscript(full)
-	} else {
-		path, err = mirrorTranscript(c, host, full)
-		if err != nil {
-			return err
+	transcript = func() (string, error) {
+		if host == "" {
+			return findLocalTranscript(full), nil
 		}
+		return mirrorTranscript(c, host, full)
+	}
+	return host, pane, full, transcript, nil
+}
+
+// SessionRead writes the last turns of a session's conversation.
+func SessionRead(w io.Writer, id string, turns int) error {
+	_, _, _, transcript, err := sessionByID(id)
+	if err != nil {
+		return err
+	}
+	path, err := transcript()
+	if err != nil {
+		return err
 	}
 	if path == "" {
 		return errors.New("it has no conversation yet")

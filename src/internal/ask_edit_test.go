@@ -18,7 +18,7 @@ import (
 func fakeAskEditor(t *testing.T, edit func(question string) string, err error) *string {
 	t.Helper()
 	path := new(string)
-	setForTest(t, &runAskEditor, func(file string, done func(error) tea.Msg) tea.Cmd {
+	setForTest(t, &runAskEditor, func(file string, _ []string, done func(error) tea.Msg) tea.Cmd {
 		*path = file
 		before, readErr := os.ReadFile(file)
 		require.NoError(t, readErr)

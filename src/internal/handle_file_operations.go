@@ -989,6 +989,7 @@ func (m *model) openPathsWithEditor(paths []string, recordRecent bool) tea.Cmd {
 
 	cmd, args := editorCommand(common.Config.Editor, os.Getenv("EDITOR"), runtime.GOOS, paths)
 	c := exec.Command(cmd, args...) //nolint:gosec // the editor you configured, on the files you chose
+	c.Env = append(os.Environ(), m.editorEnv()...)
 
 	// The child owns the terminal from here until editorFinishedMsg
 	// arrives; stop driving the input method's mode in the meantime.
