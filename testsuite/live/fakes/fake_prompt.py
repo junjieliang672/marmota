@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import signal
 import sys
@@ -62,6 +63,20 @@ class Prompt:
             return time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(t)) + ".%03dZ" % int(t % 1 * 1000)
 
         reply = "Echo: " + (text.strip().splitlines() or [""])[0]
+        # Asked to change a file in place, as Marmota's plugin for micro
+        # asks: the lines named are put in capitals, the whole file with none.
+        edit = re.search(r'editing the file in place: @"?([^"#\s]+)"?(?:#L(\d+)(?:-(\d+))?)?', text)
+        if edit:
+            try:
+                lines = open(edit.group(1)).read().split("\n")
+                first = int(edit.group(2) or 1)
+                last = int(edit.group(3) or edit.group(2) or len(lines))
+                for i in range(first - 1, min(last, len(lines))):
+                    lines[i] = lines[i].upper()
+                open(edit.group(1), "w").write("\n".join(lines))
+                reply = "Put lines %d-%d in capitals." % (first, last)
+            except OSError as err:
+                reply = "Couldn't edit: %s" % err
         with open(transcript, "a") as f:
             f.write(json.dumps({"type": "user", "message": {"role": "user", "content": text},
                                 "timestamp": stamp(0), "sessionId": self.title}) + "\n")

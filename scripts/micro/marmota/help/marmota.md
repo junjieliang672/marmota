@@ -8,6 +8,7 @@ cmd+/ opens this page, ctrl+q closes it (and any file or tab).
 |-----|------|
 | cmd+L | Ask the session this editor writes to, about this file: type the question, enter. The file is saved, and named to the session with the lines you selected, so it reads them itself. Go on writing: its reply shows on the right when its turn has ended |
 | cmd+shift+L | Pick the session questions go to, then ask it. The first row is a session not started yet: your question starts it, in this editor's folder, and the next ones go on with it |
+| cmd+K | Have the session change the selected lines, or with none the file, as you ask, in the file itself: the editor shows the change when it is made, and cmd+Z takes it back |
 | cmd+enter | Put the last reply at the cursor, or in place of what is selected; cmd+Z takes it back |
 | cmd+J | Show the replies on the right, or put them away |
 
@@ -20,7 +21,12 @@ another: each question waits for its own reply, and the replies show under
 their questions as they come. The status line says whom questions go to and
 how many replies are still awaited: "→ fix login  ✳ 2 asking". A session that
 stops to ask you something (a permission, or whether to trust its folder)
-says so in place of its reply: answer it from Marmota's Sessions box.
+says so in place of its reply: answer it from Marmota's Sessions box, and the
+reply, or the change, comes. While a session changes the file, what you type
+into it may give way to its change when that comes in: cmd+Z brings yours
+back. A session on another computer can't read or change the file: it is
+sent the selected text itself, and after cmd+K replies with the new text
+for cmd+enter to put in.
 
 ## Find and jump
 

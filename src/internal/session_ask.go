@@ -56,8 +56,9 @@ type askedState struct {
 // turn it started, once that turn has ended. A session that stops to ask
 // you something first returns a *NeedsYouError. With sent, the message is
 // already the session's: the one it was started with, say. It is only
-// waited for.
-func SessionAsk(id, text string, timeout time.Duration, sent bool) (string, error) {
+// waited for. With patient, a session that stops to ask you something is
+// waited for all the same: you answer it, and its reply comes.
+func SessionAsk(id, text string, timeout time.Duration, sent, patient bool) (string, error) {
 	host, pane, full, transcript, err := sessionByID(id)
 	if err != nil {
 		return "", err
@@ -90,18 +91,20 @@ func SessionAsk(id, text string, timeout time.Duration, sent bool) (string, erro
 			}
 			return st
 		}
-		return awaitAskedTurn(look, askKey(text), time.Time{}, timeout)
+		return awaitAskedTurn(look, askKey(text), time.Time{}, timeout, patient)
 	}
 	before := look()
 	if _, err := sendToClaudePrompt(pane, text); err != nil {
 		return "", err
 	}
-	return awaitAskedTurn(look, askKey(text), askedAt(before.turns, askKey(text)), timeout)
+	return awaitAskedTurn(look, askKey(text), askedAt(before.turns, askKey(text)), timeout, patient)
 }
 
 // awaitAskedTurn waits for the turn whose prompt starts as key does, begun
-// after prior, to end, and returns its reply.
-func awaitAskedTurn(look func() askedState, key string, prior time.Time, timeout time.Duration) (string, error) {
+// after prior, to end, and returns its reply. A session that stops to ask
+// you something ends the wait with a *NeedsYouError, unless patient.
+func awaitAskedTurn(look func() askedState, key string, prior time.Time, timeout time.Duration, patient bool,
+) (string, error) {
 	deadline := time.Now().Add(timeout)
 	waiting := 0
 	for {
@@ -118,7 +121,7 @@ func awaitAskedTurn(look func() askedState, key string, prior time.Time, timeout
 		} else {
 			waiting = 0
 		}
-		if waiting > 1 {
+		if waiting > 1 && !patient {
 			return "", &NeedsYouError{What: st.needsYou, Reply: strings.TrimSpace(turn.Reply)}
 		}
 		if time.Now().After(deadline) {

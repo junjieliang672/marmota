@@ -225,7 +225,12 @@ local function repliesText()
         table.insert(out, "› " .. a.question .. "   — " .. a.title)
         if a.reply == nil then
             table.insert(out, "")
-            table.insert(out, a.starting and "✳ starting a session…" or "✳ asking…")
+            if a.needsYou ~= nil then
+                table.insert(out, "⚠ " .. a.needsYou)
+                table.insert(out, "✳ waiting for your answer there…")
+            else
+                table.insert(out, a.starting and "✳ starting a session…" or "✳ asking…")
+            end
         else
             table.insert(out, "")
             table.insert(out, a.reply)
@@ -257,46 +262,111 @@ local function showReplies(bp)
     pane:Relocate()
 end
 
--- reference names what the question is about: the file, with the selected
--- lines, as Claude Code writes a mention of them, "@notes/plan.md#L12-30".
--- A session on another computer can't read the file, and gets the selected
--- text, or the file's, itself.
-local function reference(bp)
-    local path = bp.Buf.AbsPath
-    local from, to = selection(bp.Cursor)
-    if session.host ~= "" and session.host ~= "here" then
-        local text
-        if from ~= nil then
-            text = util.String(bp.Cursor:GetSelection())
-        else
-            text = util.String(bp.Buf:Bytes())
-        end
-        return "From " .. filepath.Base(path) .. ":\n\n" .. text
-    end
-    local mention = "@" .. path
-    if path:find(" ") then
-        mention = '@"' .. path .. '"'
-    end
-    if from ~= nil then
-        local last = to.Y
-        if to.X == 0 and to.Y > from.Y then
-            last = to.Y - 1 -- the selection ends before this line's first character
-        end
-        if last > from.Y then
-            mention = mention .. "#L" .. (from.Y + 1) .. "-" .. (last + 1)
-        else
-            mention = mention .. "#L" .. (from.Y + 1)
-        end
-    end
-    return mention
+-- remote reports a session on another computer, which can't read this
+-- one's files.
+local function remote()
+    return session.host ~= "" and session.host ~= "here"
 end
 
-local function onReply(output, args)
+-- mention names the file to a session, with the selected lines, as Claude
+-- Code writes it: "@notes/plan.md#L12-30". It says whether lines are named.
+local function mention(bp)
+    local path = bp.Buf.AbsPath
+    local from, to = selection(bp.Cursor)
+    local out = "@" .. path
+    if path:find(" ") then
+        out = '@"' .. path .. '"'
+    end
+    if from == nil then
+        return out, false
+    end
+    local last = to.Y
+    if to.X == 0 and to.Y > from.Y then
+        last = to.Y - 1 -- the selection ends before this line's first character
+    end
+    if last > from.Y then
+        return out .. "#L" .. (from.Y + 1) .. "-" .. (last + 1), true
+    end
+    return out .. "#L" .. (from.Y + 1), true
+end
+
+-- excerpt is the selected text, or the file's, for a session that can't
+-- read the file itself.
+local function excerpt(bp)
+    local text
+    if bp.Cursor:HasSelection() then
+        text = util.String(bp.Cursor:GetSelection())
+    else
+        text = util.String(bp.Buf:Bytes())
+    end
+    return "From " .. filepath.Base(bp.Buf.AbsPath) .. ":\n\n" .. text
+end
+
+-- reference is what a question says of what it is about: the file and the
+-- selected lines by name, for the session to read; their text itself for a
+-- session on another computer.
+local function reference(bp)
+    if remote() then
+        return excerpt(bp)
+    end
+    return (mention(bp))
+end
+
+-- editRequest is what cmd+K adds to what you ask for: that the change is
+-- made in the file itself, which this editor shows as soon as it is. A
+-- session on another computer can't reach the file: it replies with the new
+-- text, for cmd+enter to put in.
+local function editRequest(bp)
+    if remote() then
+        return "Reply with only the new text, nothing before or after it, for this:\n\n" .. excerpt(bp)
+    end
+    local name, lines = mention(bp)
+    if lines then
+        return "Do this by editing the file in place: " .. name .. " (those lines only, unless it needs more). "
+            .. "It is open in an editor that shows your change. Reply with one line on what you changed."
+    end
+    return "Do this by editing the file in place: " .. name .. ". "
+        .. "It is open in an editor that shows your change. Reply with one line on what you changed."
+end
+
+-- reload shows a file as it is on disk now in every pane that has it open:
+-- a session changed it. The change is one step to undo.
+local function reload(path)
+    local tabs = micro.Tabs().List
+    for i = 1, #tabs do
+        local panes = tabs[i].Panes
+        for j = 1, #panes do
+            if panes[j].Buf.AbsPath == path then
+                panes[j].Buf:ReOpen()
+                panes[j]:Relocate()
+            end
+        end
+    end
+end
+
+local onReply
+
+-- wait has entry's reply waited for: its message is the session's already.
+local function wait(index, bp)
+    local entry = asked[index]
+    shell.JobSpawn(marmota, { "session", "ask", "--sent", "--keep-waiting", entry.session, entry.message },
+        nil, nil, onReply, index, bp)
+end
+
+onReply = function(output, args)
     -- its place in asked, not the entry: a table handed to a job comes
     -- back a copy
     local entry, bp = asked[args[1]], args[2]
     output = strings.TrimSpace(output)
     local failed = output:match("y session ask: (.*)$")
+    if failed ~= nil and failed:find("it stopped to ask you", 1, true) and entry.needsYou == nil then
+        -- it needs your answer, in Marmota: said once, and waited for
+        entry.needsYou = failed
+        micro.InfoBar():Error(entry.title .. " " .. failed)
+        wait(args[1], bp)
+        showReplies(bp)
+        return
+    end
     if failed ~= nil then
         local before = strings.TrimSpace(output:sub(1, #output - #failed - #"y session ask: "))
         entry.reply = "⚠ " .. failed
@@ -307,7 +377,12 @@ local function onReply(output, args)
     else
         entry.reply = output
         entry.done = true
-        micro.InfoBar():Message(entry.title .. " replied: cmd+enter puts it at the cursor")
+        if entry.edits ~= nil then
+            reload(entry.edits)
+            micro.InfoBar():Message(entry.title .. " changed " .. filepath.Base(entry.edits) .. ": cmd+Z takes it back")
+        else
+            micro.InfoBar():Message(entry.title .. " replied: cmd+enter puts it at the cursor")
+        end
     end
     arrived = arrived + 1
     entry.arrived = arrived
@@ -328,6 +403,7 @@ local function onStarted(output, args)
         return
     end
     entry.starting = false
+    entry.session = id
     if session.id == newSession then
         -- the next questions go on with it
         session.id, session.title, session.host = id, entry.title, "here"
@@ -336,15 +412,20 @@ local function onStarted(output, args)
     showReplies(bp)
 end
 
-local function send(bp, question)
+-- send asks the session: question, and about it either what it is about
+-- (cmd+L) or, with edit, that it changes the file itself (cmd+K).
+local function send(bp, question, edit)
     if bp.Buf.Path ~= "" and bp.Buf:Modified() then
         bp:Save()
     end
     local message = question
     if bp.Buf.Path ~= "" then
-        message = question .. "\n\n" .. reference(bp)
+        message = question .. "\n\n" .. (edit and editRequest(bp) or reference(bp))
     end
-    local entry = { title = session.title, question = question, message = message }
+    local entry = { title = session.title, question = question, message = message, session = session.id }
+    if edit and bp.Buf.Path ~= "" and not remote() then
+        entry.edits = bp.Buf.AbsPath
+    end
     table.insert(asked, entry)
     if session.id == newSession then
         entry.starting = true
@@ -360,9 +441,19 @@ end
 local function promptQuestion(bp)
     micro.InfoBar():Prompt("Ask " .. session.title .. " › ", "", "MarmotaAsk", nil, function(resp, canceled)
         if not canceled and strings.TrimSpace(resp) ~= "" then
-            send(bp, strings.TrimSpace(resp))
+            send(bp, strings.TrimSpace(resp), false)
         end
     end)
+end
+
+local function promptEdit(bp)
+    local what = bp.Cursor:HasSelection() and "these lines" or "this file"
+    micro.InfoBar():Prompt(session.title .. ", change " .. what .. " › ", "", "MarmotaEdit", nil,
+        function(resp, canceled)
+            if not canceled and strings.TrimSpace(resp) ~= "" then
+                send(bp, strings.TrimSpace(resp), true)
+            end
+        end)
 end
 
 -- pickSession lists Marmota's sessions to pick the one questions go to,
@@ -420,13 +511,29 @@ function askAnother(bp)
     return true
 end
 
+-- edit is cmd+K: the session changes the selected lines, or the file, in
+-- the file itself, as you ask; this editor shows the change when it is
+-- made, and cmd+Z takes it back.
+function edit(bp)
+    if bp.Buf.Path == "" then
+        micro.InfoBar():Message("Save the file first: the session changes it on disk")
+        return true
+    end
+    if session.id == "" then
+        pickSession(bp, promptEdit)
+    else
+        promptEdit(bp)
+    end
+    return true
+end
+
 -- insertReply is cmd+enter: the last reply at the cursor, or in place of
--- what is selected.
+-- what is selected. What a session said of a change it made isn't one.
 function insertReply(bp)
     -- the reply that came last, whichever question it answers
     local reply, last = nil, 0
     for _, a in ipairs(asked) do
-        if a.done and a.arrived > last then
+        if a.done and a.edits == nil and a.arrived > last then
             reply, last = a.reply, a.arrived
         end
     end

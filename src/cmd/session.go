@@ -127,13 +127,15 @@ func sessionCommand() *cli.Command {
 						Usage: "how long to wait for the reply"},
 					&cli.BoolFlag{Name: "sent", Usage: "the message is already the session's, such as the one " +
 						"it was started with: only wait for its reply"},
+					&cli.BoolFlag{Name: "keep-waiting", Usage: "go on waiting when the session stops to ask you " +
+						"something, for you to answer it, instead of exiting with 3"},
 				},
 				Action: func(_ context.Context, c *cli.Command) error {
 					if c.Args().Len() < 2 {
 						return cli.Exit("y session ask: give the session's id and the message", 1)
 					}
 					reply, err := internal.SessionAsk(c.Args().First(), strings.Join(c.Args().Tail(), " "),
-						c.Duration("timeout"), c.Bool("sent"))
+						c.Duration("timeout"), c.Bool("sent"), c.Bool("keep-waiting"))
 					if needs, ok := internal.IsNeedsYou(err); ok {
 						if needs.Reply != "" {
 							fmt.Println(needs.Reply)

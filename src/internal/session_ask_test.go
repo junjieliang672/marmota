@@ -37,7 +37,7 @@ func TestAskWaitsForItsOwnTurnToEnd(t *testing.T) {
 		return st
 	}
 
-	reply, err := awaitAskedTurn(look, askKey("Summarize\n@notes.md#L3-9"), time.Time{}, time.Minute)
+	reply, err := awaitAskedTurn(look, askKey("Summarize\n@notes.md#L3-9"), time.Time{}, time.Minute, false)
 
 	require.NoError(t, err)
 	assert.Equal(t, "Half a reply, then all of it.", reply)
@@ -63,7 +63,7 @@ func TestAskTheSameMessageAgain(t *testing.T) {
 		st := looks[min(n, len(looks)-1)]
 		n++
 		return st
-	}, askKey("again?"), prior, time.Minute)
+	}, askKey("again?"), prior, time.Minute, false)
 
 	require.NoError(t, err)
 	assert.Equal(t, "the second answer", reply)
@@ -85,19 +85,33 @@ func TestAskSaysWhenTheSessionNeedsYou(t *testing.T) {
 		st := seq[min(n, len(seq)-1)]
 		n++
 		return st
-	}, askKey("run the tests"), time.Time{}, time.Minute)
+	}, askKey("run the tests"), time.Time{}, time.Minute, false)
 
 	needs, ok := IsNeedsYou(err)
 	require.True(t, ok, "%v", err)
 	assert.Equal(t, "Bash(go test ./...)", needs.What)
 	assert.Equal(t, "I'll run them.", needs.Reply)
 	assert.Equal(t, 5, n, "one look that says it waits isn't enough")
+
+	// Told to keep waiting, it does: you answer the session, and it replies.
+	done := working
+	done.turns = []claudesession.Turn{askTurn("run the tests", "All 12 pass.", t0.Add(time.Minute))}
+	done.lastTurnEnd = t0.Add(2 * time.Minute)
+	seq = []askedState{waiting, waiting, waiting, working, done}
+	n = 0
+	reply, err := awaitAskedTurn(func() askedState {
+		st := seq[min(n, len(seq)-1)]
+		n++
+		return st
+	}, askKey("run the tests"), time.Time{}, time.Minute, true)
+	require.NoError(t, err)
+	assert.Equal(t, "All 12 pass.", reply)
 }
 
 func TestAskGivesUpAfterItsTimeout(t *testing.T) {
 	setForTest(t, &sessionAskPoll, time.Millisecond)
 	_, err := awaitAskedTurn(func() askedState { return askedState{} }, askKey("hello"), time.Time{},
-		20*time.Millisecond)
+		20*time.Millisecond, false)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "isn't in its conversation")
 }

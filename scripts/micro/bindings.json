@@ -18,5 +18,6 @@
     "Alt-l": "lua:marmota.ask",
     "Alt-L": "lua:marmota.askAnother",
     "Alt-Enter": "lua:marmota.insertReply",
-    "Alt-j": "lua:marmota.toggleReplies"
+    "Alt-j": "lua:marmota.toggleReplies",
+    "Alt-k": "lua:marmota.edit"
 }
