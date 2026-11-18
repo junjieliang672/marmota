@@ -482,11 +482,11 @@ def main() -> int:
         m.type("DRAFT ")
         wait_for("the typing", lambda: "DRAFT # Plan" in m.screen())
         m.press("cmd+m")
-        away = "✎ micro · 1 file · 1 unsaved · b back"
+        away = "✎ micro · 1 file · b back"
         wait_for("Marmota with the editor put away", lambda: away in m.screen())
         assert m.runs() != "micro", m.runs()
         assert plan.read_text() == PLAN, "nothing was saved"
-        print("ok   cmd+M put micro away: Marmota is back, and says an editor with unsaved text is put away")
+        print("ok   cmd+M put micro away: Marmota is back, and says an editor is put away")
 
         m.type("e")  # e stays what it was: another editor
         wait_for("a second micro", lambda: "# Plan" in m.screen() and "DRAFT" not in m.screen())
@@ -505,9 +505,10 @@ def main() -> int:
         m.type("q")
         wait_for("micro back instead of quitting", lambda: "Marmota didn't quit" in m.screen())
         assert "DRAFT # Plan" in m.screen(), m.screen()
-        m.press("cmd+s", "cmd+m")
-        wait_for("Marmota, the file saved", lambda: "✎ micro · 1 file · b back" in m.screen())
-        assert plan.read_text() == "DRAFT " + PLAN, plan.read_text()
+        m.press("cmd+s")
+        wait_for("the file saved", lambda: plan.read_text() == "DRAFT " + PLAN)
+        m.press("cmd+m")
+        wait_for("Marmota", lambda: away in m.screen())
         m.type("q")
         wait_for("Marmota to quit", lambda: "MARMOTA-ENDED" in m.screen())
         left = subprocess.run(["pgrep", "-f", f"micro {plan}"], capture_output=True, text=True).stdout.split()

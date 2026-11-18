@@ -209,9 +209,6 @@ func (m *model) editorAwayStatus() string {
 	default:
 		parts = append(parts, strconv.Itoa(a.files)+" files")
 	}
-	if a.unsaved > 0 {
-		parts = append(parts, strconv.Itoa(a.unsaved)+" unsaved")
-	}
 	parts = append(parts, firstKey(common.Hotkeys.BackToEditor)+" back")
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(common.Theme.Hint)).
 		Background(lipgloss.Color(common.Theme.FilePanelBG)).Render(strings.Join(parts, " · "))

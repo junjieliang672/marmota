@@ -91,8 +91,8 @@ func TestAnEditorPutAwayIsNamedInTheStatusLineAndBBringsItBack(t *testing.T) {
 
 	require.NotNil(t, m.editorAway)
 	assert.False(t, m.externalProcessRunning, "Marmota has the terminal again")
-	assert.Equal(t, "✎ micro · 3 files · 1 unsaved · b back", ansi.Strip(m.editorAwayStatus()))
-	assert.Contains(t, ansi.Strip(m.View()), "✎ micro · 3 files · 1 unsaved · b back")
+	assert.Equal(t, "✎ micro · 3 files · b back", ansi.Strip(m.editorAwayStatus()))
+	assert.Contains(t, ansi.Strip(m.View()), "✎ micro · 3 files · b back")
 
 	// b gives it the terminal again, with nothing asked of it.
 	require.NoError(t, os.WriteFile(state+editorOrderSuffix, []byte("quit\n"), 0o600))
@@ -113,8 +113,8 @@ func TestWhatAnEditorPutAwaySaysItHolds(t *testing.T) {
 	for holds, want := range map[string]string{
 		"1 0": "✎ micro · 1 file · b back",
 		"2 0": "✎ micro · 2 files · b back",
-		"4 2": "✎ micro · 4 files · 2 unsaved · b back",
-		"":    "✎ micro · b back", // an editor that says nothing, as vim
+		"4 2": "✎ micro · 4 files · b back", // what isn't saved is q's to know, not the line's
+		"":    "✎ micro · b back",           // an editor that says nothing, as vim
 	} {
 		m, state := awayTestModel(t)
 		putAway(t, m, state, holds)
