@@ -11,7 +11,7 @@ local config = import("micro/config")
 local util = import("micro/util")
 
 function init()
-    -- "help marmota" (cmd+/): the keys Marmota sets up
+    -- "help marmota" (cmd+H): the keys worth knowing, Marmota's and micro's
     config.AddRuntimeFile("marmota", config.RTHelp, "help/marmota.md")
     -- $(marmota.status) in the status line (statusformatr in settings.json)
     micro.SetStatusInfoFn("marmota.status")
@@ -573,18 +573,35 @@ local function shellQuote(s)
     return "'" .. s:gsub("'", "'\\''") .. "'"
 end
 
--- repliesPane is the pane that shows the replies, when one does.
-local function repliesPane()
+-- paneNamed is the pane that shows the buffer of that name, when one does.
+local function paneNamed(name)
     local tabs = micro.Tabs().List
     for i = 1, #tabs do
         local panes = tabs[i].Panes
         for j = 1, #panes do
-            if panes[j].Buf:GetName() == repliesName then
+            if panes[j].Buf:GetName() == name then
                 return panes[j], tabs[i], j - 1
             end
         end
     end
     return nil
+end
+
+-- repliesPane is the pane that shows the replies, when one does.
+local function repliesPane()
+    return paneNamed(repliesName)
+end
+
+-- keys is cmd+H: the page of keys ("help marmota"), shown below the file or
+-- put away, wherever the cursor is.
+function keys(bp)
+    local pane = paneNamed("Help marmota") -- the name micro gives a help page's buffer
+    if pane ~= nil then
+        pane:Quit()
+    else
+        bp:HandleCommand("help marmota")
+    end
+    return true
 end
 
 local function repliesText()

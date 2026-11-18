@@ -14,5 +14,5 @@
     "scrollbar": true,
     "softwrap": true,
     "wordwrap": true,
-    "statusformatr": "$(marmota.status)cmd+/: keys"
+    "statusformatr": "$(marmota.status)cmd+H: keys"
 }

@@ -914,7 +914,12 @@ do
     { 'f', 'CMD|SHIFT', '\x1bF' }, -- search every file
     { 'f', 'CMD|OPT', '\x1br' }, -- fuzzy search in this file
     { 'o', 'CMD|SHIFT', '\x1bo' }, -- go to a heading or function
-    { '/', 'CMD', '\x1b/' }, -- Marmota's keys for micro
+    { '/', 'CMD', '\x1b/' }, -- comment the line, or take its comment off
+    -- the keys' page (F1); elsewhere cmd+H hides WezTerm, as it did
+    { 'h', 'CMD', '\x1bOP', wezterm.action.HideApplication },
+    -- close the file, tab or pane, the last one micro itself (ctrl+Q);
+    -- elsewhere cmd+W closes WezTerm's tab, as it did
+    { 'w', 'CMD', '\x11', wezterm.action.CloseCurrentTab { confirm = true } },
     { 'l', 'CMD', '\x1bl' }, -- ask a session about this file
     { 'l', 'CMD|SHIFT', '\x1bL' }, -- pick the session, then ask
     { 'k', 'CMD', '\x1bk' }, -- have the session change the selected lines

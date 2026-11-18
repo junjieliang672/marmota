@@ -57,6 +57,8 @@ KEY = {
     "cmd+g": b"\x1bg", "cmd+shift+g": b"\x1bG", "cmd+s": b"\x13", "esc": b"\x1b", "right": b"\x1b[C",
     "cmd+l": b"\x1bl", "cmd+shift+l": b"\x1bL", "cmd+k": b"\x1bk",
     "cmd+enter": b"\x1b\r", "cmd+j": b"\x1bj", "enter": b"\r", "down": b"\x1b[B", "shift+down": b"\x1b[1;2B",
+    "cmd+h": b"\x1bOP", "cmd+w": b"\x11", "cmd+/": b"\x1b/", "opt+n": b"\x1bn", "opt+]": b"\x1b]",
+    "opt+m": b"\x1bm", "opt+x": b"\x1bx",
 }
 PLAN = "# Plan\n\nline three\nline four\nline five\n\nlast para one\nlast para two\n"
 BRACKETS = "# Plan\n\nline three\nsay (a [b] c) d\n\nlast para one\nlast para two\n"
@@ -266,12 +268,44 @@ def main() -> int:
         print("ok   cmd+G went to lines, the top and bottom, paragraphs, brackets and back, staying open after g; "
               "cmd+shift+G selected up to them; the wheel scrolled a drag's selection on")
 
+        # 3. the page of keys, closing, comments, several cursors
+        assert after("cmd+/")[0] == "<!-- # Plan -->", "cmd+/ comments the line"
+        assert after("cmd+/", "cmd+/")[0] == "# Plan", "and again takes the comment off"
+        assert after("down", "down", "opt+n", "opt+n", "X")[2:4] == ["X three", "X four"], \
+            "option+N selects the word, then its next occurrence too, and typing goes to both"
+        assert after("cmd+g", "5", "enter", "!", "cmd+g", "t", "opt+]", "?")[4] == "?!line five", \
+            "option+] goes to the next changed line"
+        assert after("down", "down", "shift+down", "shift+down", "opt+m", "X")[2:4] == ["Xline three", "Xline four"], \
+            "option+M puts a cursor on each selected line"
+        assert after("opt+x", "replace line row -a", "enter")[2:5] == ["row three", "row four", "row five"], \
+            "option+X opens the command bar, and replace with -a replaces all"
+        m = editor()
+        m.press("cmd+h")
+        wait_for("the page of keys", lambda: "Keys in micro" in m.screen())
+        m.press("cmd+h")
+        wait_for("cmd+H to put the page away", lambda: "Keys in micro" not in m.screen())
+        m.press("cmd+h")
+        wait_for("the page of keys again", lambda: "Keys in micro" in m.screen())
+        m.press("cmd+w")
+        wait_for("cmd+W to close the page", lambda: "Keys in micro" not in m.screen())
+        assert "# Plan" in m.screen(), "the file stays open"
+        m.type("zz")
+        m.press("cmd+w")
+        wait_for("cmd+W to ask about what isn't saved", lambda: "Save changes" in m.screen())
+        m.type("n")
+        wait_for("micro to close", lambda: m.screen().strip() == "")
+        assert plan.read_text() == PLAN, "nothing was saved"
+        m = None
+        print("ok   cmd+H showed the page of keys and put it away; cmd+W closed the page, then micro, asking "
+              "about what wasn't saved; cmd+/ commented, option+N and option+M typed at several cursors, "
+              "option+] found the change, the command bar replaced all")
+
         # two sessions to ask
         first = session("start", "--cwd", str(project), "--", "hello").split()[1]
         second = session("start", "--cwd", str(project), "--", "second").split()[1]
         wait_for("the sessions", lambda: session("list").count(" idle ") == 2)
 
-        # 3. cmd+L asks the editor's session about the file and the selected lines
+        # 4. cmd+L asks the editor's session about the file and the selected lines
         m = editor(first, "first", "here")
         assert "→ first" in m.screen().splitlines()[-2], "the status line says whom questions go to"
         m.press("down", "down", "shift+down", "shift+down", "cmd+l")
@@ -292,7 +326,7 @@ def main() -> int:
         print("ok   cmd+L asked the session about the file and lines 3-4 while typing went on; its reply showed "
               "on the right; cmd+enter put it at the cursor and cmd+Z took it back")
 
-        # 4. another session, picked from the list
+        # 5. another session, picked from the list
         m.press("cmd+shift+l")
         wait_for("the list of sessions", lambda: "New session in project" in m.screen() and "idle" in m.screen())
         assert first not in m.screen(), "the ids stay out of sight"
@@ -306,7 +340,7 @@ def main() -> int:
         print("ok   cmd+shift+L listed the sessions and a new one; the second was asked too, and both replies "
               "show under their questions")
 
-        # 5. a session the question starts
+        # 6. a session the question starts
         m.press("cmd+shift+l")
         wait_for("the list of sessions", lambda: "New session in project" in m.screen())
         m.press("enter")  # the first row
@@ -326,7 +360,7 @@ def main() -> int:
               "with it")
         m.quit()
 
-        # 6. cmd+K: the session changes the lines in the file
+        # 7. cmd+K: the session changes the lines in the file
         m = editor(first, "first", "here")
         m.press("down", "down", "shift+down", "shift+down", "cmd+k")
         wait_for("the change's prompt", lambda: "first, change these lines ›" in m.screen())
@@ -345,7 +379,7 @@ def main() -> int:
               "the change back")
         m.quit()
 
-        # 7. a session on another computer gets the text itself
+        # 8. a session on another computer gets the text itself
         remote_socket = socket + "-remote"
         on = f"env MARMOTA_TMUX_SOCKET={remote_socket} /bin/sh -c"
         out = session("start", "--on", on, "--cwd", str(project), "--", "far away")
