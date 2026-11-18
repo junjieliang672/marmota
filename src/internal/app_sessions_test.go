@@ -7,11 +7,13 @@ import (
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/junjieliang672/marmota/src/internal/common"
+	sessionsui "github.com/junjieliang672/marmota/src/internal/ui/sessions"
 	"github.com/junjieliang672/marmota/src/internal/utils"
 	"github.com/junjieliang672/marmota/src/pkg/claudecloud"
 )
@@ -55,9 +57,8 @@ func TestTheRemoteSectionListsClaudeAppSessionsBelowThisComputers(t *testing.T) 
 		}
 		return -1
 	}
-	require.GreaterOrEqual(t, at("── Remote"), 0, box)
-	assert.Less(t, at("ime hold tests"), at("── Remote"), "below this computer's sessions")
-	assert.Less(t, at("── Remote"), at(" b1 "))
+	assert.Equal(t, -1, at("── Remote"), "no title: each row's cloud says where it runs")
+	assert.Equal(t, at("ime hold tests")+2, at(" b1 "), "right below this computer's sessions")
 	assert.GreaterOrEqual(t, at("needs you: bring b2"), 0, box)
 	assert.GreaterOrEqual(t, at("offline · redteam-root · main"), 0, box)
 }
@@ -159,4 +160,109 @@ func TestThePreviewOfARemoteSessionSaysWhereItIs(t *testing.T) {
 	assert.Equal(t, "b1", v.Title)
 	assert.Contains(t, v.Place, "Claude app")
 	assert.Equal(t, "needs you: bring b2 back online", v.Now)
+}
+
+func TestRemoteSessionsListTheLatestFirstAndTheOfflineOnesLast(t *testing.T) {
+	m := appTestModel(t)
+	now := time.Now()
+	m.applyAppSessions(appSessionsMsg{at: now, sessions: []claudecloud.Session{
+		{ID: "cse_01old", Title: "old", Connected: true, Updated: now.Add(-time.Hour)},
+		{ID: "cse_01off", Title: "off", Updated: now},
+		{ID: "cse_01new", Title: "new", Connected: true, Updated: now.Add(-time.Minute)},
+	}})
+	var ids []string
+	for _, s := range m.appSessions() {
+		ids = append(ids, s.ID)
+	}
+	assert.Equal(t, []string{"app:cse_01new", "app:cse_01old", "app:cse_01off"}, ids)
+}
+
+func TestARemoteSessionOpenedInTheAppIsReadAndAnsweredUntilItMovesOn(t *testing.T) {
+	m := appTestModel(t)
+	openAppURL = func(string) error { return nil }
+	t.Cleanup(func() { openAppURL = func(string) error { return errors.New("tests must not open the Claude app") } })
+	at := time.Now().Add(-time.Minute)
+	m.applyAppSessions(appSessionsMsg{at: time.Now(), sessions: []claudecloud.Session{
+		{ID: "cse_01b1", Title: "b1", Bucket: "blocked", Unread: true, Connected: true, Updated: at,
+			NeedsAction: "bring b2 back online"},
+	}})
+	row, _ := m.appSessionByID("app:cse_01b1")
+	require.Equal(t, sessionsui.NeedsYou, m.sessionState(row))
+
+	m.focusDockSessionsOn("app:cse_01b1")
+	cmd := m.dockSessionsKey(utils.TeaKeyMsg(common.Hotkeys.Confirm[0]))
+	row, _ = m.appSessionByID("app:cse_01b1")
+	assert.NotEqual(t, sessionsui.NeedsYou, m.sessionState(row), "answered in the app: ! goes on")
+	assert.False(t, row.App.Unread)
+	assert.NotContains(t, row.App.Doing, "needs you")
+	TeaUpdate(m, cmd())
+
+	m.applyAppSessions(appSessionsMsg{at: time.Now(), sessions: []claudecloud.Session{
+		{ID: "cse_01b1", Title: "b1", Bucket: "blocked", Unread: true, Connected: true, Updated: at},
+	}})
+	row, _ = m.appSessionByID("app:cse_01b1")
+	assert.NotEqual(t, sessionsui.NeedsYou, m.sessionState(row), "the same event, listed again")
+
+	m.applyAppSessions(appSessionsMsg{at: time.Now(), sessions: []claudecloud.Session{
+		{ID: "cse_01b1", Title: "b1", Bucket: "blocked", Unread: true, Connected: true, Updated: time.Now()},
+	}})
+	row, _ = m.appSessionByID("app:cse_01b1")
+	assert.Equal(t, sessionsui.NeedsYou, m.sessionState(row), "a later event needs you again")
+}
+
+func TestARemoteSessionThatFailedToOpenStaysUnread(t *testing.T) {
+	m := appTestModel(t)
+	m.applyAppSessions(appSessionsMsg{at: time.Now(), sessions: []claudecloud.Session{
+		{ID: "cse_01b2", Title: "b2", Bucket: "completed", Unread: true, Connected: true},
+	}})
+	m.focusDockSessionsOn("app:cse_01b2")
+	TeaUpdate(m, m.dockSessionsKey(utils.TeaKeyMsg(common.Hotkeys.Confirm[0]))())
+	row, _ := m.appSessionByID("app:cse_01b2")
+	assert.True(t, row.App.Unread)
+}
+
+func TestEnterOnARemoteSessionInTheGoToListOpensItInTheClaudeApp(t *testing.T) {
+	m := appTestModel(t)
+	var opened []string
+	openAppURL = func(url string) error { opened = append(opened, url); return nil }
+	t.Cleanup(func() { openAppURL = func(string) error { return errors.New("tests must not open the Claude app") } })
+
+	pressKey(m, common.Hotkeys.GoTo[0])
+	typeInto(m, "b1")
+	cmd := TeaUpdate(m, utils.TeaKeyMsg("enter"))
+	require.NotNil(t, cmd, "opening runs off the screen's loop")
+	runCmds(m, cmd)
+	assert.False(t, m.jumpUI.IsOpen())
+	assert.Equal(t, []string{"claude://claude.ai/code/session_01b1"}, opened)
+}
+
+// runCmds runs cmd, and those of a batch, handing their messages to m.
+func runCmds(m *model, cmd tea.Cmd) {
+	if cmd == nil {
+		return
+	}
+	switch msg := cmd().(type) {
+	case tea.BatchMsg:
+		for _, c := range msg {
+			runCmds(m, c)
+		}
+	case nil:
+	default:
+		TeaUpdate(m, msg)
+	}
+}
+
+func TestTheGoToListShowsEachSessionsStateAndWhatARemoteOneWaitsFor(t *testing.T) {
+	m := appTestModel(t)
+	pressKey(m, common.Hotkeys.GoTo[0])
+	view := ansi.Strip(m.jumpUI.Render(true))
+	var b1 string
+	for _, l := range strings.Split(view, "\n") {
+		if strings.Contains(l, " b1 ") {
+			b1 = l
+		}
+	}
+	require.NotEmpty(t, b1, view)
+	assert.Contains(t, b1, "⚑ cc", "its mark, as in the Sessions box")
+	assert.Contains(t, b1, "needs you: bring b2", "what it waits for, in its folder's place")
 }

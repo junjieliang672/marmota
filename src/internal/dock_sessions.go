@@ -377,18 +377,17 @@ func (m *model) dockSessionsRender() string {
 	return r.Render()
 }
 
-// remoteSectionLines head the Remote section: its title across the box,
-// and why claude.ai can't be asked when it can't.
+// remoteSectionLines head the Remote section: nothing, its rows' cloud says
+// where they run, but a line saying why claude.ai can't be asked when it can't.
 func (m *model) remoteSectionLines(width int) []string {
+	note := m.appSectionNote()
+	if note == "" {
+		return nil
+	}
 	base := lipgloss.NewStyle().Background(common.FilePanelBGColor).Foreground(common.FooterFGColor)
 	dim := base.Foreground(lipgloss.Color(common.Theme.FooterBorder))
-	title := " ── " + remoteSectionTitle + " "
-	lines := []string{dockFill(dim.Render(title+strings.Repeat("─", max(0, width-ansi.StringWidth(title)-1))),
-		width, base)}
-	if note := m.appSectionNote(); note != "" {
-		lines = append(lines, dockFill(dim.Render(ansi.Truncate("    "+note, width, "…")), width, base))
-	}
-	return lines
+	return []string{dockFill(base.Render("  ")+common.HostMark(remoteSectionTitle, common.FilePanelBGColor)+
+		dim.Render(ansi.Truncate(" "+note, max(0, width-4), "…")), width, base)}
 }
 
 // claudeColor is the ✳ orange superfile uses for Claude.

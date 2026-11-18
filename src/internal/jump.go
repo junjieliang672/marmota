@@ -204,8 +204,13 @@ func (m *model) jumpSections() []jump.Section {
 
 	sec = jump.Section{Kind: jump.Session}
 	for _, s := range m.dockSessions() {
-		sec.Items = append(sec.Items, jump.Item{Kind: jump.Session, Key: s.ID, Title: s.DisplayTitle(), Where: s.Cwd,
-			Tag: agentTag(s), Meta: jumpSessionState(m.sessionState(s))})
+		state := m.sessionState(s)
+		where := s.Cwd
+		if s.App != nil { // on another computer: what it does there, as the Sessions box says
+			where = s.App.Doing
+		}
+		sec.Items = append(sec.Items, jump.Item{Kind: jump.Session, Key: s.ID, Title: s.DisplayTitle(), Where: where,
+			Tag: agentTag(s), Meta: jumpSessionState(state), State: state, Stated: true})
 	}
 	sections = append(sections, sec)
 
@@ -312,7 +317,8 @@ func (m *model) jumpAct(act jump.Action) tea.Cmd {
 // jumpGo is enter on an item: a folder is opened in the panel, a file's
 // folder is with the cursor on it; for a session the Sessions box takes the
 // keyboard, on its row, and the preview shows it, while the pane beside
-// Marmota stays as it is; an ended one is resumed in a hidden pane first.
+// Marmota stays as it is; an ended one is resumed in a hidden pane first; one
+// on another computer opens in the Claude app.
 func (m *model) jumpGo(it jump.Item) tea.Cmd {
 	if m.jump.forResume {
 		m.jumpUI.Close()
@@ -338,6 +344,11 @@ func (m *model) jumpGo(it jump.Item) tea.Cmd {
 		m.dock.lastID = s.ID
 		return tea.Batch(cmd, m.focusDockSessionsOn(s.ID))
 	case jump.Session:
+		if s, ok := m.appSessionByID(it.Key); ok { // on another computer: the Claude app opens it
+			m.dock.lastID = s.ID
+			cmd, _ := m.appKey(s, common.Hotkeys.Confirm[0])
+			return cmd
+		}
 		s, ok := m.findResumable(it.Key)
 		if !ok {
 			m.flashClaude(it.Title + " is no longer listed")

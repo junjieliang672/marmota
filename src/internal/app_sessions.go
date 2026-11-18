@@ -34,7 +34,7 @@ const (
 	// appIDPrefix starts the id of a row of the Remote section, which is
 	// claude.ai's id: it never meets a Claude Code session's.
 	appIDPrefix = "app:"
-	// remoteSectionTitle heads the Remote section.
+	// remoteSectionTitle names the Remote section: its rows' cloud mark.
 	remoteSectionTitle = "Remote"
 	// inTheClaudeApp is what keys that act on a session say on one of the
 	// Remote section.
@@ -62,6 +62,11 @@ type appSessionsState struct {
 	err      error
 	at       time.Time
 	inflight bool
+	// opened is, by claude.ai id, the last event of each session as it stood
+	// when enter opened it in the Claude app: read from then, and answered if
+	// it needed you, until claude.ai lists a later event. claude.ai doesn't
+	// say at once what the app has read.
+	opened map[string]time.Time
 }
 
 type appSessionsTickMsg struct{}
@@ -73,7 +78,10 @@ type appSessionsMsg struct {
 	at       time.Time
 }
 
-type appOpenedMsg struct{ err error }
+type appOpenedMsg struct {
+	id  string
+	err error
+}
 
 func scheduleAppSessionsTick() tea.Cmd {
 	return tea.Tick(appSessionsInterval, func(time.Time) tea.Msg { return appSessionsTickMsg{} })
@@ -145,10 +153,27 @@ func (m *model) appSessions() []claudesession.Session {
 	}
 	out := make([]claudesession.Session, 0, len(m.app.listed))
 	for _, c := range m.app.listed {
-		if !here[c.LinkID()] {
-			out = append(out, appSession(c))
+		if here[c.LinkID()] {
+			continue
 		}
+		if at, ok := m.app.opened[c.ID]; ok && !c.Updated.After(at) {
+			c.Unread = false
+			if c.Bucket == "blocked" {
+				c.Bucket, c.NeedsAction = "", ""
+			}
+		}
+		out = append(out, appSession(c))
 	}
+	// Those online first, the latest event first; the offline ones after.
+	slices.SortStableFunc(out, func(a, b claudesession.Session) int {
+		if a.App.Offline != b.App.Offline {
+			if a.App.Offline {
+				return 1
+			}
+			return -1
+		}
+		return b.LastActivity.Compare(a.LastActivity)
+	})
 	return out
 }
 
@@ -221,8 +246,13 @@ func (m *model) appSectionNote() string {
 func (m *model) appKey(s claudesession.Session, key string) (tea.Cmd, bool) {
 	switch {
 	case slices.Contains(common.Hotkeys.Confirm, key):
-		url := s.App.URL
-		return func() tea.Msg { return appOpenedMsg{err: openAppURL(url)} }, true
+		url, id := s.App.URL, strings.TrimPrefix(s.ID, appIDPrefix)
+		if m.app.opened == nil {
+			m.app.opened = map[string]time.Time{}
+		}
+		m.app.opened[id] = s.LastActivity // so ! goes on to the next one
+		m.refreshSessionsList()
+		return func() tea.Msg { return appOpenedMsg{id: id, err: openAppURL(url)} }, true
 	case slices.ContainsFunc([][]string{common.Hotkeys.OpenAskBar, common.Hotkeys.SessionMention,
 		common.Hotkeys.SessionRename, common.Hotkeys.SessionFork, common.Hotkeys.SessionStop,
 		common.Hotkeys.MoveSessionHere, common.Hotkeys.ShowSessionFiles, common.Hotkeys.CopyPath,
@@ -235,6 +265,8 @@ func (m *model) appKey(s claudesession.Session, key string) (tea.Cmd, bool) {
 
 func (m *model) applyAppOpened(msg appOpenedMsg) {
 	if msg.err != nil {
+		delete(m.app.opened, msg.id)
+		m.refreshSessionsList()
 		slog.Error("Could not open the session in the Claude app", "error", msg.err)
 		m.flashClaude("Could not open it: " + msg.err.Error())
 	}

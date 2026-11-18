@@ -5,11 +5,13 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/junjieliang672/marmota/src/config/icon"
 	"github.com/junjieliang672/marmota/src/internal/common"
 	"github.com/junjieliang672/marmota/src/internal/ui"
+	sessionsui "github.com/junjieliang672/marmota/src/internal/ui/sessions"
 )
 
 // slot is one row of the list: a section's title, an item, or a note
@@ -274,6 +276,9 @@ func (m *Model) itemLine(it Item, n int, picked bool, width int) string {
 	switch {
 	case it.Tag != "":
 		mark = st.Session.Render(it.Tag) + st.Text.Render(" ")
+		if it.Stated {
+			mark = m.stateStyle(st, it.State).Render(sessionsui.Symbol(it.State)) + st.Text.Render(" ") + mark
+		}
 	case it.Dir:
 		mark = st.Accent.Render("▸ ")
 	}
@@ -294,10 +299,24 @@ func (m *Model) itemLine(it Item, n int, picked bool, width int) string {
 	if picked {
 		titleStyle = st.Picked
 	}
+	metaStyle := st.Faint
+	if it.Stated {
+		metaStyle = m.stateStyle(st, it.State)
+	}
 	gap := max(1, width-ansi.StringWidth(head)-ansi.StringWidth(title)-ansi.StringWidth(where)-len(it.Meta)-1)
 	line := head + titleStyle.Render(title) + st.Text.Render(" ") + st.Muted.Render(where) +
-		st.Text.Render(strings.Repeat(" ", gap)) + st.Faint.Render(it.Meta)
+		st.Text.Render(strings.Repeat(" ", gap)) + metaStyle.Render(it.Meta)
 	return padTo(ansi.Truncate(line, width, "…"), width)
+}
+
+// stateStyle draws a session's state in its color, on the row's background:
+// bold when it needs you or replied unread, as in the Sessions box.
+func (m *Model) stateStyle(st common.PopupStyleSet, state sessionsui.State) lipgloss.Style {
+	s := st.Text.Foreground(sessionsui.StateColor(state))
+	if state == sessionsui.NeedsYou || state == sessionsui.Unread {
+		s = s.Bold(true)
+	}
+	return s
 }
 
 // pathLine says where enter goes.

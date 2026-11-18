@@ -21,6 +21,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/junjieliang672/marmota/src/internal/common"
+	sessionsui "github.com/junjieliang672/marmota/src/internal/ui/sessions"
 	"github.com/junjieliang672/marmota/src/internal/utils"
 )
 
@@ -58,6 +59,10 @@ type Item struct {
 	Meta string
 	// Tag is cc or co for a session.
 	Tag string
+	// State is a running session's, drawn as the Sessions box draws it: its
+	// mark before Tag and Meta in its color. Stated says it has one.
+	State  sessionsui.State
+	Stated bool
 	// Dir is set for a folder.
 	Dir bool
 }
