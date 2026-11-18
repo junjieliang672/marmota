@@ -65,7 +65,14 @@ y session ask <id> "<message>"   # send it, wait for that turn to end, print the
                                  # (--sent: only wait, for the message it was started with;
                                  #  exit 3: it stopped to ask the user something;
                                  #  --keep-waiting: wait for the user to answer it instead)
+y session show <id>              # open its own window in a pane under yours (WezTerm), for
+                                 # the user to watch it or answer what it asks
 ```
+
+`y session start --temporary` starts a session for the program that runs it
+alone: Marmota's Sessions box and `y session list` leave it out, and it closes
+when that program exits. Marmota's editor starts one so for a question asked
+from it. Don't use it for a session the user is to follow.
 
 The id can be shortened to its first 8 characters. A status of `waiting`
 means the session asks something (a permission or a question): tell the user,

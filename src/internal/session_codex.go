@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -176,7 +177,14 @@ func sessionStartCodex(o SessionStartOptions) (StartedSession, error) {
 	}
 	args := append(codexsession.PermissionArgs(mode), codexsession.ModelArgs(o.Model)...)
 	began := time.Now()
-	w, err := c.Start(tmuxWindowName(managedAgentProviderCodex, ""), cwd, codexLaunch(args...))
+	window, command := tmuxWindowName(managedAgentProviderCodex, ""), codexLaunch(args...)
+	if o.Temporary {
+		// Its id isn't known yet to put on the record: the window's name
+		// tells Marmota not to list the session that shows meanwhile.
+		window = sessionhost.NameFor(sessionhost.CodexPrefix, temporaryWindow+strconv.FormatInt(began.UnixNano(), 36))
+		command = closesWith(o.Owner) + command
+	}
+	w, err := c.Start(window, cwd, command)
 	if err != nil {
 		return StartedSession{}, err
 	}
@@ -184,6 +192,12 @@ func sessionStartCodex(o SessionStartOptions) (StartedSession, error) {
 	if err != nil {
 		_ = c.CloseWindow(w.ID) // nothing lists it: it would run out of sight
 		return StartedSession{}, err
+	}
+	if o.Temporary {
+		if err := rememberTemporarySession(id); err != nil {
+			_ = c.CloseWindow(w.ID)
+			return StartedSession{}, fmt.Errorf("couldn't record the temporary session: %w", err)
+		}
 	}
 	name := sessionhost.NameFor(sessionhost.CodexPrefix, id)
 	if err := c.Rename(w.ID, name); err != nil {

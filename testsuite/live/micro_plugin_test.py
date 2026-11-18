@@ -37,6 +37,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -58,7 +59,7 @@ KEY = {
     "cmd+l": b"\x1bl", "cmd+shift+l": b"\x1bL", "cmd+k": b"\x1bk",
     "cmd+enter": b"\x1b\r", "cmd+j": b"\x1bj", "enter": b"\r", "down": b"\x1b[B", "shift+down": b"\x1b[1;2B",
     "cmd+h": b"\x1bOP", "cmd+w": b"\x11", "cmd+/": b"\x1b/", "opt+n": b"\x1bn", "opt+]": b"\x1b]",
-    "opt+m": b"\x1bm", "opt+x": b"\x1bx",
+    "opt+m": b"\x1bm", "opt+x": b"\x1bx", "cmd+o": b"\x1bOQ",
 }
 PLAN = "# Plan\n\nline three\nline four\nline five\n\nlast para one\nlast para two\n"
 BRACKETS = "# Plan\n\nline three\nsay (a [b] c) d\n\nlast para one\nlast para two\n"
@@ -110,6 +111,15 @@ class Micro:
     def right(self) -> str:
         """What the replies' pane shows."""
         return "\n".join(line.split("|", 1)[1] for line in self.screen().splitlines() if "|" in line)
+
+    def drawn(self, line_with: str, word: str) -> str:
+        """The color word is drawn in, on the screen's line that has line_with: the escape sequence that
+        sets it, just before the word."""
+        for line in self.tmux("capture-pane", "-p", "-e", "-t", "t").splitlines():
+            if line_with in re.sub(r"\x1b\[[0-9;]*m", "", line):
+                found = re.findall(r"\x1b\[(38;[0-9;]*)m" + re.escape(word), line)
+                return found[-1] if found else ""
+        return ""
 
     def quit(self) -> None:
         self.tmux("kill-server")
@@ -315,7 +325,14 @@ def main() -> int:
         m.press("cmd+down")
         m.type("typed while it works ")
         wait_for("the reply on the right", lambda: "Echo: make these shorter" in m.right())
-        assert "› make these shorter" in m.right() and "first" in m.right()
+        assert "You → first" in m.right() and "┃ make these shorter" in m.right(), m.right()
+        assert "⏺ first" in m.right(), "the reply starts under the session's name: " + m.right()
+        asked, replied = m.drawn("┃ make these", "shorter"), m.drawn("Echo: make these", "shorter")
+        assert asked and replied and asked != replied, \
+            f"what you asked is drawn in another color than the reply: {asked!r} and {replied!r}"
+        bar, name = m.drawn("You → first", "You"), m.drawn("⏺ first", "first")
+        assert bar and name and len({asked, replied, bar, name}) == 4, \
+            f"and so are the bar that says whom you asked and the name the reply starts under: {bar!r}, {name!r}"
         wait_for("the question in the session", lambda: f"@{plan}#L3-4" in sent_to(socket, first))
         assert any("typed while it works" in line for line in m.left()), "typing went on meanwhile"
         m.press("cmd+enter")
@@ -323,8 +340,13 @@ def main() -> int:
             line.endswith("typed while it works Echo: make these shorter") for line in m.left()))
         m.press("cmd+z")
         wait_for("it taken back", lambda: not any("Echo" in line for line in m.left()))
+        # cmd+O has y show the session; this test's micro is in no WezTerm pane, which y says.
+        m.press("cmd+o")
+        wait_for("cmd+O to ask y for the session's window",
+                 lambda: "Couldn't open first: this isn't a WezTerm pane" in m.screen().splitlines()[-1])
         print("ok   cmd+L asked the session about the file and lines 3-4 while typing went on; its reply showed "
-              "on the right; cmd+enter put it at the cursor and cmd+Z took it back")
+              "on the right, drawn apart from the question; cmd+enter put it at the cursor and cmd+Z took it back; "
+              "cmd+O asked for the session's window")
 
         # 5. another session, picked from the list
         m.press("cmd+shift+l")
@@ -352,17 +374,25 @@ def main() -> int:
         m.type("start with this")
         m.press("enter")
         wait_for("the new session's reply", lambda: "Ready." in m.right())
-        started = [line.split()[0] for line in session("list").splitlines()[1:] if line.split()[0] not in (first, second)]
-        assert len(started) == 1, session("list")
+        # It is the editor's own: in a window of Marmota's tmux, and not listed.
+        def windows() -> list[str]:
+            out = subprocess.run(["tmux", "-L", socket, "list-windows", "-a", "-F", "#{window_name}"],
+                                 capture_output=True, text=True).stdout.split()
+            return sorted({name[3:] for name in out if name.startswith("cc-")})
+        started = [sid for sid in windows() if sid not in (first, second)]
+        assert len(started) == 1, windows()
+        assert started[0] not in session("list"), "a temporary session isn't listed: " + session("list")
         m.press("cmd+l")
         wait_for("the question's prompt", lambda: "Ask new · project ›" in m.screen())
         m.type("a follow-up")
         m.press("enter")
         wait_for("the follow-up's reply", lambda: "Echo: a follow-up" in m.right())
         wait_for("the follow-up in the new session", lambda: "a follow-up" in sent_to(socket, started[0]))
-        print("ok   the list's first row started a session with the question, and the next question went on "
-              "with it")
         m.quit()
+        wait_for("the session to close with the editor", lambda: started[0] not in windows(), timeout=20)
+        assert first in windows() and second in windows(), "the others go on"
+        print("ok   the list's first row started a session with the question, and the next question went on "
+              "with it; it wasn't listed, and closed with the editor")
 
         # 7. cmd+K: the session changes the lines in the file
         m = editor(first, "first", "here")

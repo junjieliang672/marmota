@@ -234,13 +234,17 @@ func (m *model) applyClaudeSessionsSnapshot(msg claudeSessionsSnapshotMsg) tea.C
 	m.claude.inflight = false
 	m.claude.loaded = true
 	m.claude.snapshot = msg.snapshot
+	// A program's temporary sessions, such as those the editor starts for
+	// its questions, aren't Marmota's to list, running or ended.
+	m.claude.snapshot.Live = withoutTemporary(m.claude.snapshot.Live)
+	m.claude.snapshot.Past = withoutTemporary(m.claude.snapshot.Past)
 	m.claude.folder = msg.folder
 	if msg.layoutGen == m.claude.layoutGen && msg.panesListed {
 		m.claude.panes = msg.panes
 	}
 	m.mergeCodexSessions(msg.codex)
 	m.mergeRemoteSessions(m.remoteListing())
-	for _, s := range msg.starting {
+	for _, s := range withoutTemporary(msg.starting) {
 		if _, askStarted := m.ask.starts[s.ID]; !askStarted { // the Ask box shows its own
 			m.claude.snapshot.Live = append(m.claude.snapshot.Live, s)
 		}

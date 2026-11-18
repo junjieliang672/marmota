@@ -38,11 +38,18 @@ type NeedsYouError struct {
 	// What is what it asks, as Claude Code names it; Reply is what it
 	// wrote before asking.
 	What, Reply string
+	// Show is the session's id when it is a temporary one, which Marmota's
+	// Sessions box leaves out: `y session show` is how to reach it.
+	Show string
 }
 
 func (e *NeedsYouError) Error() string {
-	return "it stopped to ask you: " + firstNonEmpty(e.What, "a question") +
-		" (answer it from Marmota's Sessions box)"
+	asks := "it stopped to ask you: " + firstNonEmpty(e.What, "a question")
+	if e.Show != "" {
+		return asks + " (a temporary session, not in Marmota's Sessions box: `y session show " + e.Show +
+			"` opens it beside this pane to answer)"
+	}
+	return asks + " (answer it from Marmota's Sessions box)"
 }
 
 // askedState is what `y session ask` reads at each look: the session's last
@@ -60,12 +67,22 @@ type askedState struct {
 // waited for. With patient, a session that stops to ask you something is
 // waited for all the same: you answer it, and its reply comes.
 func SessionAsk(id, text string, timeout time.Duration, sent, patient bool) (string, error) {
+	reply, full, err := sessionAsk(id, text, timeout, sent, patient)
+	if needs, ok := IsNeedsYou(err); ok && isTemporarySession(full) {
+		needs.Show = full // Marmota's Sessions box doesn't have it
+	}
+	return reply, err
+}
+
+// sessionAsk is SessionAsk, and the whole id of the session asked.
+func sessionAsk(id, text string, timeout time.Duration, sent, patient bool) (string, string, error) {
 	if s, ok := codexSessionByID(id); ok {
-		return sessionAskCodex(s, text, timeout, sent, patient)
+		reply, err := sessionAskCodex(s, text, timeout, sent, patient)
+		return reply, s.ID, err
 	}
 	host, pane, full, transcript, err := sessionByID(id)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	tracker := claudesession.NewTracker()
 	look := func() askedState {
@@ -95,13 +112,15 @@ func SessionAsk(id, text string, timeout time.Duration, sent, patient bool) (str
 			}
 			return st
 		}
-		return awaitAskedTurn(look, askKey(text), time.Time{}, timeout, patient)
+		reply, err := awaitAskedTurn(look, askKey(text), time.Time{}, timeout, patient)
+		return reply, full, err
 	}
 	before := look()
 	if _, err := sendToClaudePrompt(pane, text); err != nil {
-		return "", err
+		return "", full, err
 	}
-	return awaitAskedTurn(look, askKey(text), askedAt(before.turns, askKey(text)), timeout, patient)
+	reply, err := awaitAskedTurn(look, askKey(text), askedAt(before.turns, askKey(text)), timeout, patient)
+	return reply, full, err
 }
 
 // awaitAskedTurn waits for the turn whose prompt starts as key does, begun

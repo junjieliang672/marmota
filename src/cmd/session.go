@@ -22,7 +22,7 @@ func sessionCommand() *cli.Command {
 		Commands: []*cli.Command{
 			{
 				Name:      "start",
-				Usage:     "Start a session; it shows in Marmota's Sessions box",
+				Usage:     "Start a session; it shows in Marmota's Sessions box, unless it is --temporary",
 				ArgsUsage: "[-- PROMPT]",
 				Flags: []cli.Flag{
 					&cli.StringFlag{Name: "agent", Usage: "cc for Claude Code (default), co for Codex, which " +
@@ -35,6 +35,9 @@ func sessionCommand() *cli.Command {
 					&cli.StringFlag{Name: "effort", Usage: "Claude Code's --effort; Codex's effort, medium when not given"},
 					&cli.StringFlag{Name: "permission-mode", Usage: "bypassPermissions (default), acceptEdits, auto, " +
 						"plan or default; Codex runs in its nearest to each"},
+					&cli.BoolFlag{Name: "temporary", Usage: "a session for the program that runs this, as the " +
+						"editor's for a question asked from it: Marmota's Sessions box and `y session list` leave " +
+						"it out, and it closes when that program does. On this computer only"},
 					&cli.BoolFlag{Name: "json", Usage: "print the session as JSON"},
 				},
 				Action: func(_ context.Context, c *cli.Command) error {
@@ -42,6 +45,8 @@ func sessionCommand() *cli.Command {
 						Agent: c.String("agent"), On: c.String("on"), Cwd: c.String("cwd"),
 						Prompt: strings.Join(c.Args().Slice(), " "),
 						Model:  c.String("model"), Effort: c.String("effort"), Mode: c.String("permission-mode"),
+						// The program that ran this is the one a temporary session closes with.
+						Temporary: c.Bool("temporary"), Owner: os.Getppid(),
 					})
 					if err != nil {
 						return cli.Exit("y session start: "+err.Error(), 1)
@@ -165,6 +170,23 @@ func sessionCommand() *cli.Command {
 					if err := internal.SessionRead(os.Stdout, c.Args().First(), int(c.Int("turns"))); err != nil {
 						return cli.Exit("y session read: "+err.Error(), 1)
 					}
+					return nil
+				},
+			},
+			{
+				Name: "show",
+				Usage: "Open a session's own window in a pane under this one (WezTerm), to watch it or answer " +
+					"what it asks; closing the pane leaves the session running",
+				ArgsUsage: "ID",
+				Action: func(_ context.Context, c *cli.Command) error {
+					if c.Args().Len() != 1 {
+						return cli.Exit("y session show: give the session's id", 1)
+					}
+					shown, err := internal.SessionShow(c.Args().First())
+					if err != nil {
+						return cli.Exit("y session show: "+err.Error(), 1)
+					}
+					fmt.Printf("showing %s in pane %d\n", shown.ID, shown.Pane)
 					return nil
 				},
 			},

@@ -71,7 +71,7 @@ func (m *model) readEndedCmd() tea.Cmd {
 				ended = append(ended, s)
 			}
 		}
-		return resumeEndedMsg{sessions: ended}
+		return resumeEndedMsg{sessions: withoutTemporary(ended)}
 	}
 }
 

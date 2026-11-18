@@ -13,6 +13,8 @@ local util = import("micro/util")
 function init()
     -- "help marmota" (cmd+H): the keys worth knowing, Marmota's and micro's
     config.AddRuntimeFile("marmota", config.RTHelp, "help/marmota.md")
+    -- how the pane of questions and replies is drawn (showReplies)
+    config.AddRuntimeFile("marmota", config.RTSyntax, "syntax/marmota-replies.yaml")
     -- $(marmota.status) in the status line (statusformatr in settings.json)
     micro.SetStatusInfoFn("marmota.status")
 end
@@ -609,21 +611,30 @@ function keys(bp)
     return true
 end
 
+-- Each question is a bar that says whom you asked, then the question
+-- beside a rule down its left; the reply starts under the session's name;
+-- a line parts one question from the next. syntax/marmota-replies.yaml
+-- colors them by how these lines start.
 local function repliesText()
     local out = {}
-    for _, a in ipairs(asked) do
-        table.insert(out, "› " .. a.question .. "   — " .. a.title)
-        if a.reply == nil then
+    for i, a in ipairs(asked) do
+        if i > 1 then
+            table.insert(out, string.rep("─", 36))
             table.insert(out, "")
-            if a.needsYou ~= nil then
-                table.insert(out, "⚠ " .. a.needsYou)
-                table.insert(out, "✳ waiting for your answer there…")
-            else
-                table.insert(out, a.starting and "✳ starting a session…" or "✳ asking…")
-            end
-        else
-            table.insert(out, "")
+        end
+        table.insert(out, " You → " .. a.title .. " ")
+        for line in (a.question .. "\n"):gmatch("(.-)\n") do
+            table.insert(out, "┃ " .. line)
+        end
+        table.insert(out, "")
+        if a.reply ~= nil then
+            table.insert(out, "⏺ " .. a.title)
             table.insert(out, a.reply)
+        elseif a.needsYou ~= nil then
+            table.insert(out, "⚠ " .. a.needsYou)
+            table.insert(out, "✳ cmd+O opens it under the editor: answer it there, then close that pane")
+        else
+            table.insert(out, a.starting and "✳ starting a session…" or "✳ asking…")
         end
         table.insert(out, "")
     end
@@ -641,7 +652,7 @@ local function showReplies(bp)
         buf.Type.Scratch = true
         buf:SetOptionNative("softwrap", true)
         buf:SetOptionNative("wordwrap", true)
-        buf:SetOptionNative("filetype", "markdown")
+        buf:SetOptionNative("filetype", "marmota-replies")
         buf:SetOptionNative("ruler", false)
         pane = bp:VSplitIndex(buf, true)
         tab:SetActive(at)
@@ -764,9 +775,10 @@ onReply = function(output, args)
     output = strings.TrimSpace(output)
     local failed = output:match("y session ask: (.*)$")
     if failed ~= nil and failed:find("it stopped to ask you", 1, true) and entry.needsYou == nil then
-        -- it needs your answer, in Marmota: said once, and waited for
-        entry.needsYou = failed
-        micro.InfoBar():Error(entry.title .. " " .. failed)
+        -- it needs your answer: said once, and waited for. Where to answer
+        -- is this editor's to say (cmd+O), not y's.
+        entry.needsYou = failed:gsub("%s*%(.*%)$", "")
+        micro.InfoBar():Error(entry.title .. " stopped to ask you something: cmd+O opens it to answer")
         wait(args[1], bp)
         showReplies(bp)
         return
@@ -834,8 +846,10 @@ local function send(bp, question, edit)
     table.insert(asked, entry)
     if session.id == newSession then
         entry.starting = true
-        shell.JobSpawn(marmota, { "session", "start", "--agent", session.agent, "--cwd", folder(), "--", message },
-            nil, nil, onStarted, #asked, bp)
+        -- a session of this editor's own: Marmota's Sessions box leaves it
+        -- out, and it closes when the editor does
+        shell.JobSpawn(marmota, { "session", "start", "--temporary", "--agent", session.agent, "--cwd", folder(),
+            "--", message }, nil, nil, onStarted, #asked, bp)
     else
         shell.JobSpawn(marmota, { "session", "ask", session.id, message }, nil, nil, onReply, #asked, bp)
     end
@@ -966,6 +980,37 @@ function insertReply(bp)
     end
     bp.Buf:Insert(buffer.Loc(c.X, c.Y), reply)
     bp:Relocate()
+    return true
+end
+
+-- openSession is cmd+O: the session's own window, in a pane under the
+-- editor, to answer what it asks or to watch it work. It is the session
+-- that waits for your answer, else the one questions go to. Closing the
+-- pane leaves the session running.
+function openSession(bp)
+    local id, title = nil, nil
+    for i = #asked, 1, -1 do
+        local a = asked[i]
+        if a.reply == nil and a.needsYou ~= nil and a.session ~= newSession then
+            id, title = a.session, a.title
+            break
+        end
+    end
+    if id == nil and session.id ~= "" and session.id ~= newSession then
+        id, title = session.id, session.title
+    end
+    if id == nil then
+        micro.InfoBar():Message("No session to open yet: cmd+L asks one")
+        return true
+    end
+    shell.JobSpawn(marmota, { "session", "show", id }, nil, nil, function(output, args)
+        local failed = strings.TrimSpace(output):match("y session show: (.*)$")
+        if failed ~= nil then
+            micro.InfoBar():Error("Couldn't open " .. args[1] .. ": " .. failed)
+        else
+            micro.InfoBar():Message(args[1] .. " is open below: close that pane when you are done, it goes on")
+        end
+    end, title)
     return true
 end
 

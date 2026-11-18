@@ -98,6 +98,7 @@ Brackets are ( ) [ ] { }, counted as written: one inside a string counts too.
 | cmd+K | Have the session change the selected lines, or with none the file, as you ask; cmd+Z takes the change back |
 | cmd+enter | Put the last reply at the cursor, or in place of what is selected |
 | cmd+J | Show the replies on the right, or put them away |
+| cmd+O | Open the session in a pane under the editor: the one that stopped to ask you something, else the one questions go to. Answer it there, or watch it work; closing the pane leaves it running |
 
 The session is the one Marmota's Ask box wrote to when it opened the editor,
 until you pick another. It is one of Marmota's sessions: what you ask here
@@ -110,8 +111,8 @@ another: each question waits for its own reply, and the replies show under
 their questions as they come. The status line says whom questions go to and
 how many replies are still awaited: "→ fix login  ✳ 2 asking". A session that
 stops to ask you something (a permission, or whether to trust its folder)
-says so in place of its reply: answer it from Marmota's Sessions box, and the
-reply, or the change, comes. While a session changes the file, what you type
+says so in place of its reply: answer it from Marmota's Sessions box, or open
+it with cmd+O, and the reply, or the change, comes. While a session changes the file, what you type
 into it may give way to its change when that comes in: cmd+Z brings yours
 back. A session on another computer can't read or change the file: it is
 sent the selected text itself, and after cmd+K replies with the new text
@@ -120,6 +121,10 @@ for cmd+enter to put in.
 A Codex session is asked through Codex's own server, and its reply is its
 answer, without what it said as it worked. A new one starts with full
 access, at medium effort, as Marmota's Ask box starts one.
+
+A session a question starts from here is this editor's own: Marmota's
+Sessions box doesn't list it, and it closes when the editor does. One that
+stops to ask you something says so in the replies: cmd+O opens it.
 
 ## The command bar
 

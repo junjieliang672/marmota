@@ -19,6 +19,7 @@ import (
 	"github.com/junjieliang672/marmota/src/pkg/claudeask"
 	"github.com/junjieliang672/marmota/src/pkg/claudesession"
 	"github.com/junjieliang672/marmota/src/pkg/codexsession"
+	"github.com/junjieliang672/marmota/src/pkg/sessionhost"
 )
 
 // Codex sessions are listed with Claude Code's (claudesession.Session, with
@@ -54,6 +55,9 @@ type codexState struct {
 	// moved is the folder = moved a session to, by id, until its rollout
 	// says so: from its next turn.
 	moved map[string]string
+	// listed are the sessions a refresh has listed: one that shows while a
+	// temporary session starts in its folder isn't among them.
+	listed map[string]bool
 }
 
 // codexFork is a fork superfile started in a pane.
@@ -98,6 +102,7 @@ func collectCodexSessions(o codexsession.Options) []claudesession.Session {
 // are known. Codex keeps a session loaded after its window has closed: one
 // that is idle with no pane has nothing running, and is listed as finished.
 func (m *model) mergeCodexSessions(sessions []claudesession.Session) {
+	sessions = m.withoutTemporaryCodex(sessions)
 	if len(sessions) == 0 {
 		return
 	}
@@ -166,6 +171,35 @@ func (m *model) matchCodexForks(sessions []claudesession.Session) {
 		}
 	}
 	m.codex.forks = kept
+}
+
+// withoutTemporaryCodex leaves out the temporary sessions (see
+// temporary_sessions.go): those on the record, and, while one starts, the
+// session that shows in its folder, which is put on the record once its id
+// is known. Its window's name says that it starts.
+func (m *model) withoutTemporaryCodex(sessions []claudesession.Session) []claudesession.Session {
+	sessions = withoutTemporary(sessions)
+	var starting []string // the folders temporary sessions start in
+	for _, p := range m.claude.panes {
+		if ref, ok := tmuxPanes.ref(p.PaneID); ok {
+			if prefix, id, _ := sessionhost.SessionOf(ref.name); prefix == sessionhost.CodexPrefix &&
+				strings.HasPrefix(id, temporaryWindow) {
+				starting = append(starting, p.Cwd)
+			}
+		}
+	}
+	if m.codex.listed == nil {
+		m.codex.listed = make(map[string]bool)
+	}
+	kept := sessions[:0]
+	for _, s := range sessions {
+		if !m.codex.listed[s.ID] && slices.ContainsFunc(starting, func(dir string) bool { return sameDir(dir, s.Cwd) }) {
+			continue // not listed for now: it may be the one starting
+		}
+		m.codex.listed[s.ID] = true
+		kept = append(kept, s)
+	}
+	return kept
 }
 
 // codexPane is the pane a Codex session runs in: the one superfile started

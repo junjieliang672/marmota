@@ -38,6 +38,11 @@ type SessionStartOptions struct {
 	// Codex takes its own models, its nearest to each mode, and medium
 	// effort when none is given.
 	Model, Effort, Mode string
+	// Temporary starts a session Marmota doesn't list (see
+	// temporary_sessions.go), which closes when the process Owner has gone:
+	// the program that asked for it. It starts on this computer.
+	Temporary bool
+	Owner     int
 }
 
 // StartedSession is a session `y session start` started.
@@ -57,6 +62,9 @@ func SessionStart(o SessionStartOptions) (StartedSession, error) {
 	codex, err := isCodexAgent(o.Agent)
 	if err != nil {
 		return StartedSession{}, err
+	}
+	if o.Temporary && strings.TrimSpace(o.On) != "" {
+		return StartedSession{}, errors.New("a temporary session starts on this computer only: leave --on out")
 	}
 	if codex {
 		started, err := sessionStartCodex(o)
@@ -88,7 +96,15 @@ func SessionStart(o SessionStartOptions) (StartedSession, error) {
 	if o.Prompt != "" {
 		parts = append(parts, "--", shellQuote(o.Prompt))
 	}
-	w, err := c.Start(sessionhost.NameFor(sessionhost.ClaudePrefix, id), cwd, strings.Join(parts, " "))
+	command := strings.Join(parts, " ")
+	if o.Temporary {
+		// On the record before it runs: Marmota never lists it.
+		if err := rememberTemporarySession(id); err != nil {
+			return StartedSession{}, fmt.Errorf("couldn't record the temporary session: %w", err)
+		}
+		command = closesWith(o.Owner) + command
+	}
+	w, err := c.Start(sessionhost.NameFor(sessionhost.ClaudePrefix, id), cwd, command)
 	if err != nil {
 		return StartedSession{}, err
 	}
@@ -150,10 +166,10 @@ func SessionList() ([]ListedSession, map[string]error) {
 		out = append(out, ListedSession{ID: s.ID, Agent: agentOf(s), Host: s.Host, Status: string(s.Status),
 			Title: s.DisplayTitle(), Cwd: s.Cwd, Waiting: waiting})
 	}
-	for _, s := range localTmuxSessions(tracker) {
+	for _, s := range withoutTemporary(localTmuxSessions(tracker)) {
 		add(s)
 	}
-	for _, s := range localCodexSessions() {
+	for _, s := range withoutTemporary(localCodexSessions()) {
 		add(s)
 	}
 	remote := listRemoteSessions(tracker, nil)

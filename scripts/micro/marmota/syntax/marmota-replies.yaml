@@ -1,0 +1,19 @@
+filetype: marmota-replies
+
+# The pane of questions and replies (marmota.lua, repliesText): what you
+# asked stands apart from what the session wrote, which is Markdown.
+detect:
+    filename: "^Marmota replies$"
+
+rules:
+    - include: "markdown"
+    # what you asked: a bar that says whom, then the question beside a rule
+    - statusline: "^ You → .* $"
+    - identifier: "^┃.*$"
+    # the session's reply starts under its name
+    - special: "^⏺ .*$"
+    # between two questions
+    - comment: "^─+$"
+    # still awaited, and what went wrong
+    - todo: "^✳ .*$"
+    - error: "^⚠ .*$"
