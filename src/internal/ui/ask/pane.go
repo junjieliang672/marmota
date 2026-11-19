@@ -326,6 +326,9 @@ func conversationLines(s Session, width int, st paneStyles) []string {
 		if s.Now != "" {
 			return append(lines, now)
 		}
+		if s.Older != "" {
+			return append(lines, st.dim.Render(ansi.Truncate(s.Older, width, "…")))
+		}
 		return append(lines, st.dim.Render("Nothing said yet"))
 	}
 	if s.Older != "" {

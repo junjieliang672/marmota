@@ -195,3 +195,38 @@ func TestThePreviewLoadsOlderTurnsAsYouScrollUp(t *testing.T) {
 	assert.Equal(t, "third answer", m.sessions.convo.turns[2].Reply, "what is written next is read on from there")
 	assert.Equal(t, "first question", m.sessions.convo.turns[0].Prompt)
 }
+
+// A session the preview goes to is read in the background: the preview says
+// so meanwhile, and shows the conversation once it is read. Going back to a
+// session read before shows it at once.
+func TestTheSelectedSessionIsReadInTheBackground(t *testing.T) {
+	conversationsInBackground = true
+	defer func() { conversationsInBackground = false }()
+	m := dockTestModel(t)
+	m.fileModel.filePreview.SetOpen(true)
+	m.setFilePreviewPanelSize()
+	m.claude.snapshot.Live[0].TranscriptPath = longTranscript(t)
+	bang(m)
+	require.True(t, m.sessions.list.Select("s50"))
+	assert.Nil(t, m.loadSessionsConversation(), "no transcript: nothing to read")
+
+	require.True(t, m.sessions.list.Select("s20"))
+	cmd := m.loadSessionsConversation()
+	require.NotNil(t, cmd)
+	assert.True(t, m.sessions.convo.reading)
+	assert.Empty(t, m.sessions.convo.turns)
+	assert.Equal(t, "reading the conversation…", m.sessionsPaneView().Older)
+	assert.NotContains(t, ansi.Strip(m.View()), "Nothing said yet", "it isn't said there is nothing yet")
+
+	runCmds(m, cmd)
+	require.Len(t, m.sessions.convo.turns, sessionsConversationTurns)
+	assert.Contains(t, ansi.Strip(m.View()), "answer 29")
+	assert.NotContains(t, ansi.Strip(m.View()), "reading the conversation")
+
+	require.True(t, m.sessions.list.Select("s50"))
+	m.loadSessionsConversation()
+	require.True(t, m.sessions.list.Select("s20"))
+	assert.Nil(t, m.loadSessionsConversation(), "nothing to read")
+	assert.False(t, m.sessions.convo.reading, "kept from before")
+	assert.Len(t, m.sessions.convo.turns, sessionsConversationTurns)
+}

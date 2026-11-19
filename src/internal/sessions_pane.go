@@ -233,6 +233,8 @@ func branchOf(dir, gitPath string, isDir bool) string {
 // further: scrolling up to here loads it.
 func olderNote(c sessionsConversation) string {
 	switch {
+	case c.reading:
+		return "reading the conversation…"
 	case c.loading:
 		return "↑ loading older turns…"
 	case c.hasOlderTurns():

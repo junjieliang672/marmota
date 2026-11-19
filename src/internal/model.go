@@ -240,6 +240,9 @@ func (m *model) handleOwnMsg(msg tea.Msg) (tea.Cmd, bool) {
 		m.olderTurnsLoaded(msg)
 		return nil, true
 
+	case conversationReadMsg:
+		return m.conversationRead(msg), true
+
 	case gitRefreshDebounceMsg:
 		// Debounce timer fired - refresh git status now
 		m.gitRefreshPending = false

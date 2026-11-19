@@ -288,7 +288,7 @@ func (m *model) dockAskMore(width, rows int) []string {
 			"Sending starts a session in "+folderName(m.sessionsHere())+" in the background.", width, "…")))
 		return out[:min(len(out), rows)]
 	}
-	turns := m.dock.recentTurns(s)
+	turns := m.askTurns(s)
 	if len(turns) == 0 && s.LastPrompt != "" {
 		// A turn longer than the transcript tail that is read has its
 		// prompt out of reach; the session still knows it.
@@ -357,7 +357,7 @@ func (m *model) dockAskIdleLines(s claudesession.Session, width, rows int) []str
 	head := []string{st.val.Render(ansi.Truncate("→ "+s.DisplayTitle(), width, "…")),
 		m.dockAgentLine(s, width), dockHostLine(s.Host, width), st.dim.Render(key + verb)}
 	head = append(head, m.dockDraftLine(width)...)
-	turn, ok := m.dock.lastTurn(s)
+	turn, ok := lastOf(m.askTurns(s))
 	now := time.Now()
 	var body []string
 	switch {
@@ -402,7 +402,7 @@ func (m *model) dockAskIdleLines(s claudesession.Session, width, rows int) []str
 	if room > 0 && more != "" {
 		return append(lines, dimLines(wrapLines(more, width, room))...)
 	}
-	turns := m.dock.recentTurns(s)
+	turns := m.askTurns(s)
 	for i := len(turns) - 2; i >= 0 && room > 0; i-- { // the last is above
 		if p := oneLine(turns[i].Prompt); p != "" {
 			lines = append(lines, st.dim.Render(ansi.Truncate("› "+p, width, "…")))
@@ -562,9 +562,21 @@ func (d *dockState) recentTurns(s claudesession.Session) []claudesession.Turn {
 	return turns
 }
 
-// lastTurn is the session's last turn, when there is one to read.
-func (d *dockState) lastTurn(s claudesession.Session) (claudesession.Turn, bool) {
-	turns := d.recentTurns(s)
+// askTurns is the last turns of the session the Ask box writes to: the
+// preview's, when it shows that session, which it reads off the screen's
+// loop (none while it does), else read here.
+func (m *model) askTurns(s claudesession.Session) []claudesession.Turn {
+	if c := m.sessions.convo; m.sessionsShown() && c.id == s.ID && c.path == s.TranscriptPath {
+		if c.reading {
+			return nil
+		}
+		return c.turns[max(0, len(c.turns)-askRecentTurns):]
+	}
+	return m.dock.recentTurns(s)
+}
+
+// lastOf is the last of turns, when there is one.
+func lastOf(turns []claudesession.Turn) (claudesession.Turn, bool) {
 	if len(turns) == 0 {
 		return claudesession.Turn{}, false
 	}

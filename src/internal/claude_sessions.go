@@ -279,8 +279,7 @@ func (m *model) sessionsChanged(askBarTarget string) []tea.Cmd {
 	m.keepViewerPin()
 	cmds := []tea.Cmd{m.updateClaudeInbox()}
 	if m.sessionsShown() {
-		m.loadSessionsConversation()
-		cmds = append(cmds, m.watchClaudeQuestion())
+		cmds = append(cmds, m.loadSessionsConversation(), m.watchClaudeQuestion())
 	}
 	return cmds
 }

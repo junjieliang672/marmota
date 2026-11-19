@@ -52,7 +52,9 @@ type sessionsState struct {
 	// as the one the Ask bar just started, if the list is still on New.
 	pendingSelect string
 	convo         sessionsConversation
-	question      claudeQuestion
+	// kept is the conversations the preview left lately, by session.
+	kept     map[string]sessionsConversation
+	question claudeQuestion
 	// selection is the text the mouse selected in the session preview.
 	selection previewSelection
 }
@@ -73,7 +75,9 @@ type sessionsConversation struct {
 	from, read int64
 	limit      int
 	loading    bool
-	branch     string
+	// reading: the session's conversation is being read, in the background
+	reading bool
+	branch  string
 }
 
 // olderTurnsMsg is a session's conversation read further back.
@@ -244,19 +248,91 @@ func (m *model) sessionsSelectionChanged() tea.Cmd {
 	if id != m.sessions.convo.id {
 		m.sessions.scroll = 0
 	}
-	m.loadSessionsConversation()
-	return m.watchClaudeQuestion()
+	return tea.Batch(m.loadSessionsConversation(), m.watchClaudeQuestion())
 }
 
+// conversationsInBackground is whether a session's conversation is read
+// off the screen's loop when the preview goes to it. Tests read it at once.
+var conversationsInBackground = true //nolint:gochecknoglobals // test seam
+
+// conversationsKept is how many sessions' conversations stay read after
+// the preview leaves them, so going back to one shows it at once.
+const conversationsKept = 8
+
+// conversationReadMsg is a session's conversation, read and laid out in
+// the background.
+type conversationReadMsg struct{ convo sessionsConversation }
+
 // loadSessionsConversation reads the selected session's conversation when
-// its transcript changed since it was last read.
-func (m *model) loadSessionsConversation() {
+// its transcript changed since it was last read: what was written since, at
+// once. A session the preview goes to is read in the background, its turns
+// laid out there too, unless its conversation is kept from before; the
+// preview shows the rest of it meanwhile.
+func (m *model) loadSessionsConversation() tea.Cmd {
 	s, ok := m.selectedSession()
 	if !ok {
+		m.keepConversation(m.sessions.convo)
 		m.sessions.convo = sessionsConversation{id: m.sessions.list.SelectedID(), branch: gitBranch(s.Cwd)}
+		return nil
+	}
+	c := m.sessions.convo
+	if c.id != s.ID || c.path != s.TranscriptPath {
+		m.keepConversation(c)
+		c = m.sessions.kept[s.ID]
+		delete(m.sessions.kept, s.ID)
+		if c.id != s.ID || c.path != s.TranscriptPath {
+			if s.TranscriptPath != "" && conversationsInBackground {
+				m.sessions.convo = sessionsConversation{id: s.ID, path: s.TranscriptPath, reading: true}
+				return m.readConversationCmd(s)
+			}
+			c = sessionsConversation{}
+		}
+	}
+	if c.reading {
+		m.sessions.convo = c
+		return nil
+	}
+	m.sessions.convo = readConversation(c, s)
+	return nil
+}
+
+// keepConversation keeps a conversation the preview leaves, to show at once
+// when it comes back.
+func (m *model) keepConversation(c sessionsConversation) {
+	if c.id == "" || c.reading || c.loading {
 		return
 	}
-	m.sessions.convo = readConversation(m.sessions.convo, s)
+	if m.sessions.kept == nil {
+		m.sessions.kept = map[string]sessionsConversation{}
+	}
+	if len(m.sessions.kept) >= conversationsKept {
+		clear(m.sessions.kept)
+	}
+	m.sessions.kept[c.id] = c
+}
+
+// readConversationCmd reads s's conversation, and lays out its turns as the
+// preview will draw them, off the screen's loop.
+func (m *model) readConversationCmd(s claudesession.Session) tea.Cmd {
+	view, width := m.sessionsPaneView(), m.fileModel.filePreview.GetWidth()
+	return func() tea.Msg {
+		c := readConversation(sessionsConversation{}, s)
+		view.Turns, view.Dir = c.turns, s.Cwd
+		askui.PrepareTurns(view, width)
+		return conversationReadMsg{convo: c}
+	}
+}
+
+// conversationRead puts a conversation read in the background in the
+// preview, if it is still on that session, and reads on to what was written
+// meanwhile.
+func (m *model) conversationRead(msg conversationReadMsg) tea.Cmd {
+	c := m.sessions.convo
+	if !c.reading || c.id != msg.convo.id || c.path != msg.convo.path {
+		return nil
+	}
+	m.sessions.convo = msg.convo
+	return m.loadSessionsConversation()
 }
 
 // readConversation is s's conversation: c, what was last read, when s is
