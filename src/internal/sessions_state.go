@@ -34,7 +34,10 @@ const (
 const (
 	// sessionsConversationTurns is how many turns the preview reads.
 	sessionsConversationTurns = 20
-	sessionsScrollStep        = 5
+	// sessionsConversationTail is how much of a transcript's end the
+	// preview reads first.
+	sessionsConversationTail = 512 * 1024
+	sessionsScrollStep       = 5
 )
 
 type sessionsState struct {
@@ -63,10 +66,23 @@ type sessionsConversation struct {
 	size    int64
 	modTime time.Time
 	turns   []claudesession.Turn
-	// read is how much of a Claude Code transcript turns were read from,
-	// which only grows: the next read starts there.
-	read   int64
-	branch string
+	// Of a Claude Code transcript, turns were read from its bytes from
+	// from (0: its start) to read; it only grows, so the next read starts
+	// at read. limit is how many turns are kept: more once older ones load,
+	// loading while they do.
+	from, read int64
+	limit      int
+	loading    bool
+	branch     string
+}
+
+// olderTurnsMsg is a session's conversation read further back.
+type olderTurnsMsg struct {
+	id, path   string
+	turns      []claudesession.Turn
+	from, read int64
+	limit      int
+	err        error
 }
 
 func newSessionsState() sessionsState {
@@ -258,22 +274,67 @@ func readConversation(c sessionsConversation, s claudesession.Session) sessionsC
 		c.branch = branch
 		return c
 	}
-	var turns []claudesession.Turn
-	var read int64
+	next := sessionsConversation{id: s.ID, path: s.TranscriptPath, size: info.Size(),
+		modTime: info.ModTime(), limit: sessionsConversationTurns, branch: branch}
 	switch {
 	case s.IsCodex():
-		turns, err = sessionConversation(s, sessionsConversationTurns)
+		next.turns, err = sessionConversation(s, sessionsConversationTurns)
 	case c.id == s.ID && c.path == s.TranscriptPath && c.read > 0:
-		// what was written since; a turn can be megabytes, read once
-		turns, read, err = claudesession.ConversationMore(s.TranscriptPath, c.turns, c.read, sessionsConversationTurns)
+		// what was written since: a turn can be megabytes, read once
+		next.from, next.limit, next.loading = c.from, c.limit, c.loading
+		next.turns, next.read, err = claudesession.ConversationMore(s.TranscriptPath, c.turns, c.read, c.limit)
 	default:
-		turns, read, err = claudesession.ConversationBack(s.TranscriptPath, sessionsConversationTurns)
+		// the transcript's tail; turns before it load as you scroll up to
+		// them (loadOlderTurns), off the screen's loop
+		next.turns, next.from, next.read, err = claudesession.ConversationTail(s.TranscriptPath,
+			sessionsConversationTurns, sessionsConversationTail)
 	}
 	if err != nil {
 		slog.Debug("Could not read the session's conversation", "session", s.ID, "error", err)
 	}
-	return sessionsConversation{id: s.ID, path: s.TranscriptPath, size: info.Size(),
-		modTime: info.ModTime(), turns: turns, read: read, branch: branch}
+	return next
+}
+
+// hasOlderTurns reports whether the conversation in the preview goes back
+// further than it was read.
+func (c sessionsConversation) hasOlderTurns() bool {
+	return c.read > 0 && c.from > 0
+}
+
+// loadOlderTurns reads the conversation in the preview further back, four
+// times as much of the transcript as before, for as many turns again, in
+// the background: the preview has scrolled up to its first turn.
+func (m *model) loadOlderTurns() tea.Cmd {
+	c := &m.sessions.convo
+	if c.loading || !c.hasOlderTurns() {
+		return nil
+	}
+	c.loading = true
+	id, path, limit := c.id, c.path, c.limit+sessionsConversationTurns
+	tail := max(c.read-c.from, sessionsConversationTail) * 4 //nolint:mnd // four times as much
+	return func() tea.Msg {
+		turns, from, read, err := claudesession.ConversationTail(path, limit, tail)
+		return olderTurnsMsg{id: id, path: path, turns: turns, from: from, read: read, limit: limit, err: err}
+	}
+}
+
+// olderTurnsLoaded puts the turns read further back in the preview, which
+// stays on what it showed: it is scrolled from the conversation's end.
+func (m *model) olderTurnsLoaded(msg olderTurnsMsg) {
+	c := &m.sessions.convo
+	if msg.id != c.id || msg.path != c.path {
+		return
+	}
+	c.loading = false
+	if msg.err != nil {
+		slog.Debug("Could not read the session's older turns", "session", msg.id, "error", msg.err)
+		c.from = 0 // not again
+		return
+	}
+	c.turns, c.from, c.read, c.limit = msg.turns, msg.from, msg.read, msg.limit
+	// what was written meanwhile: read on from msg.read
+	c.size = -1
+	m.loadSessionsConversation()
 }
 
 // addPickToQuestion adds the selected files to the question as mentions.
@@ -316,17 +377,21 @@ func (m *model) isDockQuitKey(key string) bool {
 
 // scrollSessionsPane moves the session in the preview back (1) or on (-1)
 // by half the preview, no further than it goes.
-func (m *model) scrollSessionsPane(direction int) {
+func (m *model) scrollSessionsPane(direction int) tea.Cmd {
 	page := max(sessionsScrollStep, m.fileModel.filePreview.GetHeight()/2) //nolint:mnd // half the pane
-	m.scrollSessionsPaneBy(direction * page)
+	return m.scrollSessionsPaneBy(direction * page)
 }
 
 // scrollSessionsPaneBy scrolls the session in the preview by lines: up, to
 // older turns, when lines is positive.
-func (m *model) scrollSessionsPaneBy(lines int) {
+func (m *model) scrollSessionsPaneBy(lines int) tea.Cmd {
 	pv := &m.fileModel.filePreview
 	limit := askui.ScrollLimit(m.sessionsPaneView(), "", pv.GetWidth(), pv.GetHeight())
 	m.sessions.scroll = min(max(0, m.sessions.scroll+lines), limit)
+	if lines > 0 && m.sessions.scroll >= limit {
+		return m.loadOlderTurns()
+	}
+	return nil
 }
 
 // sessionsTypingKey handles a key while the list's search or rename box has

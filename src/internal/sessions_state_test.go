@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -140,4 +141,57 @@ func TestSessionsWithNoFolderAreListedLast(t *testing.T) {
 	bang(m)
 	pressKey(m, common.Hotkeys.ListBottom[0])
 	assert.Equal(t, "nowhere", m.sessions.list.SelectedID())
+}
+
+// The preview reads a transcript's tail at first; scrolled up to its first
+// turn, it reads further back, in the background, and stays where it was.
+func TestThePreviewLoadsOlderTurnsAsYouScrollUp(t *testing.T) {
+	m := dockTestModel(t)
+	m.fileModel.filePreview.SetOpen(true)
+	m.setFilePreviewPanelSize()
+	transcript := filepath.Join(t.TempDir(), "long.jsonl")
+	big := strings.Repeat("x", sessionsConversationTail+100)
+	lines := []string{
+		`{"type":"user","message":{"role":"user","content":"first question"}}`,
+		`{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"first answer"}]}}`,
+		`{"type":"user","message":{"role":"user","content":"second question"}}`,
+		`{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"` + big + `"}]}}`,
+		`{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"second answer"}]}}`,
+		`{"type":"user","message":{"role":"user","content":"third question"}}`,
+	}
+	require.NoError(t, os.WriteFile(transcript, []byte(strings.Join(lines, "\n")+"\n"), 0o600))
+	m.claude.snapshot.Live[0].TranscriptPath = transcript
+	bang(m)
+	require.True(t, m.sessions.list.Select("s20"))
+	m.loadSessionsConversation()
+
+	require.Len(t, m.sessions.convo.turns, 2, "the tail: the turn it starts in, and the next")
+	assert.Equal(t, "second question", m.sessions.convo.turns[0].Prompt)
+	assert.Contains(t, ansi.Strip(m.View()), "older turns load as you scroll up")
+
+	var cmd tea.Cmd
+	for range 20 {
+		if cmd = press(m, common.Hotkeys.PageUp[0]); cmd != nil {
+			break
+		}
+	}
+	require.NotNil(t, cmd, "scrolled up to the first turn, it reads further back")
+	assert.True(t, m.sessions.convo.loading)
+	assert.Nil(t, m.loadOlderTurns(), "once at a time")
+	TeaUpdate(m, ExecuteTeaCmdWithTimeout(cmd, 2*time.Second))
+
+	require.Len(t, m.sessions.convo.turns, 3)
+	assert.Equal(t, "first question", m.sessions.convo.turns[0].Prompt)
+	assert.False(t, m.sessions.convo.hasOlderTurns(), "the whole transcript is read")
+	assert.NotContains(t, ansi.Strip(m.View()), "older turns")
+
+	f, err := os.OpenFile(transcript, os.O_APPEND|os.O_WRONLY, 0o600)
+	require.NoError(t, err)
+	_, err = f.WriteString(`{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"third answer"}]}}` + "\n")
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+	m.loadSessionsConversation()
+	require.Len(t, m.sessions.convo.turns, 3)
+	assert.Equal(t, "third answer", m.sessions.convo.turns[2].Reply, "what is written next is read on from there")
+	assert.Equal(t, "first question", m.sessions.convo.turns[0].Prompt)
 }

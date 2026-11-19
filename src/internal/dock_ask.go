@@ -174,11 +174,9 @@ func (m *model) dockAskKey(msg tea.KeyMsg) tea.Cmd {
 		}
 		return cmd
 	case slices.Contains(common.Hotkeys.PageUp, key):
-		m.scrollSessionsPane(1)
-		return nil
+		return m.scrollSessionsPane(1)
 	case slices.Contains(common.Hotkeys.PageDown, key):
-		m.scrollSessionsPane(-1)
-		return nil
+		return m.scrollSessionsPane(-1)
 	case slices.Contains(common.Hotkeys.AskChooseAgent, key) && !m.askSending().New:
 		return nil // a running session's agent is its own
 	case (slices.Contains(common.Hotkeys.AskChooseModel, key) || slices.Contains(common.Hotkeys.AskChooseEffort, key)) &&

@@ -88,6 +88,23 @@ func ConversationMore(path string, turns []Turn, offset int64, limit int) ([]Tur
 	return turns, offset + read, nil
 }
 
+// ConversationTail is the last limit turns in a transcript's last tail
+// bytes, where those bytes start (0: the whole file was read), and where the
+// last whole line read ends, which ConversationMore goes on from. Turns
+// further back are read with a larger tail.
+func ConversationTail(path string, limit int, tail int64) ([]Turn, int64, int64, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	return conversationTailOf(f, info.Size(), max(tail, 1), limit)
+}
+
 func conversation(path string, limit int, most int64) ([]Turn, int64, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -100,7 +117,7 @@ func conversation(path string, limit int, most int64) ([]Turn, int64, error) {
 	}
 	tail := int64(conversationTail)
 	for {
-		turns, end, err := conversationTailOf(f, info.Size(), tail, limit)
+		turns, _, end, err := conversationTailOf(f, info.Size(), tail, limit)
 		if err != nil || limit <= 0 || len(turns) >= limit || tail >= info.Size() || tail >= most {
 			return turns, end, err
 		}
@@ -109,11 +126,12 @@ func conversation(path string, limit int, most int64) ([]Turn, int64, error) {
 }
 
 // conversationTailOf is the last limit turns in the last tail bytes of f, a
-// transcript size bytes long, and where the last whole line read ends.
-func conversationTailOf(f *os.File, size, tail int64, limit int) ([]Turn, int64, error) {
+// transcript size bytes long, where those bytes start, and where the last
+// whole line read ends.
+func conversationTailOf(f *os.File, size, tail int64, limit int) ([]Turn, int64, int64, error) {
 	start := max(0, size-tail)
 	if _, err := f.Seek(start, io.SeekStart); err != nil {
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
 	reader := bufio.NewReaderSize(f, 64*1024) //nolint:mnd // read buffer
 	var turns []Turn
@@ -135,7 +153,7 @@ func conversationTailOf(f *os.File, size, tail int64, limit int) ([]Turn, int64,
 	if limit > 0 && len(turns) > limit {
 		turns = turns[len(turns)-limit:]
 	}
-	return turns, first + read, nil
+	return turns, start, first + read, nil
 }
 
 // applyLines adds the whole lines reader holds to turns, and says how many

@@ -235,9 +235,9 @@ func (m *model) dockSessionsKey(msg tea.KeyMsg) tea.Cmd {
 			selectAt(len(sessions) - 1)
 		}
 	case slices.Contains(common.Hotkeys.PageUp, key):
-		m.scrollSessionsPane(1)
+		return m.scrollSessionsPane(1)
 	case slices.Contains(common.Hotkeys.PageDown, key):
-		m.scrollSessionsPane(-1)
+		return m.scrollSessionsPane(-1)
 	case slices.Contains(common.Hotkeys.OpenAskBar, key):
 		if s, ok := m.selectedSession(); ok && m.canAnswerClaudeQuestion(s) {
 			m.startAnswering()

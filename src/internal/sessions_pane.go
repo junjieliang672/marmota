@@ -60,6 +60,7 @@ func (m *model) sessionPaneViewOf(s claudesession.Session, convo sessionsConvers
 		Dir:        s.Cwd,
 		Branch:     convo.branch,
 		Turns:      convo.turns,
+		Older:      olderNote(convo),
 		Tasks:      s.Todos,
 		Files:      newestFirstFiles(s.EditedFiles, s.Cwd),
 	}
@@ -226,4 +227,16 @@ func branchOf(dir, gitPath string, isDir bool) string {
 		return ref[:shortCommitLen]
 	}
 	return ref
+}
+
+// olderNote says, above the first turn, that the conversation goes back
+// further: scrolling up to here loads it.
+func olderNote(c sessionsConversation) string {
+	switch {
+	case c.loading:
+		return "↑ loading older turns…"
+	case c.hasOlderTurns():
+		return "↑ older turns load as you scroll up"
+	}
+	return ""
 }

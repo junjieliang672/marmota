@@ -76,7 +76,7 @@ func (m *model) handleMouse(msg tea.MouseMsg) tea.Cmd {
 		return m.scrollFilePreview(lines, cols)
 	case sessionPreviewArea:
 		m.sessions.selection = previewSelection{} // what it lit scrolls away
-		m.scrollSessionsPaneBy(-lines)            // the session scrolls back, to older turns, when positive
+		return m.scrollSessionsPaneBy(-lines)     // the session scrolls back, to older turns, when positive
 	case detailsArea:
 		m.details.ScrollBy(lines)
 	case noPreview:

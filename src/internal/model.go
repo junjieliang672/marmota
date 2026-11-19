@@ -236,6 +236,10 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // refresh of the panels after it, and reports whether msg was one.
 func (m *model) handleOwnMsg(msg tea.Msg) (tea.Cmd, bool) {
 	switch msg := msg.(type) {
+	case olderTurnsMsg:
+		m.olderTurnsLoaded(msg)
+		return nil, true
+
 	case gitRefreshDebounceMsg:
 		// Debounce timer fired - refresh git status now
 		m.gitRefreshPending = false

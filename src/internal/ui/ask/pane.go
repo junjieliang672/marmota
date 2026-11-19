@@ -46,8 +46,11 @@ type Session struct {
 	Question     []string
 	Answering    bool
 	QuestionNote string
-	// Turns is the conversation, from the session's transcript.
+	// Turns is the conversation, from the session's transcript. Older,
+	// when set, says there is more of it before them ("↑ older turns as
+	// you scroll up"), drawn above the first.
 	Turns []claudesession.Turn
+	Older string
 	Tasks []claudesession.Todo
 	Files []string
 	// Mark is search text: lines that hold it are marked.
@@ -62,7 +65,6 @@ const (
 	maxPromptLines  = 2
 	maxTaskLines    = 6
 	maxFileLines    = 6
-	turnsShown      = 20
 	replyIndent     = "  "
 	replyMark       = "⏺ "
 	promptMark      = "› "
@@ -314,9 +316,6 @@ func optionNumber(text string) string {
 func conversationLines(s Session, width int, st paneStyles) []string {
 	st.dir = s.Dir
 	turns := s.Turns
-	if len(turns) > turnsShown {
-		turns = turns[len(turns)-turnsShown:]
-	}
 	hint := firstKey(common.Hotkeys.PageUp) + "/" + firstKey(common.Hotkeys.PageDown)
 	lines := []string{section("Conversation", hint, width, st)}
 	now := st.now.Render(ansi.Truncate("✳ "+s.Now, width, "…"))
@@ -328,6 +327,9 @@ func conversationLines(s Session, width int, st paneStyles) []string {
 			return append(lines, now)
 		}
 		return append(lines, st.dim.Render("Nothing said yet"))
+	}
+	if s.Older != "" {
+		lines = append(lines, st.dim.Render(ansi.Truncate(s.Older, width, "…")), "")
 	}
 	for i, t := range turns {
 		if i > 0 {
