@@ -331,16 +331,58 @@ func conversationLines(s Session, width int, st paneStyles) []string {
 	if s.Older != "" {
 		lines = append(lines, st.dim.Render(ansi.Truncate(s.Older, width, "…")), "")
 	}
+	rule := st.rule.Render(strings.Repeat("─", width))
 	for i, t := range turns {
 		if i > 0 {
-			lines = append(lines, "", st.rule.Render(strings.Repeat("─", width)))
+			lines = append(lines, "", rule)
 		}
-		lines = append(lines, turnBlock(t.Prompt, t.Tools, t.Reply, s.Mark, width, st)...)
+		lines = append(lines, cachedTurn(t, s.Mark, width, st)...)
 	}
 	if s.Now != "" {
 		lines = append(lines, "", now)
 	}
 	return lines
+}
+
+// A turn is drawn again only when it, the width or the search changes: the
+// preview lays out every turn for each step of the wheel, to know how far it
+// scrolls, then again to draw it.
+var (
+	turnMu    sync.Mutex               //nolint:gochecknoglobals // a cache of drawn turns
+	turnCache = map[turnKey][]string{} //nolint:gochecknoglobals // a cache of drawn turns
+)
+
+type turnKey struct {
+	prompt, tools, reply, mark, dir string
+	width                           int
+}
+
+func cachedTurn(t claudesession.Turn, mark string, width int, st paneStyles) []string {
+	key := turnKey{prompt: t.Prompt, tools: strings.Join(t.Tools, "\x00"), reply: t.Reply,
+		mark: mark, dir: st.dir, width: width}
+	turnMu.Lock()
+	defer turnMu.Unlock()
+	if lines, ok := turnCache[key]; ok {
+		return lines
+	}
+	if len(turnCache) >= maxRenderCached {
+		turnCache = map[turnKey][]string{}
+	}
+	lines := turnBlock(t.Prompt, t.Tools, t.Reply, mark, width, st)
+	turnCache[key] = lines
+	return lines
+}
+
+// PrepareTurns lays out s's turns as the preview, width wide, will draw
+// them, so drawing them then costs nothing: called off the screen's loop
+// for turns just read.
+func PrepareTurns(s Session, width int) {
+	st := newPaneStyles()
+	st.dir = s.Dir
+	inner := max(1, width-composerChrome)
+	for _, t := range s.Turns {
+		cachedTurn(t, s.Mark, inner, st)
+	}
 }
 
 // turnBlock draws one turn: "› prompt", the tools under it, and the reply.

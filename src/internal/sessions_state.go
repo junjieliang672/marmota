@@ -312,8 +312,12 @@ func (m *model) loadOlderTurns() tea.Cmd {
 	c.loading = true
 	id, path, limit := c.id, c.path, c.limit+sessionsConversationTurns
 	tail := max(c.read-c.from, sessionsConversationTail) * 4 //nolint:mnd // four times as much
+	view, width := m.sessionsPaneView(), m.fileModel.filePreview.GetWidth()
 	return func() tea.Msg {
 		turns, from, read, err := claudesession.ConversationTail(path, limit, tail)
+		// laid out here, so they cost the screen nothing when they show
+		view.Turns = turns
+		askui.PrepareTurns(view, width)
 		return olderTurnsMsg{id: id, path: path, turns: turns, from: from, read: read, limit: limit, err: err}
 	}
 }
@@ -388,7 +392,9 @@ func (m *model) scrollSessionsPaneBy(lines int) tea.Cmd {
 	pv := &m.fileModel.filePreview
 	limit := askui.ScrollLimit(m.sessionsPaneView(), "", pv.GetWidth(), pv.GetHeight())
 	m.sessions.scroll = min(max(0, m.sessions.scroll+lines), limit)
-	if lines > 0 && m.sessions.scroll >= limit {
+	// older turns start loading two screens before the first, so they are
+	// there by the time you reach it
+	if lines > 0 && m.sessions.scroll >= limit-2*pv.GetHeight() {
 		return m.loadOlderTurns()
 	}
 	return nil
