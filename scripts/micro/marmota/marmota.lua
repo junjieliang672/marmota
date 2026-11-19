@@ -883,46 +883,27 @@ local function span(first, last)
     return "L" .. first
 end
 
--- placeNow says where a question's lines are now, and which to select:
--- its place in the replies ("plan.md L3-4 · now at L5-6"), the first and
--- last line to select (nil when the whole file was asked about: the
--- cursor's line is gone back to), and whether those lines changed since.
--- cache keeps each file's lines for one drawing of the replies.
-local function placeNow(a, cache)
+-- placeNow says which lines of its file a question is about now: the first
+-- and last to select (nil when the whole file was asked about, or cmd+K
+-- changed nothing: the cursor's line is gone back to), and whether those
+-- lines changed since. For cmd+K, once the session is done, the lines it
+-- changed; else where the lines asked about are, when lines went in above
+-- them.
+local function placeNow(a)
     local place = a.place
-    local name = filepath.Base(place.path)
-    local text = (a.edits ~= nil and "edit " or "") .. name
-    if not place.whole then
-        text = text .. " " .. span(place.first, place.last)
-    end
     if a.changed ~= nil then
         local first, last = a.changed[1], a.changed[2]
-        if last < first then
-            return text .. " · lines removed at L" .. first, first, first, false
-        end
-        return text .. " · changed " .. span(first, last), first, last, false
+        return first, math.max(first, last), false
     end
-    if a.done and a.edits ~= nil then
-        return text .. " · no change", nil, nil, false
+    if place.whole or (a.done and a.edits ~= nil) then
+        return nil, nil, false
     end
-    if place.whole then
-        return text, nil, nil, false
-    end
-    if cache[place.path] == nil then
-        cache[place.path] = fileLines(place.path) or false
-    end
-    local lines = cache[place.path]
+    local lines = fileLines(place.path)
     if not lines then
-        return text, place.first, place.last, false
+        return place.first, place.last, false
     end
     local state, first = whereNow(place, lines)
-    local last = first + #place.lines - 1
-    if state == "moved" then
-        return text .. " · now at " .. span(first, last), first, last, false
-    elseif state == "changed" then
-        return text .. " · lines changed since", first, last, true
-    end
-    return text, first, last, false
+    return first, first + #place.lines - 1, state == "changed"
 end
 
 -- Each question is a line that says whom you asked, then the question,
@@ -937,7 +918,7 @@ local highlighted = "\194\160"
 local shownFor = {}
 
 local function repliesText()
-    local out, count, cache = {}, 0, {}
+    local out, count = {}, 0
     shownFor = {}
     local function add(text, index)
         table.insert(out, text)
@@ -951,11 +932,7 @@ local function repliesText()
             add(string.rep("─", 36), i)
             add("", i)
         end
-        local header = "You → " .. a.title
-        if a.place ~= nil then
-            header = header .. " · " .. placeNow(a, cache)
-        end
-        add(header, i)
+        add("You → " .. a.title, i)
         for line in (a.question .. "\n"):gmatch("(.-)\n") do
             add(highlighted .. line .. " ", i)
         end
@@ -1596,7 +1573,7 @@ local function backTo(replies)
         return
     end
     local place = a.place
-    local _, first, last, changed = placeNow(a, {})
+    local first, last, changed = placeNow(a)
     local pane, tab, index = paneWith(place.path)
     if pane == nil then
         -- named from this editor's folder when it is in it, as the tab shows it
@@ -1631,6 +1608,20 @@ local function backTo(replies)
         micro.InfoBar():Message(filepath.Base(place.path) .. " " .. span(first, last)
             .. ": these lines changed since you asked")
     end
+end
+
+-- onMouseRelease: a click on a question in the replies (the line that says
+-- whom, or what you asked) goes back to what it was about, as enter does. A
+-- drag that selected text, to copy it, stays where it is.
+function onMouseRelease(bp)
+    if bp.Buf:GetName() ~= repliesName or side.mode == "pick" or bp.Cursor:HasSelection() then
+        return true
+    end
+    local line = bp.Buf:Line(bp.Cursor.Y)
+    if strings.HasPrefix(line, "You → ") or strings.HasPrefix(line, highlighted) then
+        backTo(bp)
+    end
+    return true
 end
 
 -- enter in the box sends, or picks. In the replies, it goes back to what
@@ -1716,8 +1707,8 @@ end
 
 -- What is typed in the box filters the sessions while one is picked. micro
 -- says when anything happened, not what: the box is read again. Otherwise
--- the replies are drawn again, for where the lines asked about are now
--- (render changes nothing when that is as it was).
+-- the replies are drawn again, for their keys, which say what the pane with
+-- the keyboard does (render changes nothing when that is as it was).
 function onAnyEvent()
     if side.mode ~= "pick" then
         if #asked > 0 then

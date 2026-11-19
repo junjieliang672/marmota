@@ -125,6 +125,9 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Only the wheel does something, over a preview (mouse.go).
 		return m, m.handleMouse(msg)
 	}
+	if path, line, ok := openLinkRequest(msg); ok {
+		return m, m.openLink(path, line)
+	}
 	var inputCmd, updateCmd, panelCmd, heartbeatCmd tea.Cmd
 	gotModelUpdateMsg := false
 

@@ -26,8 +26,13 @@ type Turn struct {
 	Answer string
 }
 
-// conversationTail is how much of a transcript's end Conversation reads.
-const conversationTail = 512 * 1024
+// conversationTail is how much of a transcript's end Conversation reads,
+// and ConversationBack first; conversationTailMax the most ConversationBack
+// reads.
+const (
+	conversationTail    = 512 * 1024
+	conversationTailMax = 32 << 20
+)
 
 const (
 	// cutPromptLimit is how far before a tail its turn's prompt is looked
@@ -37,20 +42,78 @@ const (
 )
 
 // Conversation returns the last limit turns of a transcript. Only the file's
-// tail is read, so a long session costs no more than a short one.
+// last conversationTail bytes are read, so a long session costs no more than
+// a short one; turns before them are left out.
 func Conversation(path string, limit int) ([]Turn, error) {
+	turns, _, err := conversation(path, limit, conversationTail)
+	return turns, err
+}
+
+// ConversationBack is Conversation reading further back, four times as much
+// each time, until it has limit turns (up to conversationTailMax bytes):
+// the turn going on can be megabytes by itself, a screenshot a tool took,
+// a long file read. It also returns how much of the file it read, which
+// ConversationMore goes on from.
+func ConversationBack(path string, limit int) ([]Turn, int64, error) {
+	return conversation(path, limit, conversationTailMax)
+}
+
+// ConversationMore is turns, a transcript's last limit turns as read up to
+// offset, with what was written after it. A transcript is only written at
+// its end; one shorter than offset is read again.
+func ConversationMore(path string, turns []Turn, offset int64, limit int) ([]Turn, int64, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer f.Close()
 	info, err := f.Stat()
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	start := max(0, info.Size()-conversationTail)
+	if info.Size() < offset {
+		return ConversationBack(path, limit)
+	}
+	if _, err := f.Seek(offset, io.SeekStart); err != nil {
+		return nil, 0, err
+	}
+	turns = append([]Turn(nil), turns...)
+	if n := len(turns); n > 0 {
+		turns[n-1].Tools = append([]string(nil), turns[n-1].Tools...) // filled in place
+	}
+	turns, read := applyLines(turns, bufio.NewReaderSize(f, 64*1024)) //nolint:mnd // read buffer
+	if limit > 0 && len(turns) > limit {
+		turns = turns[len(turns)-limit:]
+	}
+	return turns, offset + read, nil
+}
+
+func conversation(path string, limit int, most int64) ([]Turn, int64, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return nil, 0, err
+	}
+	tail := int64(conversationTail)
+	for {
+		turns, end, err := conversationTailOf(f, info.Size(), tail, limit)
+		if err != nil || limit <= 0 || len(turns) >= limit || tail >= info.Size() || tail >= most {
+			return turns, end, err
+		}
+		tail *= 4
+	}
+}
+
+// conversationTailOf is the last limit turns in the last tail bytes of f, a
+// transcript size bytes long, and where the last whole line read ends.
+func conversationTailOf(f *os.File, size, tail int64, limit int) ([]Turn, int64, error) {
+	start := max(0, size-tail)
 	if _, err := f.Seek(start, io.SeekStart); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	reader := bufio.NewReaderSize(f, 64*1024) //nolint:mnd // read buffer
 	var turns []Turn
@@ -60,15 +123,7 @@ func Conversation(path string, limit int) ([]Turn, error) {
 		first += int64(len(cut))
 		turns = []Turn{{}} // see SettleCutTurn
 	}
-	for {
-		line, err := reader.ReadBytes('\n')
-		if len(bytes.TrimSpace(line)) > 0 {
-			turns = applyTurnLine(turns, line)
-		}
-		if err != nil {
-			break
-		}
-	}
+	turns, read := applyLines(turns, reader)
 	if start > 0 {
 		turns = SettleCutTurn(f, first, turns, limit, `"type":"user"`, func(line []byte) (Turn, bool) {
 			if t := applyTurnLine(nil, line); len(t) == 1 {
@@ -80,7 +135,24 @@ func Conversation(path string, limit int) ([]Turn, error) {
 	if limit > 0 && len(turns) > limit {
 		turns = turns[len(turns)-limit:]
 	}
-	return turns, nil
+	return turns, first + read, nil
+}
+
+// applyLines adds the whole lines reader holds to turns, and says how many
+// bytes they are. A last line not ended yet is still being written: it is
+// left for the next read.
+func applyLines(turns []Turn, reader *bufio.Reader) ([]Turn, int64) {
+	var read int64
+	for {
+		line, err := reader.ReadBytes('\n')
+		if err != nil {
+			return turns, read
+		}
+		read += int64(len(line))
+		if len(bytes.TrimSpace(line)) > 0 {
+			turns = applyTurnLine(turns, line)
+		}
+	}
 }
 
 // SettleCutTurn finishes the turn a tail read began with. The tail of a

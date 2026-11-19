@@ -597,8 +597,9 @@ def main() -> int:
         print("ok   cmd+J put the column away and showed it again with what the box held; cmd+L from the box "
               "went back to the file; cmd+W in the box put the column away; in another tab it came along")
 
-        # 8. Each question says where its lines are now, and enter on it in
-        # the replies selects them in the file again.
+        # 8. A click on a question in the replies, or enter on it, selects
+        # the lines it was about in the file again, where they are now. The
+        # question's line names no lines.
         m.quit()
         m = editor(first, "first", "here")
         m.press("down", "down", "shift+down", "shift+down", "cmd+l")
@@ -606,7 +607,18 @@ def main() -> int:
         m.type("where are these")
         m.press("enter")
         wait_for("the reply", lambda: "Echo: where are these" in m.right())
-        assert "You → first · plan.md L3-4" in m.right(), "the question names its file and lines: " + m.right()
+        whom = [line for line in m.right().splitlines() if "You → first" in line]
+        assert whom and whom[0].strip() == "You → first", "the question's line names only whom: " + m.right()
+
+        def click(text: str) -> None:
+            """A click (press and release) on the first line of the screen that has text, on its first letter."""
+            for y, line in enumerate(m.screen().splitlines()):
+                if text in line:
+                    x = len(line.split(text, 1)[0]) + 1
+                    m.mouse(0, x, y + 1)
+                    m.mouse(0, x, y + 1, release=True)
+                    return
+            raise AssertionError(f"{text!r} isn't on the screen:\n{m.screen()}")
 
         def back() -> None:
             """The keyboard to the replies, enter, and it back in the file."""
@@ -640,23 +652,26 @@ def main() -> int:
         m.type("t")
         back()
         selected(slice(2, 4), ["X", "line five"], ["# Plan", "", "line three", "line four", "line five"])
+        # a click on what was asked does what enter does
+        m.press("cmd+g")
+        m.type("t")
+        click("where are these")
+        wait_for("the keyboard back in the file", lambda: "enter sends" in m.right())
+        selected(slice(2, 4), ["X", "line five"], ["# Plan", "", "line three", "line four", "line five"])
         m.press("cmd+g")
         m.type("t")
         m.type("new one")
         m.press("enter")
         m.type("new two")
         m.press("enter")
-        wait_for("the lines moved down two", lambda: "plan.md L3-4 · now at L5-6" in m.right())
         moved = ["new one", "new two", "# Plan", "", "line three", "line four", "line five"]
-        back()
+        click("You → first")
+        wait_for("the keyboard back in the file", lambda: "enter sends" in m.right())
         selected(slice(4, 6), ["X", "line five"], moved)
         m.press("cmd+g")
         m.type("5")
         m.press("enter")
         m.type("Z")
-        wait_for("the lines changed", lambda: "plan.md L3-4 · lines changed since" in m.right())
-        whom, since = m.drawn("You → first", "You"), m.drawn("lines changed since", "·")
-        assert whom and since and whom != since, f"lines changed since stand out: {whom!r} and {since!r}"
         back()
         wait_for("it to say they changed", lambda: "these lines changed since you asked" in m.screen())
         m.press("esc")
@@ -670,7 +685,7 @@ def main() -> int:
         m.press("enter")
         changed = ["# Plan", "", "LINE THREE", "LINE FOUR", "ADDED", "line five"]
         wait_for("the change in the editor", lambda: shown()[:6] == changed)
-        wait_for("the lines it spans", lambda: "You → first · edit plan.md L3-4 · changed L3-5" in m.right())
+        wait_for("the change done", lambda: "changed plan.md" in m.screen().splitlines()[-1])
         m.press("cmd+g")
         m.type("t")
         back()
@@ -688,9 +703,8 @@ def main() -> int:
         wait_for("the file in a new tab", lambda: "[plan.md]" in m.screen().splitlines()[0]
                  and shown()[1:7] == changed)
         selected(slice(3, 5), ["X", "line five"], [m.screen().splitlines()[0].rstrip(), *changed])
-        print("ok   each question named its file and lines; enter on it in the replies selected them in the file, "
-              "where they had moved to, and said when they had changed since; cmd+K's named the lines its change "
-              "spans, and enter selected those")
+        print("ok   a click or enter on a question in the replies selected its lines in the file, where they "
+              "had moved to, and said when they had changed since; for cmd+K's, the lines its change spans")
 
         # 9. The editor put away. A micro that Marmota's e didn't open, as
         # this one, has nothing to go back to and says so.

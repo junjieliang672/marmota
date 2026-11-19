@@ -647,3 +647,66 @@ func TestABackgroundSessionKeepsTheIDClaudeStopTakes(t *testing.T) {
 	assert.Equal(t, "09c7aed8", sessions[0].JobID, "`claude stop` takes the job's id, not its name")
 	assert.True(t, sessions[0].Background)
 }
+
+// One turn longer than the tail Conversation reads leaves the turns before
+// it out; ConversationBack reads back until it has them.
+func TestConversationBackReadsPastALongTurn(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "s.jsonl")
+	big := strings.Repeat("x", conversationTail)
+	lines := []string{
+		`{"type":"user","message":{"role":"user","content":"first"}}`,
+		`{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"one"}]}}`,
+		`{"type":"user","message":{"role":"user","content":"second"}}`,
+		`{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"` + big + `"}]}}`,
+		`{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"two"}]}}`,
+	}
+	writeFile(t, path, strings.Join(lines, "\n")+"\n")
+
+	tail, err := Conversation(path, 20)
+	require.NoError(t, err)
+	assert.Len(t, tail, 1)
+
+	turns, read, err := ConversationBack(path, 20)
+	require.NoError(t, err)
+	require.Len(t, turns, 2)
+	assert.Equal(t, "first", turns[0].Prompt)
+	assert.Equal(t, "second", turns[1].Prompt)
+	assert.Equal(t, "two", turns[1].Reply)
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	assert.Equal(t, info.Size(), read)
+}
+
+// ConversationMore reads only what was written since, and a line still
+// being written waits for its end.
+func TestConversationMoreGoesOn(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "s.jsonl")
+	writeFile(t, path, `{"type":"user","message":{"role":"user","content":"first"}}`+"\n")
+	turns, read, err := ConversationBack(path, 2)
+	require.NoError(t, err)
+	require.Len(t, turns, 1)
+
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o600)
+	require.NoError(t, err)
+	defer f.Close()
+	reply := `{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"one"}]}}`
+	_, err = f.WriteString(reply[:20])
+	require.NoError(t, err)
+	turns, read, err = ConversationMore(path, turns, read, 2)
+	require.NoError(t, err)
+	assert.Empty(t, turns[0].Reply, "half a line isn't read")
+
+	_, err = f.WriteString(reply[20:] + "\n" +
+		`{"type":"user","message":{"role":"user","content":"second"}}` + "\n" +
+		`{"type":"user","message":{"role":"user","content":"third"}}` + "\n")
+	require.NoError(t, err)
+	turns, _, err = ConversationMore(path, turns, read, 2)
+	require.NoError(t, err)
+	require.Len(t, turns, 2, "the last limit turns")
+	assert.Equal(t, "second", turns[0].Prompt)
+	assert.Equal(t, "third", turns[1].Prompt)
+
+	more, _, err := ConversationMore(path, []Turn{{Prompt: "first"}}, read, 3)
+	require.NoError(t, err)
+	assert.Equal(t, "one", more[0].Reply)
+}

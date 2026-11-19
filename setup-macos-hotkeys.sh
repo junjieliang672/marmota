@@ -1059,8 +1059,10 @@ do
     action = wezterm.action.OpenLinkAtMouseCursor,
   })
   -- A link to a file on this computer, file:///path#L12 as Marmota writes
-  -- it, opens in micro at its line, in a pane on the right. Any other link
-  -- opens as WezTerm opens it.
+  -- it, opens at its line: clicked in Marmota, in Marmota's editor in its
+  -- place, as e opens a file (WezTerm pastes the file and line into
+  -- Marmota after a mark it knows: open_link.go); elsewhere in micro, in a
+  -- pane on the right. Any other link opens as WezTerm opens it.
   local function unescape(s)
     return (s:gsub('%%(%x%x)', function(h)
       return string.char(tonumber(h, 16))
@@ -1075,6 +1077,11 @@ do
       return
     end
     path = unescape(path)
+    local program = (pane:get_foreground_process_name() or ''):match('([^/]+)$')
+    if program == 'y' then
+      pane:send_paste('\u{F8FF}marmota-open\u{F8FF}' .. path .. '\n' .. (line or ''))
+      return false
+    end
     local args = { os.getenv('SHELL') or '/bin/zsh', '-lc', 'exec micro "$@"', 'micro', path }
     if line then
       table.insert(args, '+' .. line)

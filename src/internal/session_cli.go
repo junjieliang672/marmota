@@ -335,7 +335,7 @@ func SessionRead(w io.Writer, id string, turns int) error {
 	if path == "" {
 		return errors.New("it has no conversation yet")
 	}
-	conv, err := claudesession.Conversation(path, turns)
+	conv, _, err := claudesession.ConversationBack(path, turns)
 	if err != nil {
 		return err
 	}

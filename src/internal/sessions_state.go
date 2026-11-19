@@ -63,7 +63,10 @@ type sessionsConversation struct {
 	size    int64
 	modTime time.Time
 	turns   []claudesession.Turn
-	branch  string
+	// read is how much of a Claude Code transcript turns were read from,
+	// which only grows: the next read starts there.
+	read   int64
+	branch string
 }
 
 func newSessionsState() sessionsState {
@@ -255,12 +258,22 @@ func readConversation(c sessionsConversation, s claudesession.Session) sessionsC
 		c.branch = branch
 		return c
 	}
-	turns, err := sessionConversation(s, sessionsConversationTurns)
+	var turns []claudesession.Turn
+	var read int64
+	switch {
+	case s.IsCodex():
+		turns, err = sessionConversation(s, sessionsConversationTurns)
+	case c.id == s.ID && c.path == s.TranscriptPath && c.read > 0:
+		// what was written since; a turn can be megabytes, read once
+		turns, read, err = claudesession.ConversationMore(s.TranscriptPath, c.turns, c.read, sessionsConversationTurns)
+	default:
+		turns, read, err = claudesession.ConversationBack(s.TranscriptPath, sessionsConversationTurns)
+	}
 	if err != nil {
 		slog.Debug("Could not read the session's conversation", "session", s.ID, "error", err)
 	}
 	return sessionsConversation{id: s.ID, path: s.TranscriptPath, size: info.Size(),
-		modTime: info.ModTime(), turns: turns, branch: branch}
+		modTime: info.ModTime(), turns: turns, read: read, branch: branch}
 }
 
 // addPickToQuestion adds the selected files to the question as mentions.

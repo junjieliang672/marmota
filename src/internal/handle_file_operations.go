@@ -1023,6 +1023,11 @@ func (m *model) openPathsWithEditor(paths []string, recordRecent bool) tea.Cmd {
 		slog.Warn("Could not open the editor beside Marmota: opening it in Marmota's place", "error", err)
 	}
 
+	return m.runEditor(paths)
+}
+
+// runEditor runs the editor on its arguments in Marmota's place.
+func (m *model) runEditor(paths []string) tea.Cmd {
 	cmd, args := editorCommand(common.Config.Editor, os.Getenv("EDITOR"), runtime.GOOS, paths)
 	if putEditorsAway() {
 		return m.startEditorJob(cmd, args)
