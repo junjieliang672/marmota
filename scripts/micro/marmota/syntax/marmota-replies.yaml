@@ -2,7 +2,7 @@ filetype: marmota-replies
 
 # The column's upper pane (marmota.lua, render). Questions and replies
 # (repliesText): what you asked stands apart from what the session wrote,
-# which is Markdown. Or the sessions to pick from (sessionsText): Claude
+# which is Markdown, and lines asked about that have changed since stand out. Or the sessions to pick from (sessionsText): Claude
 # Code's rows and Codex's each start in a color of their own, and the marked
 # row is highlighted.
 detect:
@@ -13,6 +13,8 @@ rules:
     # what you asked: a line that says whom, then the question, highlighted
     # (its line starts with a no-break space)
     - identifier: "^You → .*$"
+    # the lines it was about aren't in the file any more as they were
+    - error: "· lines changed since$"
     - statusline: "^\\x{00A0}.*$"
     # the session's reply starts under its name
     - special: "^⏺ .*$"

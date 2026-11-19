@@ -64,7 +64,8 @@ class Prompt:
 
         reply = "Echo: " + (text.strip().splitlines() or [""])[0]
         # Asked to change a file in place, as Marmota's plugin for micro
-        # asks: the lines named are put in capitals, the whole file with none.
+        # asks: the lines named are put in capitals, the whole file with none;
+        # asked to add a line too, "ADDED" goes under them.
         edit = re.search(r'editing the file in place: @"?([^"#\s]+)"?(?:#L(\d+)(?:-(\d+))?)?', text)
         if edit:
             try:
@@ -73,8 +74,11 @@ class Prompt:
                 last = int(edit.group(3) or edit.group(2) or len(lines))
                 for i in range(first - 1, min(last, len(lines))):
                     lines[i] = lines[i].upper()
-                open(edit.group(1), "w").write("\n".join(lines))
                 reply = "Put lines %d-%d in capitals." % (first, last)
+                if "add a line" in text:
+                    lines.insert(min(last, len(lines)), "ADDED")
+                    reply = "Put lines %d-%d in capitals and added a line." % (first, last)
+                open(edit.group(1), "w").write("\n".join(lines))
             except OSError as err:
                 reply = "Couldn't edit: %s" % err
         with open(transcript, "a") as f:
