@@ -23,7 +23,10 @@ def main():
     for p in panes:
         if p["tab_id"] != tab:
             continue
-        text = cli("get-text", "--escapes", "--pane-id", str(p["pane_id"]))
+        # the screen only: without the lines named, a pane with scrollback, as a session's, gives some of
+        # that above its screen, and the drawing loses as many rows at its foot
+        text = cli("get-text", "--escapes", "--pane-id", str(p["pane_id"]),
+                   "--start-line", "0", "--end-line", str(p["size"]["rows"] - 1))
         shot.append({
             "pane_id": p["pane_id"], "left": p["left_col"], "top": p["top_row"],
             "cols": p["size"]["cols"], "rows": p["size"]["rows"], "active": p["is_active"],

@@ -51,11 +51,33 @@ var (
 	appSessionsAutoRefresh = true //nolint:gochecknoglobals // test seam
 	// listAppSessions asks claude.ai for the account's sessions.
 	listAppSessions = func(ctx context.Context) ([]claudecloud.Session, error) { //nolint:gochecknoglobals // test seam
+		if file := os.Getenv(appSessionsFileEnv); file != "" {
+			return appSessionsFromFile(file)
+		}
 		return claudecloud.Client{HTTP: &http.Client{Timeout: appSessionsTimeout}}.List(ctx)
 	}
 	// openAppURL opens a session in the Claude app, else on claude.ai.
 	openAppURL = openURLDetached //nolint:gochecknoglobals // test seam
 )
+
+// appSessionsFileEnv names a file the Remote section's sessions are read from
+// in place of asking claude.ai, as JSON: a list of claudecloud.Session. The
+// tutorial's screenshots are taken with one (testsuite/shots), so that no
+// session of yours shows in a picture; nothing is asked of claude.ai then,
+// and no login is read.
+const appSessionsFileEnv = "MARMOTA_APP_SESSIONS_FILE"
+
+func appSessionsFromFile(path string) ([]claudecloud.Session, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var sessions []claudecloud.Session
+	if err := json.Unmarshal(data, &sessions); err != nil {
+		return nil, err
+	}
+	return sessions, nil
+}
 
 // appSessionsState is what the Remote section knows.
 type appSessionsState struct {

@@ -17,6 +17,7 @@ import html
 import json
 import os
 import re
+import socket
 import subprocess
 import sys
 import unicodedata
@@ -354,10 +355,22 @@ def user_subs():
     return [[re.escape(user) + r"(?![\w])", mock]]
 
 
+def host_subs():
+    """This computer's name, which the Ask box shows where a session runs, becomes one as long: the name
+    your Marmota settings give it (computer_name), and its hostname."""
+    names = {socket.gethostname().split(".")[0]}
+    for config in (Path.home() / ".config/marmota/config.toml",
+                   Path(os.environ.get("XDG_CONFIG_HOME", "/nonexistent")) / "marmota/config.toml"):
+        if config.exists():
+            names.update(re.findall(r"""^computer_name\s*=\s*['"]([^'"]+)['"]""", config.read_text(), re.M))
+    # the longest first, so a name that starts with another is swapped whole
+    return [[re.escape(n), ("macbook-air" * 4)[:len(n)]] for n in sorted(names, key=len, reverse=True) if n]
+
+
 def main():
     # subs.local.json, which git ignores, holds what only your machine
     # shows, such as another computer's address; it goes first.
-    subs = user_subs()
+    subs = user_subs() + host_subs()
     for subs_file in (HERE / "subs.local.json", HERE / "subs.json"):
         if subs_file.exists():
             subs += json.loads(subs_file.read_text())

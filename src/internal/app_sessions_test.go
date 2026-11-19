@@ -3,6 +3,8 @@ package internal
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -330,4 +332,27 @@ func TestTheGoToListSaysARemoteSessionsStateOnce(t *testing.T) {
 	view := ansi.Strip(m.jumpUI.Render(true))
 	assert.Equal(t, 1, strings.Count(view, "needs you"), view)
 	assert.Contains(t, view, "b1 · opens in the Claude app", "the foot line says where enter goes")
+}
+
+// The tutorial's screenshots show a Remote section of their own: its
+// sessions are read from a file, and claude.ai isn't asked.
+func TestTheRemoteSectionIsReadFromAFileWhenOneIsNamed(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "remote.json")
+	require.NoError(t, os.WriteFile(file, []byte(`[
+		{"ID": "cse_1", "Title": "Nightly station import", "Bucket": "working", "Connected": true,
+		 "Repo": "example/tidepool", "Branch": "main", "Updated": "2026-11-18T10:00:00Z"},
+		{"ID": "cse_2", "Title": "Print the Duxbury map", "Bucket": "blocked", "NeedsAction": "permission prompt"}
+	]`), 0o600))
+
+	got, err := appSessionsFromFile(file)
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+	assert.Equal(t, "Nightly station import", got[0].Title)
+	assert.True(t, got[0].Connected)
+	assert.Equal(t, "example/tidepool", got[0].Repo)
+	assert.Equal(t, 2026, got[0].Updated.Year())
+	assert.Equal(t, "permission prompt", got[1].NeedsAction)
+
+	_, err = appSessionsFromFile(filepath.Join(t.TempDir(), "none.json"))
+	require.Error(t, err)
 }

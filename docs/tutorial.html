@@ -158,7 +158,7 @@ dialog.zoom img { display: block; max-width: 98vw; max-height: 96vh; width: auto
   </div>
   <h1>Getting started with Marmota</h1>
   <p class="lede">Marmota is a terminal file manager that works beside your Claude Code and Codex sessions; you start it with <code>y</code>. You browse files on top; at the foot you see every session that runs, what each one is doing, and you can write to any of them without leaving your files.</p>
-  <p class="note"><strong>You need</strong> a Mac, <a href="https://wezterm.org">WezTerm</a> (y shows sessions in its panes), <a href="https://github.com/tmux/tmux">tmux</a> (sessions run in it, so they outlive WezTerm; <code>build.sh</code> installs it), and <a href="https://claude.com/claude-code">Claude Code</a>, the <a href="https://github.com/openai/codex">Codex CLI</a>, or both.</p>
+  <p class="note"><strong>You need</strong> a Mac, <a href="https://wezterm.org">WezTerm</a> (y shows sessions in its panes), <a href="https://github.com/tmux/tmux">tmux</a> (sessions run in it, so they outlive WezTerm) and <a href="https://micro-editor.github.io">micro</a> (the editor <kbd>e</kbd> opens; <code>build.sh</code> installs both), and <a href="https://claude.com/claude-code">Claude Code</a>, the <a href="https://github.com/openai/codex">Codex CLI</a>, or both.</p>
 </header>
 
 <section aria-labelledby="s1">
@@ -170,7 +170,7 @@ cd marmota
 
 <span class="c"># then, in a new terminal (WezTerm)</span>
 y</pre>
-  <p><code>build.sh</code> builds the program into <code>bin/y</code>, adds a short block to your shell config that puts it on your PATH, and gives WezTerm its look: the pane you type in stays bright and a blue edge marks it. It also installs a skill that tells Claude Code about <code>y session</code> (see <a href="#remote">Sessions on other computers</a>). Run <code>./build.sh</code> again whenever you pull new changes; it keeps your settings and adds any new ones.</p>
+  <p><code>build.sh</code> builds the program into <code>bin/y</code>, adds a short block to your shell config that puts it on your PATH, and gives WezTerm its look: the pane you type in stays bright and a blue edge marks it. It makes micro your editor, with the Mac's keys working in it as in any text field (see <a href="#editor">Write in the editor</a>). It also installs a skill that tells Claude Code about <code>y session</code> (see <a href="#remote">Sessions on other computers</a>). Run <code>./build.sh</code> again whenever you pull new changes; it keeps your settings and adds any new ones.</p>
 </section>
 
 <section aria-labelledby="s2">
@@ -184,10 +184,10 @@ y</pre>
   <div class="legend">
     <div><span class="chip">A</span><p><strong>File panels.</strong> Your folders. <kbd>tab</kbd> moves to the next panel, <kbd>n</kbd> opens another. A <span class="tag cc">✳</span> marks a file a running session changed.</p></div>
     <div><span class="chip">B</span><p><strong>Preview.</strong> The file under the cursor; while you are in the Sessions box, the selected session's conversation.</p></div>
-    <div><span class="chip">C</span><p><strong>Sessions box.</strong> Every running session, <span class="tag cc">cc</span> for Claude Code and <span class="tag co">co</span> for Codex. <kbd>!</kbd> goes to a session that needs you, and again to the next; with none, to the first. <kbd>esc</kbd> goes back.</p></div>
+    <div><span class="chip">C</span><p><strong>Sessions box.</strong> Every running session, <span class="tag cc">cc</span> for Claude Code and <span class="tag co">co</span> for Codex. <kbd>!</kbd> goes to a session that needs you or replied since you looked, and again to the next; with none, to the first. <kbd>esc</kbd> goes back. Under them, with a cloud, your sessions on other computers.</p></div>
     <div><span class="chip">D</span><p><strong>Details.</strong> The file, your Mac's cpu, memory and disk, and file operations under way. <kbd>M</kbd> focuses it.</p></div>
     <div><span class="chip">E</span><p><strong>Ask box.</strong> Where you write to a session, or start a new one. <kbd>K</kbd> opens it.</p></div>
-    <div><span class="chip">F</span><p><strong>Status line.</strong> The keys you can press now, and how many sessions are working, need you or have unread replies. <kbd>F</kbd> hides the boxes at the foot.</p></div>
+    <div><span class="chip">F</span><p><strong>Status line.</strong> The keys you can press now, how many sessions are working, need you or have unread replies, and the time. <kbd>F</kbd> hides the boxes at the foot.</p></div>
   </div>
 </section>
 
@@ -211,13 +211,17 @@ y</pre>
       <img src="shots/review.webp" width="1368" height="839" alt="" loading="lazy">
       <strong>Review what a session changed</strong><span>Its files and each one's diff.</span>
     </a>
+    <a class="flow-card" href="#editor">
+      <img src="shots/editor-ask.webp" width="1368" height="839" alt="" loading="lazy">
+      <strong>Write in the editor</strong><span>Ask a session about the lines you are on.</span>
+    </a>
     <a class="flow-card" href="#away">
       <img src="shots/away.webp" width="1368" height="839" alt="" loading="lazy">
       <strong>Leave them running</strong><span>Come back when a session needs you.</span>
     </a>
     <a class="flow-card" href="#remote">
-      <img src="shots/remote-use.webp" width="1368" height="839" alt="" loading="lazy">
-      <strong>Sessions on other computers</strong><span>Over ssh, used as one on this Mac.</span>
+      <img src="shots/remote-section.webp" width="1368" height="839" alt="" loading="lazy">
+      <strong>Sessions on other computers</strong><span>Started over ssh, followed from here.</span>
     </a>
   </nav>
 </section>
@@ -238,7 +242,7 @@ y</pre>
       <ol class="steps">
         <li><kbd>s</kbd>, type part of the folder's name, <kbd>enter</kbd>: the first match, the row with the cursor. (<kbd>ctrl+n</kbd> opens it in a new panel instead.)</li>
         <li><kbd>/</kbd> and a few letters filter the folder; <kbd>esc</kbd> clears it.</li>
-        <li><kbd>e</kbd> opens the file in your editor; <kbd>E</kbd> in your second one.</li>
+        <li><kbd>e</kbd> opens the file in the editor, in Marmota's place until you close it (<a href="#editor">more on it below</a>); <kbd>E</kbd> opens it in a new tab.</li>
       </ol>
     </div>
     <div class="case">
@@ -291,7 +295,7 @@ y</pre>
   </div>
   <figure class="shot wide">
     <button type="button" aria-label="Show full size"><img src="shots/agent-working.webp" width="1368" height="839" alt="Marmota on the left with server.go and server_test.go marked as changed; Claude Code on the right, writing tests and running them." loading="lazy"></button>
-    <figcaption>Claude Code adds a health check, on the right. On the left, <span class="tag cc">✳</span> marks the two files it has changed so far (<code>M</code> changed in git, <code>?</code> new), and the status line says <span class="tag cc">✳ 1 working</span>.</figcaption>
+    <figcaption>Claude Code works on the health check, on the right. On the left, <span class="tag cc">✳</span> marks the two files it has changed so far (<code>M</code> changed in git, <code>?</code> new), and the status line says <span class="tag cc">✳ 1 working</span>.</figcaption>
   </figure>
   <div class="cases">
     <div class="case">
@@ -327,6 +331,7 @@ y</pre>
       <ol class="steps">
         <li><kbd>m</kbd> on a file adds it to your draft as a mention.</li>
         <li><kbd>K</kbd> opens the Ask box, which writes to it; type and press <kbd>enter</kbd>. <kbd>↑</kbd> brings back what you said before.</li>
+        <li><kbd>shift+enter</kbd> is a new line; <kbd>ctrl+g</kbd> writes a long question in the editor and brings it back, unsent.</li>
       </ol>
     </div>
     <div class="case">
@@ -346,7 +351,7 @@ y</pre>
     </div>
   </div>
   <figure class="shot wide">
-    <button type="button" aria-label="Show full size"><img src="shots/agent-answer.webp" width="1368" height="839" alt="The preview shows a hidden session's permission question: a shell command, then Do you want to proceed, with the options Yes, Yes and switch to auto mode, and No." loading="lazy"></button>
+    <button type="button" aria-label="Show full size"><img src="shots/agent-answer.webp" width="1368" height="839" alt="The preview shows a hidden session's permission question: a shell command, then Do you want to proceed, with its options, from Yes to No." loading="lazy"></button>
     <figcaption>A session out of sight wants to run a shell command. After <kbd>!</kbd> and <kbd>K</kbd>, your keys go to its question: <kbd>1</kbd> answers Yes.</figcaption>
   </figure>
 </section>
@@ -359,7 +364,7 @@ y</pre>
   </div>
   <figure class="shot wide">
     <button type="button" aria-label="Show full size"><img src="shots/many-hero.webp" width="1368" height="839" alt="The Sessions box with four sessions in different states, the second selected; the preview shows its permission question; Claude Code works beside Marmota." loading="lazy"></button>
-    <figcaption>Four sessions: two replied (<span class="tag co">●</span>), one asks permission (<span style="color: var(--accent)">⚑</span>), one works beside Marmota (<span class="tag cc">✳</span>). The preview shows the selected session's question.</figcaption>
+    <figcaption>Four sessions: one waits for your next prompt (<span style="color: var(--muted)">○</span>), one asks permission (<span style="color: var(--accent)">⚑</span>), one replied since you looked (<span class="tag co">●</span>), one works beside Marmota (<span class="tag cc">✳</span>). The preview shows the selected session's question.</figcaption>
   </figure>
   <div class="cases">
     <div class="case">
@@ -435,22 +440,93 @@ y</pre>
     <p>Before you accept a session's work, read what it did, file by file, without opening each one.</p>
   </div>
   <figure class="shot wide">
-    <button type="button" aria-label="Show full size"><img src="shots/review.webp" width="1368" height="839" alt="A session's three changed files listed in the panel, and the diff of server.go in the preview: 22 lines added, 2 removed." loading="lazy"></button>
+    <button type="button" aria-label="Show full size"><img src="shots/review.webp" width="1368" height="839" alt="A session's three changed files listed in the panel, and the diff of server.go in the preview: 21 lines added, 2 removed." loading="lazy"></button>
     <figcaption><kbd>W</kbd> on the session that added the health check: its three files, and <code>server.go</code> compared with the file as it was before the session first changed it.</figcaption>
   </figure>
   <div class="case">
     <ol class="steps">
       <li><kbd>!</kbd>, select the session, <kbd>W</kbd>: the panel lists the files it changed.</li>
       <li>Move through them; the preview shows each file's diff. <kbd>]</kbd> and <kbd>[</kbd> jump to the next and previous change.</li>
-      <li><kbd>e</kbd> opens the file in your editor to fix something yourself, or write to the session with <kbd>K</kbd>.</li>
+      <li><kbd>e</kbd> opens the file in the editor to fix something yourself, or to ask the session about it from there (<kbd>cmd+L</kbd>); <kbd>K</kbd> writes to the session from here.</li>
       <li><kbd>W</kbd> or <kbd>esc</kbd> goes back to the folder.</li>
     </ol>
   </div>
 </section>
 
-<section class="flow" id="away" aria-labelledby="away-h">
+<section class="flow" id="editor" aria-labelledby="editor-h">
   <div class="flow-intro">
     <span class="eyebrow small">Workflow 5</span>
+    <h2 id="editor-h">Write in the editor, and ask from it</h2>
+    <p><kbd>e</kbd> opens the file in micro, in Marmota's place. It is an editor without modes: you type, and the Mac's keys (<kbd>cmd+S</kbd>, <kbd>cmd+Z</kbd>, <kbd>cmd+←</kbd>, <kbd>shift+option+→</kbd>) do what they do in any text field. A column on its right asks your sessions about what you are writing. <kbd>cmd+H</kbd> lists every key; <kbd>cmd+W</kbd> closes the file, and the last one the editor.</p>
+  </div>
+  <figure class="shot wide">
+    <button type="button" aria-label="Show full size"><img src="shots/editor-ask.webp" width="1368" height="839" alt="micro with predict.go on the left, lines 43 to 46 selected; on the right a column with the question, can an event at exactly midnight show up under two days now, highlighted, the session's reply under its name, and a box at the foot whose status line says Ask Tides daylight saving duplicate events, predict.go L43-46." loading="lazy"></button>
+    <figcaption>Lines 43 to 46 of <code>predict.go</code> are selected. <kbd>cmd+L</kbd> opened the column on the right; the question, highlighted, went to the session with those lines named, and its reply shows under the session's name. The box at the foot waits for the next one.</figcaption>
+  </figure>
+  <div class="cases">
+    <div class="case">
+      <h3>Ask about the lines you are on</h3>
+      <ol class="steps">
+        <li>Select the lines (<kbd>shift</kbd> and the arrows), then <kbd>cmd+L</kbd>: a column opens on the right, with the cursor in the box at its foot.</li>
+        <li>Write the question; <kbd>enter</kbd> sends it (<kbd>shift+enter</kbd> is a new line, <kbd>esc</kbd> goes back to the file and keeps what you wrote). It goes to the session the Ask box wrote to, with the file and the lines named, so the session reads them itself.</li>
+        <li>The cursor is back in the file: go on writing. The reply shows above the box; <kbd>cmd+enter</kbd> puts it at the cursor, or in place of what is selected.</li>
+      </ol>
+    </div>
+    <div class="case">
+      <h3>Have a session change the lines</h3>
+      <ol class="steps">
+        <li>Select them, <kbd>cmd+K</kbd>, say what to change, <kbd>enter</kbd>.</li>
+        <li>The session edits the file itself; the editor shows the change when it is made, and <kbd>cmd+Z</kbd> takes it back.</li>
+      </ol>
+    </div>
+  </div>
+  <figure class="shot wide">
+    <button type="button" aria-label="Show full size"><img src="shots/editor-pick.webp" width="1368" height="839" alt="The column lists the sessions above the box: two rows that start a new session in tidepool, one for Claude Code and one for Codex, then two Claude Code sessions and a Codex session, all idle, the first of them marked; the box's status line says Pick a session, type to filter." loading="lazy"></button>
+    <figcaption><kbd>cmd+shift+L</kbd>: the sessions to ask, above the box. The first two rows start a new one; the mark is on the session questions go to now, and what you type in the box filters the rows.</figcaption>
+  </figure>
+  <div class="cases">
+    <div class="case">
+      <h3>Pick another session, or start one</h3>
+      <ol class="steps">
+        <li><kbd>cmd+shift+L</kbd> lists this Mac's sessions above the box, <span class="tag cc">✳</span> for Claude Code and <span class="tag co">◆</span> for Codex. Type to filter them, <kbd>↑</kbd> <kbd>↓</kbd> to move, <kbd>enter</kbd> to pick.</li>
+        <li>The first two rows start a new session with your question, in Claude Code or in Codex. It is the editor's own: the Sessions box leaves it out, and it closes when the editor does.</li>
+        <li>A session that stops to ask you something says so in place of its reply. <kbd>cmd+O</kbd> opens it in a pane under the editor; answer there, then close that pane.</li>
+      </ol>
+    </div>
+    <div class="case">
+      <h3>Put the editor away, and come back</h3>
+      <ol class="steps">
+        <li><kbd>cmd+M</kbd>: micro stops as it is, with its files, tabs, undo history and replies, and you are back in Marmota. The status line says so: <code>✎ micro · 1 file · b back</code>.</li>
+        <li><kbd>b</kbd> brings it back. A question you asked before goes on being answered meanwhile, and its reply is there when you return.</li>
+        <li><kbd>q</kbd> with the editor put away ends it first when nothing in it is unsaved, and brings it back when something is.</li>
+      </ol>
+    </div>
+  </div>
+  <figure class="shot wide">
+    <button type="button" aria-label="Show full size"><img src="shots/editor-away.webp" width="1368" height="839" alt="Marmota again, on tidepool/internal/tides, with its four sessions in the Sessions box; the status line says micro, 1 file, b back." loading="lazy"></button>
+    <figcaption>After <kbd>cmd+M</kbd> you are back in Marmota, and the status line says an editor is put away with one file: <code>✎ micro · 1 file · b back</code>. <kbd>b</kbd> returns to it as it was.</figcaption>
+  </figure>
+  <div class="cases">
+    <div class="case">
+      <h3>Move through a file</h3>
+      <ol class="steps">
+        <li><kbd>cmd+G</kbd> goes to a place: a line's number and <kbd>enter</kbd>, or one key, <kbd>t</kbd> top, <kbd>b</kbd> bottom, <kbd>p</kbd> the next paragraph, <kbd>m</kbd> the matching bracket. <kbd>cmd+shift+G</kbd> selects up to it.</li>
+        <li><kbd>cmd+P</kbd> opens another file by name; with several open, <kbd>option+,</kbd> and <kbd>option+.</kbd> go to the tab before and after.</li>
+      </ol>
+    </div>
+    <div class="case">
+      <h3>Words, in any language</h3>
+      <ol class="steps">
+        <li><kbd>option+←</kbd> <kbd>→</kbd> move by word and <kbd>option+backspace</kbd> deletes one, here and in every text field of Marmota.</li>
+        <li>A Chinese sentence has no spaces, yet isn't one word: the words are the ones the Mac itself finds, and deleting takes exactly what moving goes over.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section class="flow" id="away" aria-labelledby="away-h">
+  <div class="flow-intro">
+    <span class="eyebrow small">Workflow 6</span>
     <h2 id="away-h">Leave them running</h2>
     <p>Get on with something else, in Marmota or another app. Marmota tells you when a session needs you, and never moves your focus on its own.</p>
   </div>
@@ -471,10 +547,14 @@ y</pre>
 
 <section class="flow" id="remote" aria-labelledby="remote-h">
   <div class="flow-intro">
-    <span class="eyebrow small">Workflow 6</span>
+    <span class="eyebrow small">Workflow 7</span>
     <h2 id="remote-h">Sessions on other computers</h2>
-    <p>Run a session on another machine, a Mac mini in the next room or a server you reach over ssh, and use it from Marmota as you would one on this Mac. It runs in Marmota's tmux over there, so it keeps going when your connection drops; with Remote Control on, the Claude app has it too.</p>
+    <p>Run a session on another machine, a Mac mini in the next room or a server you reach over ssh. It runs in Marmota's tmux over there, so it keeps going when your connection drops, and with Remote Control: the Sessions box lists it under this Mac's sessions, with a cloud, as the Claude app lists it, and you go on with it in the Claude app.</p>
   </div>
+  <figure class="shot wide">
+    <button type="button" aria-label="Show full size"><img src="shots/remote-section.webp" width="1368" height="839" alt="The Sessions box lists two sessions on this Mac with a monitor, then Import the 2027 station list, working, and Nightly tide table check, needs you: permission prompt, each with a cloud; the last is selected, and the preview says it is in the Claude app, where enter opens it." loading="lazy"></button>
+    <figcaption>Rows 3 and 4 run on other computers: a cloud where rows 1 and 2, on this Mac, have a monitor. The selected one waits for a permission; <kbd>enter</kbd> opens it in the Claude app, where its conversation is.</figcaption>
+  </figure>
   <div class="cases">
     <div class="case">
       <h3>Start one there</h3>
@@ -484,39 +564,23 @@ y</pre>
         <li>Marmota remembers the machine from then on and keeps one connection to it. With ssh, you log in once for everything.</li>
       </ol>
     </div>
-  </div>
-  <figure class="shot wide">
-    <button type="button" aria-label="Show full size"><img src="shots/remote-asks.webp" width="1368" height="839" alt="A session on the Mac mini, just started, asks whether to trust the folder ~/code/tidepool; the preview shows the question and its options, and the Sessions box row says K to answer." loading="lazy"></button>
-    <figcaption>A session just started on the Mac mini, in <code>~/code/tidepool</code> over there. Claude Code asks whether to trust the folder before anything else; <kbd>K</kbd> answers it from here.</figcaption>
-  </figure>
-  <div class="cases">
     <div class="case">
-      <h3>Use it as one on this Mac</h3>
+      <h3>Follow it from the Sessions box</h3>
       <ol class="steps">
-        <li>It shows in the Sessions box with a cloud where a session on this Mac has a monitor, named <code>computer · title</code>. <kbd>r</kbd> renames it to something short.</li>
-        <li><kbd>K</kbd> writes to it, answers its questions; the preview shows its conversation; <kbd>enter</kbd> opens it beside Marmota; <kbd>x</kbd> stops it.</li>
-        <li><code>y session list</code>, <code>send</code> and <code>read</code> do the same from a terminal or an agent.</li>
+        <li>Under this Mac's sessions, the box lists your sessions on other computers as claude.ai has them, the latest first, each with a cloud: how it stands, and what it waits for. The list is read again every 15 seconds.</li>
+        <li><kbd>enter</kbd> on one opens it in the Claude app (on claude.ai without the app), where you read it and answer it. The other keys say so.</li>
+        <li>One whose computer is offline shows greyed. When claude.ai can't be reached the last list stays, greyed, with why; <em>login expired: run claude</em> means running <code>claude</code> once renews the login.</li>
       </ol>
     </div>
   </div>
-  <figure class="shot wide">
-    <button type="button" aria-label="Show full size"><img src="shots/remote-use.webp" width="1368" height="839" alt="The Sessions box lists a session on this Mac with a monitor icon and mac-mini · Next command --json flag with a cloud icon; the preview shows that session's conversation, where Claude asks which of two changes was meant." loading="lazy"></button>
-    <figcaption>Row 2 runs on the Mac mini: a cloud where row 1, on this Mac, has a monitor. The preview shows its conversation as for any session: Claude found no <code>next</code> command and asks which change was meant.</figcaption>
-  </figure>
   <div class="cases">
     <div class="case">
-      <h3>When it needs you to log in</h3>
+      <h3>From a terminal, or an agent</h3>
       <ol class="steps">
-        <li>A sign-in expires, or the network drops: its sessions stay in the list as last seen, greyed, saying <em>needs login</em> or <em>can't reach</em>.</li>
-        <li><kbd>enter</kbd> on one opens a pane beside Marmota where ssh (or the company CLI's login) asks what it asks. Once it closes, Marmota reaches the machine again.</li>
+        <li><code>y session list</code> lists every session, here and there, who runs it and what it is doing.</li>
+        <li><code>y session send <var>id</var> "and add a test"</code> writes to one; <code>y session read <var>id</var></code> prints its last turns; <code>y session ask</code> sends and waits for the reply.</li>
       </ol>
     </div>
-  </div>
-  <figure class="shot wide">
-    <button type="button" aria-label="Show full size"><img src="shots/remote-login.webp" width="1956" height="839" alt="The Mac mini's session is selected and says logging in to mac-mini; on the right, a pane beside Marmota asks for the password of alex at mac-mini." loading="lazy"></button>
-    <figcaption>The Mac mini asked for a login again. <kbd>enter</kbd> on its session opened the pane on the right, where ssh asks for the password; the session waits as last seen, saying <em>logging in to mac-mini…</em></figcaption>
-  </figure>
-  <div class="cases">
     <div class="case">
       <h3>Bring in sessions already running there</h3>
       <ol class="steps">
@@ -531,7 +595,7 @@ y</pre>
   <div class="step-head"><span class="step-num">4</span><h2 id="s8">Make it yours</h2></div>
   <ul class="plain">
     <li><code>y path-list</code> prints where your settings live, usually <code>~/.config/marmota</code>.</li>
-    <li><code>config.toml</code>: your editor, theme, preview settings, <code>codex_command</code>, and <code>cd_on_quit</code> (your shell moves to the folder you quit in).</li>
+    <li><code>config.toml</code>: your editor (and <code>editor_beside</code>, which opens it in a pane on Marmota's right instead of in its place), theme, preview settings, <code>codex_command</code>, and <code>cd_on_quit</code> (your shell moves to the folder you quit in).</li>
     <li><code>hotkeys.toml</code>: every key. If you prefer Vim keys, copy <code>src/superfile_config/vimHotkeys.toml</code> over it.</li>
     <li>Themes: set <code>theme</code> to the name of any file in the <code>theme</code> folder.</li>
   </ul>

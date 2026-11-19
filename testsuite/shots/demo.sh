@@ -24,6 +24,7 @@ clean() {
 		rm -rf "$dir"
 	done
 	rm -rf "$DEMO/tidepool" "$DEMO/field-notes" "$H"
+	rm -f "$DEMO/CLAUDE.md"
 	rmdir "$DEMO" 2>/dev/null || true
 }
 
@@ -416,4 +417,26 @@ if command -v zoxide >/dev/null; then
 		_ZO_DATA_DIR=$H/zoxide zoxide add "$d"
 	done
 fi
+
+# The sessions reply in English, whatever your own instructions say.
+printf 'Reply in English, briefly.\n' >"$DEMO/CLAUDE.md"
+
+# micro, which e opens, is Marmota's: its settings, keys and plugin. start.sh
+# gives y a settings folder of its own, and micro looks there too.
+here=$(cd "$(dirname "$0")" && pwd)
+mkdir -p "$H/xdg/config/micro/plug"
+cp "$here/../../scripts/micro/settings.json" "$here/../../scripts/micro/bindings.json" "$H/xdg/config/micro/"
+cp -R "$here/../../scripts/micro/marmota" "$H/xdg/config/micro/plug/marmota"
+
+# The Sessions box's Remote section lists these, in place of what claude.ai
+# has of yours (start.sh names the file to y): two sessions on other
+# computers, one of them asking for a permission. Write [] to the file for a
+# picture without the section; y reads it again every 15 seconds.
+iso() { date -u -v-"$1"M +%Y-%m-%dT%H:%M:%SZ; }
+cat >"$H/remote.json" <<EOF
+[{"ID": "cse_demo01", "Title": "Import the 2027 station list", "Bucket": "working", "Connected": true,
+  "Repo": "example/tidepool", "Branch": "stations-2027", "Updated": "$(iso 2)"},
+ {"ID": "cse_demo02", "Title": "Nightly tide table check", "Bucket": "blocked", "Connected": true,
+  "Repo": "example/tidepool", "Branch": "main", "NeedsAction": "permission prompt", "Updated": "$(iso 9)"}]
+EOF
 echo "made $T and $F; start y there with ./start.sh"
