@@ -78,6 +78,7 @@ func (m *model) Init() tea.Cmd {
 // The real work is in update(). This wrapper exists so that syncIMEHold runs
 // after every message, including the ones update() returns from early.
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	defer noteSlow("update", msg, time.Now())
 	newModel, cmd := m.update(typedText(msg))
 	m.syncIMEHold()
 	return newModel, cmd
@@ -229,7 +230,8 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		refreshCmd = m.scheduleRefreshes(forcePreviewRender)
 	}
 
-	return m, tea.Batch(helpMenuCmd, inputCmd, updateCmd, panelCmd, refreshCmd, heartbeatCmd)
+	return m, tea.Batch(helpMenuCmd, inputCmd, updateCmd, panelCmd, refreshCmd, heartbeatCmd,
+		m.takeDirRefreshes())
 }
 
 // handleOwnMsg handles the messages that update one thing and need no
@@ -238,6 +240,10 @@ func (m *model) handleOwnMsg(msg tea.Msg) (tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case olderTurnsMsg:
 		m.olderTurnsLoaded(msg)
+		return nil, true
+
+	case dirRefreshMsg:
+		m.dirRefreshed(msg)
 		return nil, true
 
 	case conversationReadMsg:
@@ -1074,6 +1080,7 @@ func (m *model) warnModalForQuit() {
 
 // Implement View function for bubble tea model to handle visualization.
 func (m *model) View() string {
+	defer noteSlow("view", nil, time.Now())
 	slog.Debug("model.View() called", "mainPanelHeight", m.mainPanelHeight,
 		"footerHeight", m.footerHeight, "fullHeight", m.fullHeight,
 		"fullWidth", m.fullWidth)
@@ -1126,8 +1133,11 @@ func (m *model) View() string {
 
 	var finalRender string
 
+	// Each part is as wide as the screen already: lines put one under
+	// another (lipgloss.JoinVertical would measure every line of the screen
+	// again, on each drawing).
 	if m.toggleFooter {
-		finalRender = lipgloss.JoinVertical(0, mainPanel, footer)
+		finalRender = mainPanel + "\n" + footer
 	} else {
 		finalRender = mainPanel
 	}
@@ -1135,7 +1145,7 @@ func (m *model) View() string {
 	// Add status line at the bottom if enabled
 	if common.Config.ShowStatusLine && m.statusLineModel.IsEnabled() {
 		statusLine := m.statusLineRender()
-		finalRender = lipgloss.JoinVertical(0, finalRender, statusLine)
+		finalRender += "\n" + statusLine
 	}
 
 	finalRender = m.updateRenderForOverlay(finalRender)
@@ -1231,6 +1241,13 @@ func (m *model) getFilePanelItems() {
 		filePanel := &m.fileModel.filePanels[i]
 		nowTime := time.Now()
 		if !m.shouldSkipPanelUpdate(filePanel, focusPanel, nowTime) {
+			if refreshesInBackground && filePanel.elementCacheValid && filePanel.plainListing() &&
+				!filePanel.needsReRender() {
+				// only time says to look again: read off the screen's loop
+				m.refreshDirInBackground(i, nowTime)
+				filePanel.scrollToCursor(m.mainPanelHeight)
+				continue
+			}
 			// Throttle expired — invalidate cache to pick up external filesystem changes.
 			filePanel.invalidateElementCache()
 			// Load elements for this panel (with/without search filter)

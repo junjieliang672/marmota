@@ -89,9 +89,20 @@ func (m *model) refreshJump() {
 		return
 	}
 	m.jumpUI.SetSections(m.jumpSections())
-	if s, ok := m.jumpPreviewSession(); ok {
+	// what the session on show wrote since; another is read by
+	// jumpConversationCmd, in the background
+	if s, ok := m.jumpPreviewSession(); ok && m.jump.convo.id == s.ID && !m.jump.convo.reading {
 		m.jump.convo = readConversation(m.jump.convo, s)
 	}
+}
+
+// jumpConversationCmd brings the preview's conversation to the session the
+// list is on, reading it in the background when it is another.
+func (m *model) jumpConversationCmd() tea.Cmd {
+	if s, ok := m.jumpPreviewSession(); ok {
+		return m.loadConversation(jumpSlot, s)
+	}
+	return nil
 }
 
 // jumpTarget is what the preview shows while the list is open: the item
@@ -150,7 +161,7 @@ func (m *model) jumpPreviewPath() (string, bool) {
 }
 
 // jumpPreviewCmd keeps the preview on what the list is on, after a key or
-// an answer moved it: a session's conversation is read at once, a file or
+// an answer moved it: a session's conversation is read in the background, a file or
 // folder is drawn after the debounce the cursor's moves have. Closed, the
 // list gives the preview back to the panel's cursor.
 func (m *model) jumpPreviewCmd() tea.Cmd {
@@ -160,9 +171,8 @@ func (m *model) jumpPreviewCmd() tea.Cmd {
 	if !m.jumpUI.IsOpen() {
 		return m.requestFilePreviewRender(false)
 	}
-	if s, ok := m.jumpPreviewSession(); ok {
-		m.jump.convo = readConversation(m.jump.convo, s)
-		return nil
+	if _, ok := m.jumpPreviewSession(); ok {
+		return m.jumpConversationCmd()
 	}
 	return schedulePreviewRefresh(m)
 }

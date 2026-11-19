@@ -47,6 +47,7 @@ func cleanupTestDir() {
 
 func TestMain(m *testing.M) {
 	conversationsInBackground = false // read at once, for tests that look at it then
+	refreshesInBackground = false
 	err := common.PopulateGlobalConfigs()
 	if err != nil {
 		fmt.Printf("error while populating config, err : %v", err)

@@ -260,8 +260,27 @@ var conversationsInBackground = true //nolint:gochecknoglobals // test seam
 const conversationsKept = 8
 
 // conversationReadMsg is a session's conversation, read and laid out in
-// the background.
-type conversationReadMsg struct{ convo sessionsConversation }
+// the background, for the preview of the Sessions box or of the s list.
+type conversationReadMsg struct {
+	convo sessionsConversation
+	slot  convoSlot
+}
+
+// convoSlot is which preview a conversation is read for: the Sessions
+// box's, or the s list's.
+type convoSlot int
+
+const (
+	sessionsSlot convoSlot = iota
+	jumpSlot
+)
+
+func (m *model) convoIn(slot convoSlot) *sessionsConversation {
+	if slot == jumpSlot {
+		return &m.jump.convo
+	}
+	return &m.sessions.convo
+}
 
 // loadSessionsConversation reads the selected session's conversation when
 // its transcript changed since it was last read: what was written since, at
@@ -275,24 +294,37 @@ func (m *model) loadSessionsConversation() tea.Cmd {
 		m.sessions.convo = sessionsConversation{id: m.sessions.list.SelectedID(), branch: gitBranch(s.Cwd)}
 		return nil
 	}
-	c := m.sessions.convo
+	return m.loadConversation(sessionsSlot, s)
+}
+
+// loadConversation brings a preview's conversation to session s: what was
+// written since, at once, when it is on s already; else what is kept of s,
+// or what the other preview has read of it; else it is read in the
+// background, its turns laid out there too, and the preview shows the rest
+// of the session meanwhile.
+func (m *model) loadConversation(slot convoSlot, s claudesession.Session) tea.Cmd {
+	cur := m.convoIn(slot)
+	c := *cur
 	if c.id != s.ID || c.path != s.TranscriptPath {
 		m.keepConversation(c)
 		c = m.sessions.kept[s.ID]
 		delete(m.sessions.kept, s.ID)
+		if other := *m.convoIn(1 - slot); c.id != s.ID && other.id == s.ID && !other.reading && !other.loading {
+			c = other
+		}
 		if c.id != s.ID || c.path != s.TranscriptPath {
 			if s.TranscriptPath != "" && conversationsInBackground {
-				m.sessions.convo = sessionsConversation{id: s.ID, path: s.TranscriptPath, reading: true}
-				return m.readConversationCmd(s)
+				*cur = sessionsConversation{id: s.ID, path: s.TranscriptPath, reading: true}
+				return m.readConversationCmd(s, slot)
 			}
 			c = sessionsConversation{}
 		}
 	}
 	if c.reading {
-		m.sessions.convo = c
+		*cur = c
 		return nil
 	}
-	m.sessions.convo = readConversation(c, s)
+	*cur = readConversation(c, s)
 	return nil
 }
 
@@ -313,13 +345,13 @@ func (m *model) keepConversation(c sessionsConversation) {
 
 // readConversationCmd reads s's conversation, and lays out its turns as the
 // preview will draw them, off the screen's loop.
-func (m *model) readConversationCmd(s claudesession.Session) tea.Cmd {
-	view, width := m.sessionsPaneView(), m.fileModel.filePreview.GetWidth()
+func (m *model) readConversationCmd(s claudesession.Session, slot convoSlot) tea.Cmd {
+	view, width := m.sessionPaneViewOf(s, sessionsConversation{id: s.ID}), m.fileModel.filePreview.GetWidth()
 	return func() tea.Msg {
 		c := readConversation(sessionsConversation{}, s)
-		view.Turns, view.Dir = c.turns, s.Cwd
+		view.Turns = c.turns
 		askui.PrepareTurns(view, width)
-		return conversationReadMsg{convo: c}
+		return conversationReadMsg{convo: c, slot: slot}
 	}
 }
 
@@ -327,11 +359,14 @@ func (m *model) readConversationCmd(s claudesession.Session) tea.Cmd {
 // preview, if it is still on that session, and reads on to what was written
 // meanwhile.
 func (m *model) conversationRead(msg conversationReadMsg) tea.Cmd {
-	c := m.sessions.convo
-	if !c.reading || c.id != msg.convo.id || c.path != msg.convo.path {
+	cur := m.convoIn(msg.slot)
+	if !cur.reading || cur.id != msg.convo.id || cur.path != msg.convo.path {
 		return nil
 	}
-	m.sessions.convo = msg.convo
+	*cur = msg.convo
+	if msg.slot == jumpSlot {
+		return m.jumpConversationCmd()
+	}
 	return m.loadSessionsConversation()
 }
 

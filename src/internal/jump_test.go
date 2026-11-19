@@ -441,3 +441,27 @@ func TestEnterOnASessionPicksItInTheSessionsBoxAndLeavesThePaneBesideAlone(t *te
 		assert.NotContains(t, cmd, "activate-pane", "the keyboard stays in Marmota")
 	}
 }
+
+// A session the list is on is read in the background: typing to it costs
+// the screen nothing, and the preview shows its conversation once read.
+func TestTheListReadsASessionsConversationInTheBackground(t *testing.T) {
+	conversationsInBackground = true
+	defer func() { conversationsInBackground = false }()
+	f := jumpTestModel(t)
+	m := f.m
+	m.fileModel.filePreview.SetOpen(true)
+	m.setFilePreviewPanelSize()
+	m.claude.snapshot.Past[0].TranscriptPath = longTranscript(t)
+	pressKey(m, common.Hotkeys.GoTo[0])
+	typeInto(m, "deck") // its command, which reads it, is left: the key's
+	s, ok := m.jumpPreviewSession()
+	require.True(t, ok)
+	assert.True(t, m.jump.convo.reading, "typing reads nothing on the screen's loop")
+	assert.Nil(t, m.jumpPreviewCmd(), "being read already")
+	cmd := m.readConversationCmd(s, jumpSlot)
+	assert.NotContains(t, viewText(m), "answer 29")
+
+	runCmds(m, cmd)
+	assert.False(t, m.jump.convo.reading)
+	assert.Contains(t, viewText(m), "answer 29")
+}

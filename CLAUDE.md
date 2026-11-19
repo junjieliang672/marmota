@@ -128,6 +128,11 @@ Key message types: `PasteOperationMsg`, `DeleteOperationMsg`, `FilePreviewUpdate
 - `python3 testsuite/live/micro_plugin_test.py --binary ./bin/y` runs the real micro with `scripts/micro` (settings, keys, the `marmota` plugin) in a tmux server of its own, against fake `claude` sessions reached through the real `y session`: the Mac keys as the bytes WezTerm sends for them, the column sessions are asked in (its box, the list of sessions and its filter, starting a session, cmd+K, a click or enter on a question going back to its lines, the column put away and in another tab), cmd+G and cmd+shift+G, the wheel during a drag as the mouse reports a terminal sends, cmd+H and cmd+W, the keys of micro's own that the page of keys names, and, with the real Marmota opening micro, the editor put away with cmd+M, brought back with `b`, and ended or brought back by `q`. It needs tmux, micro and fzf, and no WezTerm.
 - The tutorial's screenshots (`docs/shots`) are real sessions on demo projects; `testsuite/shots/README.md` says how to retake them without your own sessions or machine showing. The Sessions box's Remote section shows the demo's own sessions there: `MARMOTA_APP_SESSIONS_FILE` names a JSON file of them that is read in place of asking claude.ai (`appSessionsFromFile`).
 
+## Finding what slows the screen
+
+- `MARMOTA_SLOW_LOG=<file>` writes each update and each drawing of the screen that took over 8 ms (`MARMOTA_SLOW_MS=0`: all of them), with the message's type (`src/internal/slow_log.go`); `MARMOTA_CPU_PROFILE=<file>` writes the run's CPU profile, for `go tool pprof bin/y <file>`. Run a second Marmota for this in a tmux of its own, with `XDG_STATE_HOME` set to a copy of the state folder.
+- What is known: a drawing of the whole screen at 220×56 is about 4 ms. Nothing that reads files may run on the screen's loop on each message: a folder's listing is read again once a second in the background (`src/internal/dir_refresh.go`), a session's conversation when a preview goes to it (`readConversationCmd`), older turns as the preview scrolls up to them (`loadOlderTurns`).
+
 ## Platform-Specific Notes
 
 - macOS: Uses Finder via osascript for trashing protected files

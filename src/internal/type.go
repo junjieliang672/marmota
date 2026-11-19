@@ -4,6 +4,7 @@ import (
 	"os"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	zoxidelib "github.com/lazysegtree/go-zoxide"
 
 	"github.com/junjieliang672/marmota/src/internal/search"
@@ -73,6 +74,9 @@ const (
 // issues like race conditions and whatnot, which are hidden since we are creating
 // new model in each tea update.
 type model struct {
+	// dirRefreshes is the folder reads refreshDirInBackground started, for
+	// Update to hand to Bubble Tea.
+	dirRefreshes []tea.Cmd
 	// Main Panels
 	fileModel       fileModel
 	sidebarModel    sidebar.Model
@@ -278,6 +282,8 @@ type filePanel struct {
 	cachedSortSelected int
 	cachedSortReversed bool
 	elementCacheValid  bool
+	// refreshing: the folder is being read again, in the background
+	refreshing bool
 
 	// iCloud status
 	isICloudFolder bool // whether current folder is in iCloud

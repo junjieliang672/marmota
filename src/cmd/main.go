@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"runtime/pprof"
 
 	"github.com/junjieliang672/marmota/src/internal/common"
 	"github.com/junjieliang672/marmota/src/internal/utils"
@@ -163,6 +164,15 @@ func spfAppAction(_ context.Context, c *cli.Command) error {
 	// in hotkey mode in a background tab cannot force ASCII input elsewhere.
 	p := tea.NewProgram(internal.InitialModel(firstPanelPaths, firstUse),
 		tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithReportFocus())
+	// MARMOTA_CPU_PROFILE names a file the CPU profile of this run is
+	// written to, for finding what slows the screen (go tool pprof).
+	if path := os.Getenv("MARMOTA_CPU_PROFILE"); path != "" {
+		if f, err := os.Create(path); err == nil {
+			if pprof.StartCPUProfile(f) == nil {
+				defer pprof.StopCPUProfile()
+			}
+		}
+	}
 	if _, err := p.Run(); err != nil {
 		utils.PrintfAndExitf("Alas, there's been an error: %v", err)
 	}
