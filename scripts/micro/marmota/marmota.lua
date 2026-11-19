@@ -754,6 +754,177 @@ function keys(bp)
     return true
 end
 
+-- The place a question was about. Each question keeps it: the file, the
+-- first and last line asked about (counted from 1) and what those lines
+-- said; with nothing selected, the cursor's line alone, whole set. cmd+K's
+-- also keeps the whole file as it was, and once the session has changed it,
+-- the lines its change spans now. The replies say where those lines are
+-- now, and enter on a question there selects them in the file again.
+
+-- linesOf is text as its lines, without the line ends.
+local function linesOf(text)
+    local out = {}
+    for line in (text .. "\n"):gmatch("(.-)\r?\n") do
+        table.insert(out, line)
+    end
+    return out
+end
+
+-- placeOf is what the pane's question is about, as a question keeps it:
+-- the selected lines (a selection that ends at the start of a line ends on
+-- the line before), else the cursor's line. nil for a buffer that is no
+-- file.
+local function placeOf(bp)
+    if bp.Buf.Path == "" or bp.Buf.AbsPath == "" then
+        return nil
+    end
+    local place = { path = bp.Buf.AbsPath }
+    local from, to = selection(bp.Cursor)
+    if from == nil then
+        place.first, place.last, place.whole = bp.Cursor.Y + 1, bp.Cursor.Y + 1, true
+        return place
+    end
+    local last = to.Y
+    if to.X == 0 and to.Y > from.Y then
+        last = to.Y - 1 -- the selection ends before this line's first character
+    end
+    place.first, place.last, place.lines = from.Y + 1, last + 1, {}
+    for y = from.Y, last do
+        table.insert(place.lines, bp.Buf:Line(y))
+    end
+    return place
+end
+
+-- bufferOf is the buffer of a pane that has the file open, when one does.
+local function bufferOf(path)
+    local tabs = micro.Tabs().List
+    for i = 1, #tabs do
+        local panes = tabs[i].Panes
+        for j = 1, #panes do
+            local buf = panes[j].Buf
+            if buf ~= nil and buf.AbsPath == path then
+                return buf
+            end
+        end
+    end
+    return nil
+end
+
+-- fileLines is the file as it is now, as lines: what a pane shows of it,
+-- what isn't saved too, else what is on disk. nil when it can't be read.
+local function fileLines(path, fromDisk)
+    local buf = not fromDisk and bufferOf(path) or nil
+    if buf ~= nil then
+        return linesOf(util.String(buf:Bytes()))
+    end
+    local f = io.open(path, "r")
+    if f == nil then
+        return nil
+    end
+    local text = f:read("*a") or ""
+    f:close()
+    return linesOf(text)
+end
+
+-- whereNow finds the lines a question kept in the file now: "same" at the
+-- line they were on; "moved" and the first line they are on now, the
+-- nearest to where they were when they are there more than once; else
+-- "changed".
+local function whereNow(place, lines)
+    local kept = place.lines
+    local function at(first)
+        for k = 1, #kept do
+            if lines[first + k - 1] ~= kept[k] then
+                return false
+            end
+        end
+        return true
+    end
+    if at(place.first) then
+        return "same", place.first
+    end
+    local best = nil
+    for first = 1, #lines - #kept + 1 do
+        if at(first) and (best == nil or math.abs(first - place.first) < math.abs(best - place.first)) then
+            best = first
+        end
+    end
+    if best ~= nil then
+        return "moved", best
+    end
+    return "changed", place.first
+end
+
+-- changedSpan is the lines a change spans in after, by comparing before and
+-- after from the start and from the end: from the first line that differs
+-- to the last. last is before first when lines were only taken out; nil
+-- when nothing changed. A change of yours elsewhere meanwhile widens it.
+local function changedSpan(before, after)
+    local first = 1
+    while first <= #before and first <= #after and before[first] == after[first] do
+        first = first + 1
+    end
+    if first > #before and first > #after then
+        return nil
+    end
+    local same = 0
+    while same < #before - first + 1 and same < #after - first + 1
+        and before[#before - same] == after[#after - same] do
+        same = same + 1
+    end
+    return first, #after - same
+end
+
+-- span writes lines first to last: "L3", or "L3-4".
+local function span(first, last)
+    if last > first then
+        return "L" .. first .. "-" .. last
+    end
+    return "L" .. first
+end
+
+-- placeNow says where a question's lines are now, and which to select:
+-- its place in the replies ("plan.md L3-4 · now at L5-6"), the first and
+-- last line to select (nil when the whole file was asked about: the
+-- cursor's line is gone back to), and whether those lines changed since.
+-- cache keeps each file's lines for one drawing of the replies.
+local function placeNow(a, cache)
+    local place = a.place
+    local name = filepath.Base(place.path)
+    local text = (a.edits ~= nil and "edit " or "") .. name
+    if not place.whole then
+        text = text .. " " .. span(place.first, place.last)
+    end
+    if a.changed ~= nil then
+        local first, last = a.changed[1], a.changed[2]
+        if last < first then
+            return text .. " · lines removed at L" .. first, first, first, false
+        end
+        return text .. " · changed " .. span(first, last), first, last, false
+    end
+    if a.done and a.edits ~= nil then
+        return text .. " · no change", nil, nil, false
+    end
+    if place.whole then
+        return text, nil, nil, false
+    end
+    if cache[place.path] == nil then
+        cache[place.path] = fileLines(place.path) or false
+    end
+    local lines = cache[place.path]
+    if not lines then
+        return text, place.first, place.last, false
+    end
+    local state, first = whereNow(place, lines)
+    local last = first + #place.lines - 1
+    if state == "moved" then
+        return text .. " · now at " .. span(first, last), first, last, false
+    elseif state == "changed" then
+        return text .. " · lines changed since", first, last, true
+    end
+    return text, first, last, false
+end
+
 -- Each question is a line that says whom you asked, then the question,
 -- highlighted; the reply starts under the session's name; a line parts one
 -- question from the next. syntax/marmota-replies.yaml colors them by how
@@ -761,28 +932,44 @@ end
 -- space.
 local highlighted = "\194\160"
 
+-- shownFor is which question each line of the replies is part of, by the
+-- line's number from 0, as repliesText last wrote them.
+local shownFor = {}
+
 local function repliesText()
-    local out = {}
+    local out, count, cache = {}, 0, {}
+    shownFor = {}
+    local function add(text, index)
+        table.insert(out, text)
+        for _ in (text .. "\n"):gmatch("\n") do
+            shownFor[count] = index
+            count = count + 1
+        end
+    end
     for i, a in ipairs(asked) do
         if i > 1 then
-            table.insert(out, string.rep("─", 36))
-            table.insert(out, "")
+            add(string.rep("─", 36), i)
+            add("", i)
         end
-        table.insert(out, "You → " .. a.title)
+        local header = "You → " .. a.title
+        if a.place ~= nil then
+            header = header .. " · " .. placeNow(a, cache)
+        end
+        add(header, i)
         for line in (a.question .. "\n"):gmatch("(.-)\n") do
-            table.insert(out, highlighted .. line .. " ")
+            add(highlighted .. line .. " ", i)
         end
-        table.insert(out, "")
+        add("", i)
         if a.reply ~= nil then
-            table.insert(out, "⏺ " .. a.title)
-            table.insert(out, a.reply)
+            add("⏺ " .. a.title, i)
+            add(a.reply, i)
         elseif a.needsYou ~= nil then
-            table.insert(out, "⚠ " .. a.needsYou)
-            table.insert(out, "✳ cmd+O opens it under the editor: answer it there, then close that pane")
+            add("⚠ " .. a.needsYou, i)
+            add("✳ cmd+O opens it under the editor: answer it there, then close that pane", i)
         else
-            table.insert(out, a.starting and "✳ starting a session…" or "✳ asking…")
+            add(a.starting and "✳ starting a session…" or "✳ asking…", i)
         end
-        table.insert(out, "")
+        add("", i)
     end
     return table.concat(out, "\n")
 end
@@ -913,18 +1100,32 @@ local function render()
         return
     end
     local picking = side.mode == "pick"
-    show.Buf.Type.Readonly = false
-    show.Buf:Replace(show.Buf:Start(), show.Buf:End(), picking and sessionsText() or repliesText())
-    show.Buf.Type.Readonly = true
-    show.Buf:SetOptionNative("softwrap", not picking) -- a session's row is one line, cut at the edge
-    if picking then
-        show.Cursor:GotoLoc(buffer.Loc(0, side.sel + 1)) -- the marked row, under the two lines above the rows
-    else
-        show.Cursor:GotoLoc(show.Buf:End())
+    local text = picking and sessionsText() or repliesText()
+    -- the keyboard in the replies: the cursor stays on the question it is on
+    local cur = micro.CurPane()
+    local reading = not picking and cur ~= nil and cur.Buf ~= nil and cur.Buf:GetName() == repliesName
+    if text ~= written(show) then
+        local y = show.Cursor.Y
+        show.Buf.Type.Readonly = false
+        show.Buf:Replace(show.Buf:Start(), show.Buf:End(), text)
+        show.Buf.Type.Readonly = true
+        show.Buf:SetOptionNative("softwrap", not picking) -- a session's row is one line, cut at the edge
+        if picking then
+            show.Cursor:GotoLoc(buffer.Loc(0, side.sel + 1)) -- the marked row, under the two lines above the rows
+        elseif reading then
+            show.Cursor:GotoLoc(buffer.Loc(0, math.min(y, show.Buf:LinesNum() - 1)))
+        else
+            show.Cursor:GotoLoc(show.Buf:End())
+        end
+        show:Relocate()
     end
-    show:Relocate()
-    show.Buf:SetOptionNative("statusformatl",
-        picking and "↑↓ · enter picks · esc cancels" or "enter sends · shift+enter a new line · esc back")
+    local keys = "enter sends · shift+enter a new line · esc back"
+    if picking then
+        keys = "↑↓ · enter picks · esc cancels"
+    elseif reading then
+        keys = "enter selects the question's lines in the file · esc back"
+    end
+    show.Buf:SetOptionNative("statusformatl", keys)
     local box = paneNamed(boxName)
     if box ~= nil then
         box.Buf:SetOptionNative("statusformatl", label())
@@ -1135,6 +1336,13 @@ onReply = function(output, args)
         entry.done = true
         if entry.edits ~= nil then
             reload(entry.edits)
+            local now = fileLines(entry.edits, true)
+            if now ~= nil and entry.before ~= nil then
+                local first, last = changedSpan(entry.before, now)
+                if first ~= nil then
+                    entry.changed = { first, last }
+                end
+            end
             micro.InfoBar():Message(entry.title .. " changed " .. filepath.Base(entry.edits) .. ": cmd+Z takes it back")
         else
             micro.InfoBar():Message(entry.title .. " replied: cmd+enter puts it at the cursor")
@@ -1183,8 +1391,12 @@ local function send(bp, question, edit)
     end
     local entry = { title = session.title, question = question, message = message, session = session.id,
         agent = session.agent }
+    if file then
+        entry.place = placeOf(bp)
+    end
     if edit and file then
         entry.edits = bp.Buf.AbsPath
+        entry.before = linesOf(util.String(bp.Buf:Bytes()))
     end
     table.insert(asked, entry)
     if session.id == newSession then
@@ -1347,9 +1559,91 @@ end
 -- The box's keys. micro asks a plugin before it does what a key is bound
 -- to, by the action's name, and leaves it when the plugin says false.
 
--- enter in the box sends, or picks.
+-- paneWith is the pane that has the file open: the one questions came from
+-- when it still has it, else the first, and the tab it is in, both counted
+-- from 0.
+local function paneWith(path)
+    local first = nil
+    local tabs = micro.Tabs().List
+    for i = 1, #tabs do
+        local panes = tabs[i].Panes
+        for j = 1, #panes do
+            local buf = panes[j].Buf
+            if buf ~= nil and buf.AbsPath == path then
+                local found = { panes[j], i - 1, j - 1 }
+                if side.file ~= nil and panes[j]:ID() == side.file:ID() then
+                    return found[1], found[2], found[3]
+                end
+                first = first or found
+            end
+        end
+    end
+    if first == nil then
+        return nil
+    end
+    return first[1], first[2], first[3]
+end
+
+-- backTo is enter on a question in the replies: the keyboard goes back to
+-- its file, with the lines it was about selected where they are now; those
+-- the session changed, once it has, for cmd+K's. Lines changed since are
+-- selected where they were, and the status line says so. A file no pane
+-- has open any more opens in a new tab.
+local function backTo(replies)
+    local a = asked[shownFor[replies.Cursor.Y]]
+    if a == nil or a.place == nil then
+        micro.InfoBar():Message("This question wasn't about a file")
+        return
+    end
+    local place = a.place
+    local _, first, last, changed = placeNow(a, {})
+    local pane, tab, index = paneWith(place.path)
+    if pane == nil then
+        -- named from this editor's folder when it is in it, as the tab shows it
+        local name, dir = place.path, folder()
+        if dir ~= "" and strings.HasPrefix(name, dir .. "/") then
+            name = name:sub(#dir + 2)
+        end
+        local quoted = "'" .. name:gsub("'", "'\\''") .. "'"
+        replies:HandleCommand("tab " .. quoted)
+        pane = micro.CurPane()
+        if pane == nil or pane.Buf.AbsPath ~= place.path then
+            micro.InfoBar():Error("Couldn't open " .. place.path)
+            return
+        end
+    else
+        micro.Tabs():SetActive(tab)
+        micro.Tabs().List[tab + 1]:SetActive(index)
+    end
+    local buf = pane.Buf
+    local lastLine = buf:LinesNum()
+    if first == nil then
+        -- the whole file was asked about: back to the cursor's line then
+        pane.Cursor:ResetSelection()
+        pane.Cursor:GotoLoc(buffer.Loc(0, math.min(place.first, lastLine) - 1))
+        show(pane)
+        return
+    end
+    first, last = math.min(first, lastLine), math.min(last, lastLine)
+    select(pane, buffer.Loc(0, first - 1), lineEnd(buf, last - 1), true)
+    show(pane)
+    if changed then
+        micro.InfoBar():Message(filepath.Base(place.path) .. " " .. span(first, last)
+            .. ": these lines changed since you asked")
+    end
+end
+
+-- enter in the box sends, or picks. In the replies, it goes back to what
+-- the question there was about.
 function preInsertNewline(bp)
-    if bp.Buf:GetName() ~= boxName then
+    local name = bp.Buf:GetName()
+    if name == repliesName then
+        if side.mode ~= "pick" then
+            backTo(bp)
+        end
+        return false
+    end
+    if name ~= boxName then
         return true
     end
     submit(bp)
@@ -1421,9 +1715,14 @@ function preQuit(bp)
 end
 
 -- What is typed in the box filters the sessions while one is picked. micro
--- says when anything happened, not what: the box is read again.
+-- says when anything happened, not what: the box is read again. Otherwise
+-- the replies are drawn again, for where the lines asked about are now
+-- (render changes nothing when that is as it was).
 function onAnyEvent()
     if side.mode ~= "pick" then
+        if #asked > 0 then
+            render()
+        end
         return
     end
     local box = paneNamed(boxName)

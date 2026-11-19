@@ -35,7 +35,11 @@ block in ~/.wezterm.lua). Checks:
      cmd+L from the box goes back to the file; cmd+W in the box puts the
      column away; in another tab the column comes along with what was
      asked.
-  8. The real Marmota opens micro with e; cmd+M puts micro away, as it is,
+  8. A question names its file and lines: enter on it in the replies
+     selects them in the file again, where they moved to when lines went in
+     above; changed since, it says so. cmd+K's names the lines its change
+     spans, and enter selects those; with the file closed, it opens again.
+  9. The real Marmota opens micro with e; cmd+M puts micro away, as it is,
      and Marmota says so; e opens another micro, which says it can't be put
      away too; b brings the first back with what was typed; q brings it
      back while something isn't saved, and ends it and quits once it is.
@@ -75,7 +79,7 @@ KEY = {
     "cmd+h": b"\x1bOP", "cmd+w": b"\x11", "cmd+/": b"\x1b/", "opt+n": b"\x1bn", "opt+]": b"\x1b]",
     "opt+m": b"\x1bm", "opt+x": b"\x1bx", "cmd+o": b"\x1bOQ", "cmd+m": b"\x1bOR",
     "shift+enter": b"\n", "backspace": b"\x7f", "up": b"\x1b[A", "opt+,": b"\x1b,",
-    "opt+left": b"\x1bb", "opt+delete": b"\x1b[3;3~",
+    "opt+left": b"\x1bb", "opt+delete": b"\x1b[3;3~", "opt+w": b"\x1bw",
 }
 PLAN = "# Plan\n\nline three\nline four\nline five\n\nlast para one\nlast para two\n"
 BRACKETS = "# Plan\n\nline three\nsay (a [b] c) d\n\nlast para one\nlast para two\n"
@@ -593,7 +597,102 @@ def main() -> int:
         print("ok   cmd+J put the column away and showed it again with what the box held; cmd+L from the box "
               "went back to the file; cmd+W in the box put the column away; in another tab it came along")
 
-        # 8. The editor put away. A micro that Marmota's e didn't open, as
+        # 8. Each question says where its lines are now, and enter on it in
+        # the replies selects them in the file again.
+        m.quit()
+        m = editor(first, "first", "here")
+        m.press("down", "down", "shift+down", "shift+down", "cmd+l")
+        wait_for("the box", lambda: m.in_box())
+        m.type("where are these")
+        m.press("enter")
+        wait_for("the reply", lambda: "Echo: where are these" in m.right())
+        assert "You → first · plan.md L3-4" in m.right(), "the question names its file and lines: " + m.right()
+
+        def back() -> None:
+            """The keyboard to the replies, enter, and it back in the file."""
+            m.press("opt+w")
+            wait_for("the replies to have the keyboard", lambda: "enter selects" in m.right())
+            m.press("enter")
+            wait_for("the keyboard back in the file", lambda: "enter sends" in m.right())
+
+        def shown() -> list[str]:
+            """The file's lines on the screen, without the line numbers and the marks of changed lines
+            left of them."""
+            out = []
+            for line in m.screen().splitlines()[:-2]:
+                line = line.split("|")[0]
+                out.append(re.sub(r"^\S?\s*\d+(?: |$)", "", line).rstrip())
+            return out
+
+        def selected(rows: slice, lines: list[str], before: list[str]) -> None:
+            """What is selected is those rows: typing replaces them, and cmd+Z takes it back."""
+            time.sleep(0.6)  # micro undoes what was done within half a second as one step
+            m.type("X")
+            wait_for("X in place of the selected lines", lambda: shown()[rows] == lines)
+            for _ in range(3):
+                time.sleep(0.4)
+                if shown()[:len(before)] == before:
+                    break
+                m.press("cmd+z")
+            wait_for("the lines back", lambda: shown()[:len(before)] == before)
+
+        m.press("cmd+g")
+        m.type("t")
+        back()
+        selected(slice(2, 4), ["X", "line five"], ["# Plan", "", "line three", "line four", "line five"])
+        m.press("cmd+g")
+        m.type("t")
+        m.type("new one")
+        m.press("enter")
+        m.type("new two")
+        m.press("enter")
+        wait_for("the lines moved down two", lambda: "plan.md L3-4 · now at L5-6" in m.right())
+        moved = ["new one", "new two", "# Plan", "", "line three", "line four", "line five"]
+        back()
+        selected(slice(4, 6), ["X", "line five"], moved)
+        m.press("cmd+g")
+        m.type("5")
+        m.press("enter")
+        m.type("Z")
+        wait_for("the lines changed", lambda: "plan.md L3-4 · lines changed since" in m.right())
+        whom, since = m.drawn("You → first", "You"), m.drawn("lines changed since", "·")
+        assert whom and since and whom != since, f"lines changed since stand out: {whom!r} and {since!r}"
+        back()
+        wait_for("it to say they changed", lambda: "these lines changed since you asked" in m.screen())
+        m.press("esc")
+
+        # cmd+K: the lines the session's change spans
+        m.quit()
+        m = editor(first, "first", "here")
+        m.press("down", "down", "shift+down", "shift+down", "cmd+k")
+        wait_for("the box, for a change", lambda: "first changes plan.md L3-4" in m.foot() and m.in_box())
+        m.type("in capitals and add a line")
+        m.press("enter")
+        changed = ["# Plan", "", "LINE THREE", "LINE FOUR", "ADDED", "line five"]
+        wait_for("the change in the editor", lambda: shown()[:6] == changed)
+        wait_for("the lines it spans", lambda: "You → first · edit plan.md L3-4 · changed L3-5" in m.right())
+        m.press("cmd+g")
+        m.type("t")
+        back()
+        selected(slice(2, 4), ["X", "line five"], changed)
+        # the file closed: enter opens it again, in a tab of its own
+        m.press("cmd+w")
+        if "Save changes" in m.screen():
+            m.type("n")
+        wait_for("the file's pane closed", lambda: "LINE THREE" not in m.screen())
+        # the column is all the tab holds now, without the line between panes
+        if "enter selects" not in m.screen():
+            m.press("opt+w")
+        wait_for("the replies to have the keyboard", lambda: "enter selects" in m.screen())
+        m.press("enter")
+        wait_for("the file in a new tab", lambda: "[plan.md]" in m.screen().splitlines()[0]
+                 and shown()[1:7] == changed)
+        selected(slice(3, 5), ["X", "line five"], [m.screen().splitlines()[0].rstrip(), *changed])
+        print("ok   each question named its file and lines; enter on it in the replies selected them in the file, "
+              "where they had moved to, and said when they had changed since; cmd+K's named the lines its change "
+              "spans, and enter selected those")
+
+        # 9. The editor put away. A micro that Marmota's e didn't open, as
         # this one, has nothing to go back to and says so.
         m.press("cmd+m")
         wait_for("micro to say it stays", lambda: "Nothing to go back to here" in m.screen())

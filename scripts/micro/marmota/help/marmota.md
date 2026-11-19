@@ -101,6 +101,7 @@ Brackets are ( ) [ ] { }, counted as written: one inside a string counts too.
 | enter, shift+enter, esc (in the box) | Send, or pick the marked session; a new line; back to the file, with what is written kept |
 | cmd+enter | Put the last reply at the cursor, or in place of what is selected |
 | cmd+J | Show the column, or put it away: what was asked and what the box holds are there again |
+| enter (in the replies) | Back to the file, with the lines the question was about selected: where they are now when lines went in above them, those the session changed for cmd+K. The line that says whom says so too: "plan.md L3-4 · now at L5-6", "lines changed since", "changed L3-5". Reach the replies with a click or option+W |
 | cmd+O | Open the session in a pane under the editor: the one that stopped to ask you something, else the one questions go to. Answer it there, or watch it work; closing the pane leaves it running |
 
 The session is the one Marmota's Ask box wrote to when it opened the editor,
