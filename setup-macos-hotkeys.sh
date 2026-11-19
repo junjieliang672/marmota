@@ -936,6 +936,16 @@ do
     { '-', 'CTRL', '\x1bh', wezterm.action.DecreaseFontSize },
     { '-', 'CTRL|SHIFT', '\x1bH', wezterm.action.DecreaseFontSize },
   }
+  -- In Claude Code's input box, option+backspace deletes the word before
+  -- the cursor and option+delete (fn+option+backspace) the one after it:
+  -- the words option+← → move by there, also inside a Chinese sentence.
+  -- These are the keys Claude Code does that for (alt+backspace, alt+D).
+  -- For ctrl+W, which option+backspace is often set to send, it deletes
+  -- back to a space, a whole sentence in Chinese.
+  local claude_keys = {
+    { 'Backspace', 'OPT', '\x1b\x7f', wezterm.action.SendKey { key = 'Backspace', mods = 'ALT' } },
+    { 'Delete', 'OPT', '\x1bd', wezterm.action.SendKey { key = 'Delete', mods = 'ALT' } },
+  }
   local function mods_of(mods)
     local set = {}
     for m in (mods or ''):gmatch('[^|]+') do
@@ -948,12 +958,12 @@ do
   -- A pane that shows tmux, as the one beside Marmota shows a session: tmux
   -- says what runs in the window each of its clients shows, and the client
   -- on this pane's terminal is this pane's.
-  local function tmux_shows_editor(pane)
+  local function tmux_shows(pane)
     local found, info, tty = pcall(function()
       return pane:get_foreground_process_info(), pane:get_tty_name()
     end)
     if not found or not info or not tty then
-      return false
+      return ''
     end
     local ask = { info.executable or 'tmux' }
     local argv = info.argv or {}
@@ -969,25 +979,47 @@ do
     end
     local ran, ok, out = pcall(wezterm.run_child_process, ask)
     if not ran or not ok then
-      return false
+      return ''
     end
     for line in (out or ''):gmatch('[^\n]+') do
       local client, program = line:match('^(%S+) (.*)$')
       if client == tty then
-        return program == 'micro'
+        return program
       end
     end
-    return false
+    return ''
+  end
+  -- program_of is the program a pane runs, by name: the terminal's
+  -- foreground job, or what tmux shows in the pane.
+  local function program_of(pane)
+    local name = (pane:get_foreground_process_name() or ''):match('[^/\\]+$') or ''
+    if name == 'tmux' then
+      return tmux_shows(pane)
+    end
+    return name
   end
   -- micro is the pane's program when it runs as the terminal's foreground
   -- job: by itself in a pane, or started by Marmota (e) or through
   -- ~/.config/micro/plug/marmota/edit (Claude Code's ctrl+G), which run it so.
   local function in_editor(pane)
-    local name = (pane:get_foreground_process_name() or ''):match('[^/\\]+$')
-    return name == 'micro' or (name == 'tmux' and tmux_shows_editor(pane))
+    return program_of(pane) == 'micro'
+  end
+  -- Claude Code runs as claude, as claude.exe when npm installed it, or
+  -- under its version's number, as its own installer names the program.
+  local function in_claude(pane)
+    local name = program_of(pane)
+    return name == 'claude' or name == 'claude.exe' or name:match('^%d+%.%d+%.%d+$') ~= nil
   end
   config.keys = config.keys or {}
+  local bound_keys = {}
   for _, k in ipairs(editor_keys) do
+    bound_keys[#bound_keys + 1] = { k, in_editor }
+  end
+  for _, k in ipairs(claude_keys) do
+    bound_keys[#bound_keys + 1] = { k, in_claude }
+  end
+  for _, each in ipairs(bound_keys) do
+    local k, there = each[1], each[2]
     local otherwise = k[4] -- what WezTerm does with the key by itself
     for i, bound in ipairs(config.keys) do
       if bound.key == k[1] and mods_of(bound.mods) == mods_of(k[2]) then
@@ -1000,7 +1032,7 @@ do
       key = k[1],
       mods = k[2],
       action = wezterm.action_callback(function(window, pane)
-        if in_editor(pane) then
+        if there(pane) then
           window:perform_action(wezterm.action.SendString(k[3]), pane)
         elseif otherwise then
           window:perform_action(otherwise, pane)
