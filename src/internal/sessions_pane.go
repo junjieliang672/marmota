@@ -57,6 +57,7 @@ func (m *model) sessionPaneViewOf(s claudesession.Session, convo sessionsConvers
 		Title:      title,
 		State:      m.sessionStateWords(s, state),
 		Folder:     tildePath(s.Cwd),
+		Dir:        s.Cwd,
 		Branch:     convo.branch,
 		Turns:      convo.turns,
 		Tasks:      s.Todos,

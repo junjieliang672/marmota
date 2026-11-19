@@ -32,9 +32,10 @@ type Session struct {
 	// Beside marks the session beside superfile: its place is drawn in the
 	// color the list marks it with.
 	Beside bool
-	// Folder is where it works, Branch the git branch there.
-	Folder, Branch string
-	Error          string
+	// Folder is where it works, Branch the git branch there. Dir is the
+	// folder itself, which file paths in the conversation are links into.
+	Folder, Branch, Dir string
+	Error               string
 	// Now is what it is doing while it works: the tool it runs, else
 	// "working"; "" when it isn't working. It is the conversation's last
 	// line, so it changes in place as tools come and go.
@@ -81,6 +82,9 @@ type paneStyles struct {
 	answerStyles
 
 	sec, secHint, now, ask, mark, kv, kvStrong, beside, prompt, errLine lipgloss.Style
+	// band is the background your messages are drawn on; replyMark the ⏺
+	// a reply starts with, in Claude's color; rule the line between turns.
+	band, replyMark, rule lipgloss.Style
 }
 
 func newPaneStyles() paneStyles {
@@ -97,6 +101,9 @@ func newPaneStyles() paneStyles {
 		beside:       a.base.Foreground(lipgloss.Color(common.Theme.Correct)),
 		prompt:       a.base.Bold(true),
 		errLine:      a.bad,
+		band:         a.base.Background(common.QuestionBG()),
+		replyMark:    a.base.Foreground(lipgloss.Color(common.ClaudeAgentColor)),
+		rule:         a.base.Foreground(common.FilePanelBorderColor),
 	}
 }
 
@@ -305,6 +312,7 @@ func optionNumber(text string) string {
 // conversationLines draws the turns, newest last: your prompt, the tools
 // Claude used, and its reply after ⏺, one turn after another.
 func conversationLines(s Session, width int, st paneStyles) []string {
+	st.dir = s.Dir
 	turns := s.Turns
 	if len(turns) > turnsShown {
 		turns = turns[len(turns)-turnsShown:]
@@ -323,7 +331,7 @@ func conversationLines(s Session, width int, st paneStyles) []string {
 	}
 	for i, t := range turns {
 		if i > 0 {
-			lines = append(lines, "")
+			lines = append(lines, "", st.rule.Render(strings.Repeat("─", width)))
 		}
 		lines = append(lines, turnBlock(t.Prompt, t.Tools, t.Reply, s.Mark, width, st)...)
 	}
@@ -345,13 +353,22 @@ func turnBlock(prompt string, tools []string, reply, mark string, width int, st 
 
 // promptLines draws your prompt in bold, at most two lines of it.
 func promptLines(prompt, mark string, width int, st paneStyles) []string {
+	// on a band across the preview, as micro's replies draw what you asked
+	bg := st.band.GetBackground()
 	bold := st.textStyles
-	bold.base, bold.code, bold.dim = st.prompt, st.prompt, st.base
+	bold.base, bold.code, bold.dim = st.prompt.Background(bg), st.prompt.Background(bg), st.base.Background(bg)
+	bold.bold, bold.italic = bold.base, st.italic.Background(bg).Bold(true)
+	bold.link = st.link.Background(bg).Bold(true)
 	lines := wrapSpans([]span{{text: prompt}}, width, promptMark, replyIndent, bold)
 	if len(lines) > maxPromptLines {
 		lines = lines[:maxPromptLines]
 		last := ansi.Truncate(lines[maxPromptLines-1], width-1, "")
-		lines[maxPromptLines-1] = last + st.prompt.Render("…")
+		lines[maxPromptLines-1] = last + bold.base.Render("…")
+	}
+	for i, l := range lines {
+		if gap := width - ansi.StringWidth(l); gap > 0 {
+			lines[i] = l + st.band.Render(strings.Repeat(" ", gap))
+		}
 	}
 	if hasMark(prompt, mark) {
 		lines[0] = st.mark.Render(searchMark) + ansi.TruncateLeft(lines[0], 1, "")
@@ -370,7 +387,7 @@ func replyLines(reply, mark string, width int, st paneStyles) []string {
 	for i, l := range body {
 		prefix := st.base.Render(replyIndent)
 		if i == 0 {
-			prefix = st.base.Render(replyMark)
+			prefix = st.replyMark.Render(replyMark)
 		}
 		if hasMark(ansi.Strip(l), mark) {
 			prefix = st.mark.Render(searchMark) + st.base.Render(" ")
@@ -445,10 +462,11 @@ var (
 type renderKey struct {
 	text  string
 	width int
+	dir   string
 }
 
 func cachedMarkdown(text string, width int, st textStyles) []string {
-	key := renderKey{text: text, width: width}
+	key := renderKey{text: text, width: width, dir: st.dir}
 	renderMu.Lock()
 	defer renderMu.Unlock()
 	if lines, ok := renderCache[key]; ok {

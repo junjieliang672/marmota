@@ -1040,6 +1040,48 @@ do
       end),
     })
   end
+
+  -- cmd+click opens a link where a program takes the mouse, as Marmota
+  -- does: WezTerm opens it, and the program isn't told of the click. A
+  -- session's preview in Marmota draws its links so (web addresses, and
+  -- files the session works on). Elsewhere a click goes on as before.
+  config.mouse_bindings = config.mouse_bindings or {}
+  table.insert(config.mouse_bindings, {
+    event = { Down = { streak = 1, button = 'Left' } },
+    mods = 'CMD',
+    mouse_reporting = true,
+    action = wezterm.action.Nop,
+  })
+  table.insert(config.mouse_bindings, {
+    event = { Up = { streak = 1, button = 'Left' } },
+    mods = 'CMD',
+    mouse_reporting = true,
+    action = wezterm.action.OpenLinkAtMouseCursor,
+  })
+  -- A link to a file on this computer, file:///path#L12 as Marmota writes
+  -- it, opens in micro at its line, in a pane on the right. Any other link
+  -- opens as WezTerm opens it.
+  local function unescape(s)
+    return (s:gsub('%%(%x%x)', function(h)
+      return string.char(tonumber(h, 16))
+    end))
+  end
+  wezterm.on('open-uri', function(window, pane, uri)
+    local path, line = uri:match('^file://(/[^#]*)#L(%d+)$')
+    if not path then
+      path = uri:match('^file://(/[^#]*)$')
+    end
+    if not path then
+      return
+    end
+    path = unescape(path)
+    local args = { os.getenv('SHELL') or '/bin/zsh', '-lc', 'exec micro "$@"', 'micro', path }
+    if line then
+      table.insert(args, '+' .. line)
+    end
+    pane:split { direction = 'Right', size = 0.5, args = args, cwd = path:match('^(.*)/') }
+    return false
+  end)
 end
 -- <<< marmota <<<
 LOOK_EOF

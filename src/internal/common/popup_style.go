@@ -54,6 +54,14 @@ func PopupPickedBG() lipgloss.TerminalColor {
 	return blendOr(FilePanelBGColor, FilePanelFGColor, 0.12, FilePanelBGColor) //nolint:mnd // a faint bar
 }
 
+// QuestionBG is the band your messages to a session are drawn on in its
+// preview: the background a little toward the theme's accent, apart from a
+// code block's band; the picked row's bar for a theme whose colors can't be
+// mixed.
+func QuestionBG() lipgloss.TerminalColor {
+	return blendOr(FilePanelBGColor, FilePanelBorderActiveColor, 0.18, PopupPickedBG()) //nolint:mnd // a faint band
+}
+
 // PopupHasBar reports whether the picked row's bar shows: a transparent
 // theme has none, and marks the row with the cursor instead.
 func PopupHasBar() bool {

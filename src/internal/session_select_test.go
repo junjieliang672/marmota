@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -40,37 +41,40 @@ func TestDraggingInTheSessionPreviewCopiesWhatItSelects(t *testing.T) {
 	pv := &m.fileModel.filePreview
 	left := m.fullWidth - pv.GetWidth()
 	rows := strings.Split(ansi.Strip(m.dockSessionPreview(pv.GetWidth(), pv.GetHeight())), "\n")
-	require.Equal(t, "│› question 21", strings.TrimRight(rows[5], " │"))
-	require.Equal(t, "│⏺ answer 21", strings.TrimRight(rows[6], " │"))
+	// a question with its answer under it, the first in view
+	q := slices.IndexFunc(rows, func(r string) bool { return strings.HasPrefix(r, "│› question ") })
+	require.GreaterOrEqual(t, q, 0)
+	n := strings.TrimPrefix(strings.TrimRight(rows[q], " │"), "│› question ")
+	require.Equal(t, "│⏺ answer "+n, strings.TrimRight(rows[q+1], " │"))
 
-	mouse(m, tea.MouseActionPress, left+3, 5) // on the q of question 21
-	mouse(m, tea.MouseActionMotion, left+20, 8)
-	mouse(m, tea.MouseActionMotion, left+8, 6)
+	mouse(m, tea.MouseActionPress, left+3, q) // on the q of the question
+	mouse(m, tea.MouseActionMotion, left+20, q+3)
+	mouse(m, tea.MouseActionMotion, left+8, q+1)
 	view := m.View()
 	assert.Contains(t, view, "\x1b[7m", "what it selects is lit while you drag")
 	assert.Empty(t, *copied, "nothing is copied before you let go")
-	mouse(m, tea.MouseActionRelease, left+8, 6) // the r of answer
-	assert.Equal(t, "question 21\n⏺ answer", *copied)
+	mouse(m, tea.MouseActionRelease, left+8, q+1) // the r of answer
+	assert.Equal(t, "question "+n+"\n⏺ answer", *copied)
 	assert.Contains(t, m.claude.flash, "Copied 2 lines")
 
 	// Up and over the border: from the start of the row, the border left out.
-	mouse(m, tea.MouseActionPress, left+10, 6)
-	mouse(m, tea.MouseActionRelease, left-5, 5)
-	assert.Equal(t, "› question 21\n⏺ answer 2", *copied, "backwards works too")
+	mouse(m, tea.MouseActionPress, left+10, q+1)
+	mouse(m, tea.MouseActionRelease, left-5, q)
+	assert.Equal(t, "› question "+n+"\n⏺ answer "+n[:1], *copied, "backwards works too")
 	assert.True(t, m.sessions.selection.on, "the selection stays lit")
 
 	TeaUpdate(m, utilsKey("j"))
 	assert.False(t, m.sessions.selection.on, "a key puts it away")
 
 	*copied = ""
-	mouse(m, tea.MouseActionPress, left+3, 5)
-	mouse(m, tea.MouseActionRelease, left+3, 5)
+	mouse(m, tea.MouseActionPress, left+3, q)
+	mouse(m, tea.MouseActionRelease, left+3, q)
 	assert.Empty(t, *copied, "a click copies nothing")
 	assert.False(t, m.sessions.selection.on)
 
-	mouse(m, tea.MouseActionPress, left+3, 5)
-	mouse(m, tea.MouseActionRelease, left+9, 5)
-	wheel(m, tea.MouseButtonWheelUp, left+3, 5)
+	mouse(m, tea.MouseActionPress, left+3, q)
+	mouse(m, tea.MouseActionRelease, left+9, q)
+	wheel(m, tea.MouseButtonWheelUp, left+3, q)
 	assert.False(t, m.sessions.selection.on, "scrolling puts it away: the lines it lit moved")
 }
 

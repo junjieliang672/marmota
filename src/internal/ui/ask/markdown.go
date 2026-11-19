@@ -18,6 +18,9 @@ type textStyles struct {
 	italic, link, head, codeBlock, border lipgloss.Style
 	// codeBG is set when codeBlock has a background.
 	codeBG bool
+	// dir is the folder the session works in: a file's path in the text is
+	// a link when the file is there.
+	dir string
 }
 
 type spanKind int
@@ -33,6 +36,9 @@ const (
 type span struct {
 	text string
 	kind spanKind
+	// url is where a link goes: a web address, or a file's
+	// (file:///abs/path#L12).
+	url string
 }
 
 var (
@@ -166,15 +172,18 @@ func padRight(s string, width int) string {
 }
 
 // parseInline splits text into plain, **bold**, *italic*, `code` and link
-// spans; a link shows its text.
+// spans; a link shows its text, and keeps where it goes.
 func parseInline(text string) []span {
-	text = linkText.ReplaceAllString(text, "\x01$1\x01")
+	// a link becomes \x01url\x02text\x01: its address comes first, so the
+	// spans of its text know it
+	text = linkText.ReplaceAllString(text, "\x01$2\x02$1\x01")
 	var spans []span
 	var cur strings.Builder
 	kind := plainSpan
+	url := ""
 	flush := func() {
 		if cur.Len() > 0 {
-			spans = append(spans, span{text: cur.String(), kind: kind})
+			spans = append(spans, span{text: cur.String(), kind: kind, url: url})
 			cur.Reset()
 		}
 	}
@@ -189,7 +198,16 @@ func parseInline(text string) []span {
 	for i := 0; i < len(text); {
 		switch {
 		case kind != codeSpan && text[i] == '\x01':
+			if kind != linkSpan {
+				if end := strings.IndexByte(text[i:], '\x02'); end > 0 {
+					toggle(linkSpan)
+					url = text[i+1 : i+end]
+					i += end + 1
+					continue
+				}
+			}
 			toggle(linkSpan)
+			url = ""
 			i++
 		case (kind == plainSpan || kind == codeSpan) && text[i] == '`':
 			toggle(codeSpan)
@@ -229,15 +247,16 @@ func isWordByte(b byte) bool {
 type styledRune struct {
 	r    rune
 	kind spanKind
+	url  string
 }
 
 // wrapSpans fills lines greedily, word by word. first begins the first line
 // and rest the others; both are drawn dim.
 func wrapSpans(spans []span, width int, first, rest string, st textStyles) []string {
 	var runes []styledRune
-	for _, s := range spans {
+	for _, s := range linkSpans(spans, st.dir) {
 		for _, r := range s.text {
-			runes = append(runes, styledRune{r: r, kind: s.kind})
+			runes = append(runes, styledRune{r: r, kind: s.kind, url: s.url})
 		}
 	}
 	f := &lineFiller{width: width, first: first, rest: rest}
@@ -406,7 +425,7 @@ func renderRunes(runes []styledRune, st textStyles) string {
 	var b strings.Builder
 	for i := 0; i < len(runes); {
 		j := i
-		for j < len(runes) && runes[j].kind == runes[i].kind {
+		for j < len(runes) && runes[j].kind == runes[i].kind && runes[j].url == runes[i].url {
 			j++
 		}
 		text := make([]rune, 0, j-i)
@@ -428,7 +447,13 @@ func renderRunes(runes []styledRune, st textStyles) string {
 			style = st.link
 		case plainSpan:
 		}
-		b.WriteString(style.Render(string(text)))
+		if url := runes[i].url; url != "" {
+			// the terminal keeps where it goes with the text (OSC 8), for a
+			// cmd+click to open it, each line's piece of a long link too
+			b.WriteString(hyperlink(url) + style.Render(string(text)) + hyperlink(""))
+		} else {
+			b.WriteString(style.Render(string(text)))
+		}
 		i = j
 	}
 	return b.String()
