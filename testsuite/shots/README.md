@@ -6,7 +6,7 @@
 2. `P=$(./start.sh)` starts `y` in a WezTerm window in the workspace `marmota-shots`, which your window doesn't show. Its sessions are real: `>claude`, `s` `n` and the rest start them in the demo projects, with your own Claude Code settings.
 3. `./keys.sh $P z t i d e '\r'` types into it and prints its screen. To type into a session's pane, use `wezterm cli send-text --pane-id N --no-paste`. In micro, which `e` opens in y's pane, the Mac's keys are the bytes WezTerm sends for them: `'\x1bl'` cmd+L, `'\x1bL'` cmd+shift+L, `'\x1bk'` cmd+K, `'\x1bOR'` cmd+M, `'\x11'` cmd+W (`KEY` in `testsuite/live/micro_plugin_test.py` has them all).
 4. `./capture.py NAME $P` saves every pane of that window to `out/NAME.json`, colors included. `./render.py NAME` draws it as WezTerm does into `out/NAME.png`, using headless Chrome and the JetBrains Mono Nerd Font.
-5. `cwebp -lossless -z 9 out/NAME.png -o ../../docs/shots/NAME.webp`.
+5. `cwebp -lossless -z 9 out/NAME.png -o ../../docs/shots/NAME.webp`. Then raise the number after `?v=` on the pictures in `docs/tutorial.html`: a browser that has the old picture keeps it for the same address, and shows it under the new text and labels.
 6. Stop the sessions, or your own Marmota lists them as well: it lists every live session on the computer. `./demo.sh --clean` removes the projects, `~/code/.shots`, and the demo sessions' transcripts.
 
 Nothing about your computer reaches a picture:
