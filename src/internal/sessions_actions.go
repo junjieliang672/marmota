@@ -34,7 +34,7 @@ func (m *model) sessionPlace(s claudesession.Session) string {
 		return "in the Claude app"
 	case ok && m.isClaudeSessionVisible(s):
 		return "beside Marmota"
-	case ok && pane.Workspace == managedAgentHiddenWorkspace, ok && isTmuxPane(pane.PaneID):
+	case ok && inHiddenWorkspace(pane), ok && isTmuxPane(pane.PaneID):
 		return "hidden"
 	case ok:
 		return "in another WezTerm tab"

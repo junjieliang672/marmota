@@ -157,7 +157,7 @@ dialog.zoom img { display: block; max-width: 98vw; max-height: 96vh; width: auto
     <span class="eyebrow">A tour for your first session</span>
   </div>
   <h1>Getting started with Marmota</h1>
-  <p class="lede">Marmota is a terminal file manager that works beside your Claude Code and Codex sessions; you start it with <code>y</code>. You browse files on top; at the foot you see every session that runs, what each one is doing, and you can write to any of them without leaving your files.</p>
+  <p class="lede">Marmota is a terminal file manager that works beside your Claude Code and Codex sessions; you start it with <code>y</code>. Your files are in a column on the left, with a preview beside them; under the preview you see every session that runs, what each one is doing, and you can write to any of them without leaving your files.</p>
   <p class="note"><strong>You need</strong> a Mac, <a href="https://wezterm.org">WezTerm</a> (y shows sessions in its panes), <a href="https://github.com/tmux/tmux">tmux</a> (sessions run in it, so they outlive WezTerm) and <a href="https://micro-editor.github.io">micro</a> (the editor <kbd>e</kbd> opens; <code>build.sh</code> installs both), and <a href="https://claude.com/claude-code">Claude Code</a>, the <a href="https://github.com/openai/codex">Codex CLI</a>, or both.</p>
 </header>
 
@@ -177,17 +177,17 @@ y</pre>
   <div class="step-head"><span class="step-num">2</span><h2 id="s2">What is on the screen</h2></div>
   <figure class="shot wide">
     <div class="shot-pins">
-      <button type="button" aria-label="Show full size"><img src="shots/screen.webp" width="1368" height="839" alt="Marmota in a project called tidepool: the file panel on internal/api with server.go under the cursor, its code in the preview, and at the foot the Sessions box with four sessions, Details, and the Ask box; the status line says 1 needs you."></button>
-      <span class="pin" style="left:9.8%;top:2.6%">A</span><span class="pin" style="left:58.9%;top:2.6%">B</span><span class="pin" style="left:11.6%;top:73.1%">C</span><span class="pin" style="left:41.1%;top:73.1%">D</span><span class="pin" style="left:79.8%;top:73.1%">E</span><span class="pin" style="left:52.8%;top:97.4%">F</span>
+      <button type="button" aria-label="Show full size"><img src="shots/screen.webp" width="1368" height="839" alt="Marmota in a project called tidepool. On the left, the file panel on internal/api with server.go under the cursor and, under it, Details. On the right, the file's code in the preview, then the Ask box, then the Sessions box with four sessions. The status line says 1 working, 1 needs you, 1 unread."></button>
+      <span class="pin" style="left:9.8%;top:2.6%">A</span><span class="pin" style="left:58.9%;top:2.6%">B</span><span class="pin" style="left:58.9%;top:84.1%">C</span><span class="pin" style="left:9.8%;top:75.2%">D</span><span class="pin" style="left:79.8%;top:77.4%">E</span><span class="pin" style="left:52.8%;top:97.4%">F</span>
     </div>
   </figure>
   <div class="legend">
-    <div><span class="chip">A</span><p><strong>File panels.</strong> Your folders. <kbd>tab</kbd> moves to the next panel, <kbd>n</kbd> opens another. A <span class="tag cc">✳</span> marks a file a running session changed.</p></div>
+    <div><span class="chip">A</span><p><strong>File panels.</strong> Your folders, one under another, each as tall as its files. <kbd>tab</kbd> moves to the next panel, <kbd>n</kbd> opens another. A <span class="tag cc">✳</span> marks a file a running session changed.</p></div>
     <div><span class="chip">B</span><p><strong>Preview.</strong> The file under the cursor; while you are in the Sessions box, the selected session's conversation.</p></div>
     <div><span class="chip">C</span><p><strong>Sessions box.</strong> Every running session, <span class="tag cc">cc</span> for Claude Code and <span class="tag co">co</span> for Codex. <kbd>s</kbd> goes to a session that needs you or replied since you looked, and again to the next; with none, to the first. <kbd>esc</kbd> goes back. Under them, with a cloud, your sessions on other computers.</p></div>
     <div><span class="chip">D</span><p><strong>Details.</strong> The file, your Mac's cpu, memory and disk, and file operations under way. <kbd>M</kbd> focuses it.</p></div>
-    <div><span class="chip">E</span><p><strong>Ask box.</strong> Where you write to a session, or start a new one. <kbd>K</kbd> opens it.</p></div>
-    <div><span class="chip">F</span><p><strong>Status line.</strong> The keys you can press now, how many sessions are working, need you or have unread replies, and the time. <kbd>F</kbd> hides the boxes at the foot.</p></div>
+    <div><span class="chip">E</span><p><strong>Ask box.</strong> The session your next message goes to, what you last asked it and how that stands. <kbd>K</kbd> writes there, to it or to a new one.</p></div>
+    <div><span class="chip">F</span><p><strong>Status line.</strong> The keys you can press now, how many sessions are working, need you or have unread replies, and the time. <kbd>F</kbd> hides Details and the Ask box, and the file panels take their room.</p></div>
   </div>
 </section>
 
@@ -230,11 +230,11 @@ y</pre>
   <div class="flow-intro">
     <span class="eyebrow small">Workflow 1</span>
     <h2 id="browse-h">Just browse files</h2>
-    <p>No agents needed. Marmota is a file manager first: two or more panels, a preview of what is under the cursor, and the boxes at the foot, which <kbd>F</kbd> hides.</p>
+    <p>No agents needed. Marmota is a file manager first: panels one under another, a preview of what is under the cursor, and Details under the panels, which <kbd>F</kbd> hides to give them its room.</p>
   </div>
   <figure class="shot wide">
-    <button type="button" aria-label="Show full size"><img src="shots/browse-panels.webp" width="1368" height="839" alt="Two file panels, field-notes/2026-11 on the left and tidepool/internal/tides on the right, with the Go code of predict.go in the preview." loading="lazy"></button>
-    <figcaption>Two panels: trip notes on the left, the code of a tide-table tool on the right. The preview shows <code>predict.go</code>, the file under the cursor.</figcaption>
+    <button type="button" aria-label="Show full size"><img src="shots/browse-panels.webp" width="1368" height="839" alt="Two file panels one under the other, field-notes/2026-11 above and tidepool/internal/tides below, with the Go code of predict.go in the preview on the right." loading="lazy"></button>
+    <figcaption>Two panels: trip notes above, the code of a tide-table tool below, where the keyboard is. The preview shows <code>predict.go</code>, the file under the cursor.</figcaption>
   </figure>
   <div class="cases">
     <div class="case">
@@ -330,7 +330,7 @@ y</pre>
       <h3>Talk to it without leaving your files</h3>
       <ol class="steps">
         <li><kbd>m</kbd> on a file adds it to your draft as a mention.</li>
-        <li><kbd>K</kbd> opens the Ask box, which writes to it; type and press <kbd>enter</kbd>. <kbd>↑</kbd> brings back what you said before.</li>
+        <li><kbd>K</kbd> puts the keyboard in the Ask box, under the preview, which writes to it; type and press <kbd>enter</kbd>. <kbd>↑</kbd> brings back what you said before.</li>
         <li><kbd>shift+enter</kbd> is a new line; <kbd>ctrl+g</kbd> writes a long question in the editor and brings it back, unsent.</li>
       </ol>
     </div>
@@ -364,7 +364,7 @@ y</pre>
   </div>
   <figure class="shot wide">
     <button type="button" aria-label="Show full size"><img src="shots/many-hero.webp" width="1368" height="839" alt="The Sessions box with four sessions in different states, the second selected; the preview shows its permission question; Claude Code works beside Marmota." loading="lazy"></button>
-    <figcaption>Four sessions: one waits for your next prompt (<span style="color: var(--muted)">○</span>), one asks permission (<span style="color: var(--accent)">⚑</span>), one replied since you looked (<span class="tag co">●</span>), one works beside Marmota (<span class="tag cc">✳</span>). The preview shows the selected session's question.</figcaption>
+    <figcaption>Four sessions: one works beside Marmota (<span class="tag cc">✳</span>), one asks permission (<span style="color: var(--accent)">⚑</span>), one replied since you looked (<span class="tag co">●</span>), one waits for your next prompt (<span style="color: var(--muted)">○</span>). The preview shows the selected session's question.</figcaption>
   </figure>
   <div class="cases">
     <div class="case">
@@ -378,7 +378,7 @@ y</pre>
     <div class="case">
       <h3>See how each one is doing</h3>
       <ol class="steps">
-        <li><kbd>s</kbd> opens the Sessions box. Each row: its state, <span class="tag cc">cc</span> or <span class="tag co">co</span>, its name, its age, and what it is doing now. A phone beside the age means Remote Control is on: you can follow and answer that session from the Claude app (Claude Code) or the ChatGPT app (Codex).</li>
+        <li><kbd>s</kbd> opens the Sessions box. Each row: its state, <span class="tag cc">cc</span> or <span class="tag co">co</span>, its name, what it is doing now or what you last asked it, where it runs, and how long ago. A phone beside the age means Remote Control is on: you can follow and answer that session from the Claude app (Claude Code) or the ChatGPT app (Codex).</li>
         <li>The preview shows the selected session's conversation; <kbd>pgup</kbd> <kbd>pgdown</kbd> scroll it.</li>
       </ol>
       <div class="states">
@@ -390,7 +390,7 @@ y</pre>
     </div>
   </div>
   <figure class="shot wide">
-    <button type="button" aria-label="Show full size"><img src="shots/many-new-wide.webp" width="1368" height="839" alt="The Ask box at full width: a new Codex session in tidepool, auto permissions, model codex default, effort medium, with a task typed in." loading="lazy"></button>
+    <button type="button" aria-label="Show full size"><img src="shots/many-new-wide.webp" width="1368" height="839" alt="The Ask box, under the preview, on a new Codex session in tidepool, with a task typed in; its bottom edge says co default, medium, auto." loading="lazy"></button>
     <figcaption><kbd>s</kbd> <kbd>n</kbd>, then <kbd>tab</kbd> for Codex: the Ask box will start a Codex session in <code>tidepool</code>, in auto mode, at medium effort.</figcaption>
   </figure>
   <div class="cases">
@@ -412,8 +412,8 @@ y</pre>
     </div>
   </div>
   <figure class="shot wide">
-    <button type="button" aria-label="Show full size"><img src="shots/many-write.webp" width="1368" height="839" alt="The Ask box writing to a hidden session: also document GET /healthz in the README usage section; below it, the earlier request and when it replied." loading="lazy"></button>
-    <figcaption><kbd>K</kbd> on a hidden session: the message goes into its prompt. Under the draft, what you sent it before and when it replied.</figcaption>
+    <button type="button" aria-label="Show full size"><img src="shots/many-write.webp" width="1368" height="839" alt="The Ask box writing to a hidden session: also document GET /healthz in the README usage section; the preview above shows that session, which is working." loading="lazy"></button>
+    <figcaption><kbd>K</kbd> on a hidden session: you write in the Ask box where it is, and the message goes into the session's prompt. The preview shows the session you write to; the status line, the box's keys.</figcaption>
   </figure>
   <div class="cases">
     <div class="case">
@@ -440,7 +440,7 @@ y</pre>
     <p>Before you accept a session's work, read what it did, file by file, without opening each one.</p>
   </div>
   <figure class="shot wide">
-    <button type="button" aria-label="Show full size"><img src="shots/review.webp" width="1368" height="839" alt="A session's three changed files listed in the panel, and the diff of server.go in the preview: 21 lines added, 2 removed." loading="lazy"></button>
+    <button type="button" aria-label="Show full size"><img src="shots/review.webp" width="1368" height="839" alt="A session's three changed files listed in the panel, and the diff of server.go in the preview: 11 lines added, 2 removed." loading="lazy"></button>
     <figcaption><kbd>W</kbd> on the session that added the health check: its three files, and <code>server.go</code> compared with the file as it was before the session first changed it.</figcaption>
   </figure>
   <div class="case">
@@ -460,8 +460,8 @@ y</pre>
     <p><kbd>e</kbd> opens the file in micro, in Marmota's place. It is an editor without modes: you type, and the Mac's keys (<kbd>cmd+S</kbd>, <kbd>cmd+Z</kbd>, <kbd>cmd+←</kbd>, <kbd>shift+option+→</kbd>) do what they do in any text field. A column on its right asks your sessions about what you are writing. <kbd>cmd+H</kbd> lists every key; <kbd>cmd+W</kbd> closes the file, and the last one the editor.</p>
   </div>
   <figure class="shot wide">
-    <button type="button" aria-label="Show full size"><img src="shots/editor-ask.webp" width="1368" height="839" alt="micro with predict.go on the left, lines 43 to 46 selected; on the right a column with the question, can an event at exactly midnight show up under two days now, highlighted, the session's reply under its name, and a box at the foot whose status line says Ask Tides daylight saving duplicate events, predict.go L43-46." loading="lazy"></button>
-    <figcaption>Lines 43 to 46 of <code>predict.go</code> are selected. <kbd>cmd+L</kbd> opened the column on the right; the question, highlighted, went to the session with those lines named, and its reply shows under the session's name. The box at the foot waits for the next one.</figcaption>
+    <button type="button" aria-label="Show full size"><img src="shots/editor-ask.webp" width="1368" height="839" alt="micro with predict.go on the left, lines 44 to 47 marked; on the right a column with the question, in two sentences: why AddDate here and not days*24 hours, highlighted, the session's reply under its name, and a box at the foot whose status line says Ask Tidepool midnight event DST duplication in predict.go." loading="lazy"></button>
+    <figcaption>Lines 44 to 47 of <code>predict.go</code> were selected. <kbd>cmd+L</kbd> opened the column on the right; the question, highlighted, went to the session with those lines named, and its reply shows under the session's name. The box at the foot waits for the next one.</figcaption>
   </figure>
   <div class="cases">
     <div class="case">
@@ -531,7 +531,7 @@ y</pre>
     <p>Get on with something else, in Marmota or another app. Marmota tells you when a session needs you, and never moves your focus on its own.</p>
   </div>
   <figure class="shot wide">
-    <button type="button" aria-label="Show full size"><img src="shots/away.webp" width="1368" height="839" alt="Marmota showing a trip report, with a note in the top right corner: Tides daylight saving duplicate events needs you, permission prompt." loading="lazy"></button>
+    <button type="button" aria-label="Show full size"><img src="shots/away.webp" width="1368" height="839" alt="Marmota showing a trip report, with a note in the top right corner: Tidepool midnight event DST duplication needs you, permission prompt; s open, esc later." loading="lazy"></button>
     <figcaption>A hidden session stopped to ask permission. The note in the top right says which one and why; <kbd>s</kbd> opens it, <kbd>esc</kbd> puts the note away.</figcaption>
   </figure>
   <div class="case">
@@ -552,8 +552,8 @@ y</pre>
     <p>Run a session on another machine, a Mac mini in the next room or a server you reach over ssh. It runs in Marmota's tmux over there, so it keeps going when your connection drops, and with Remote Control: the Sessions box lists it under this Mac's sessions, with a cloud, as the Claude app lists it, and you go on with it in the Claude app.</p>
   </div>
   <figure class="shot wide">
-    <button type="button" aria-label="Show full size"><img src="shots/remote-section.webp" width="1368" height="839" alt="The Sessions box lists two sessions on this Mac with a monitor, then Import the 2027 station list, working, and Nightly tide table check, needs you: permission prompt, each with a cloud; the last is selected, and the preview says it is in the Claude app, where enter opens it." loading="lazy"></button>
-    <figcaption>Rows 3 and 4 run on other computers: a cloud where rows 1 and 2, on this Mac, have a monitor. The selected one waits for a permission; <kbd>enter</kbd> opens it in the Claude app, where its conversation is.</figcaption>
+    <button type="button" aria-label="Show full size"><img src="shots/remote-section.webp" width="1368" height="839" alt="The Sessions box lists four sessions on this Mac with a monitor, then Import the 2027 station list, working, and Nightly tide table check, needs you: permission prompt, each with a cloud; the last is selected, and the preview says it is in the Claude app, where enter opens it." loading="lazy"></button>
+    <figcaption>Rows 5 and 6 run on other computers: a cloud where rows 1 to 4, on this Mac, have a monitor. The selected one waits for a permission; <kbd>enter</kbd> opens it in the Claude app, where its conversation is.</figcaption>
   </figure>
   <div class="cases">
     <div class="case">
@@ -561,7 +561,7 @@ y</pre>
       <ol class="steps">
         <li>Ask a coding agent in one of your sessions, in your own words: <em>"open a session on my Mac mini in ~/proj that fixes the flaky test"</em>. The skill <code>build.sh</code> installed tells it how.</li>
         <li>Or run it yourself: <code>y session start --on "ssh me@192.168.1.20" --cwd ~/proj -- "fix the flaky test"</code>. <code>--on</code> is how you reach the machine from a terminal: <code>ssh</code>, <code>ssh -J</code> through a jump host, or a company CLI such as <code>"corp ssh gpu-1 --"</code>.</li>
-        <li>Marmota remembers the machine from then on and keeps one connection to it. With ssh, you log in once for everything.</li>
+        <li>Marmota remembers the machine from then on: <code>y session list</code>, <code>send</code> and <code>read</code> reach it without <code>--on</code>.</li>
       </ol>
     </div>
     <div class="case">

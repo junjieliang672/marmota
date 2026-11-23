@@ -20,9 +20,15 @@ on PATH and a tmux server of its own (MARMOTA_TMUX_SOCKET). Checks:
   6. WezTerm loses Marmota and the pane beside it: a new Marmota lists every
      session still running, and enter shows a tmux one beside it again.
   7. `y session start --on` starts a session on "another computer" (this
-     one, through a command, with a tmux server of its own): it shows in the
-     Sessions box with that computer's name, `y session send` and `read`
-     reach it, enter shows it beside Marmota, and x stops it.
+     one, through a command, with a tmux server of its own): `y session
+     list`, `send` and `read` reach it. The Sessions box keeps to this
+     computer's sessions: those on other computers are claude.ai's to list.
+  8. That computer out of reach, as with a login that ran out: `y session
+     list` names it with why, and lists its session again once it answers.
+  9. Marmota restarts in its pane: the pane beside it that shows a session
+     is taken back, and enter opens no second one.
+ 10. `y session adopt` moves a session started by hand on the other
+     computer into Marmota's tmux there, with the same id.
 
 It never focuses a pane, so your active workspace and window don't change.
 Everything it starts is killed at the end, its tmux server too.
@@ -35,7 +41,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import shlex
 import shutil
 import subprocess
@@ -49,24 +54,8 @@ from wezterm_sessions_test import (HERE, client_state, dock_rows, in_sessions_bo
                                    select_session, marmota_knows_sessions, type_keys, wait_for)
 
 TEST_WORKSPACE = "marmota-tmux-test"
-HIDDEN_WORKSPACE = "marmota-agents"
-
-
-def row_of_host(text: str, host: str, title: str) -> str | None:
-    """The Sessions box's row of a session on host. Its name is "host · title"
-    until it is renamed; a narrow box may cut the title short."""
-    for line in text.splitlines():
-        box = line.split("││", 1)[0]  # the Sessions box's part: the Ask box is on the same lines
-        if not box.startswith("│") or " cc " not in box:
-            continue  # not a session's row: the preview's title says the name too
-        if host + " · " in box and (title in box or title[:3] in box.split(host + " · ", 1)[1]):
-            return box
-    return None
-
-
-def title_after(row: str, host: str) -> str:
-    """The title in a row whose session's name is "host · title"."""
-    return row.split(host + " · ", 1)[1].split()[0]
+# The key that goes to the Sessions box: s now, ! in the Marmota --old names.
+SESSIONS_KEY, OLD_SESSIONS_KEY = "s", "!"
 
 
 def main() -> int:
@@ -133,16 +122,17 @@ def main() -> int:
             type_keys(marmota, "\x1b")
         wait_for("the main screen", lambda: "K:ask" in screen(marmota))
 
-    def listed(marmota: int) -> set[str]:
-        """The titles in the Sessions box, read with the keyboard in it."""
+    def listed(marmota: int, key: str = SESSIONS_KEY) -> set[str]:
+        """The titles in the Sessions box, read with the keyboard in it; key
+        is the one that Marmota goes to the box on."""
         if not in_sessions_box(marmota):
-            type_keys(marmota, "s")
+            type_keys(marmota, key)
             try:
                 wait_for("the Sessions box", lambda: in_sessions_box(marmota), timeout=8)
             except AssertionError:
                 # A Marmota that has just started may drop the first key; one
                 # that hangs fails this second time.
-                type_keys(marmota, "s")
+                type_keys(marmota, key)
                 wait_for("the Sessions box", lambda: in_sessions_box(marmota))
         titles = {title.split()[0] for _, title, _ in dock_rows(marmota)}
         type_keys(marmota, "\x1b")
@@ -164,13 +154,15 @@ def main() -> int:
             type_keys(marmota, command)
             time.sleep(2)
         wait_for("two sessions", lambda: marmota_knows_sessions(iso, registry, 2))
+        # The old Marmota's hidden workspace has the name it had then: the one
+        # of the test's panes that isn't in the test's workspace is in it.
         parked = wait_for("one parked in the hidden workspace", lambda: next(
-            (p for p in panes() if p.get("workspace") == HIDDEN_WORKSPACE and is_test_pane(p)), None))
+            (p for p in panes() if str(work) in p.get("cwd", "") and p.get("workspace") != TEST_WORKSPACE), None))
         beside = wait_for("one beside Marmota", lambda: next(
             (p for p in panes() if p["tab_id"] == marmota_tab and p["pane_id"] != marmota and is_test_pane(p)), None))
         by_hand = spawn("claude")
         wait_for("the one started by hand", lambda: marmota_knows_sessions(iso, registry, 3))
-        old_titles = wait_for("the old Marmota to list three", lambda: (lambda t: t if len(t) == 3 else None)(listed(marmota)))
+        old_titles = wait_for("the old Marmota to list three", lambda: (lambda t: t if len(t) == 3 else None)(listed(marmota, OLD_SESSIONS_KEY)))
         assert not windows(), "the old Marmota started nothing in tmux"
         print(f"ok   the old Marmota lists {sorted(old_titles)}: one beside it, one parked, one started by hand")
 
@@ -274,66 +266,31 @@ def main() -> int:
             return subprocess.run([*env_args, new, "session", *a],
                                   check=True, capture_output=True, text=True, cwd=project).stdout
 
+        def session_list() -> dict[str, Any]:
+            """`y session list --json`, whether or not every computer answered."""
+            return json.loads(subprocess.run([*env_args, new, "session", "list", "--json"],
+                                             capture_output=True, text=True, cwd=project).stdout)
+
         started_out = y("start", "--on", on, "--cwd", str(project), "--", "from far away")
         remote_id = started_out.split()[1]
         host = started_out.split(" on ")[1].split(" in ")[0]
-        listed_json = json.loads(y("list", "--json"))
-        assert any(s["id"] == remote_id and s["host"] == host for s in listed_json["sessions"]), listed_json
+        assert any(s["id"] == remote_id and s["host"] == host for s in session_list()["sessions"]), session_list()
         y("send", remote_id[:8], "and one more")
         wait_for("the message in the remote session", lambda: "and one more" in subprocess.run(
             ["tmux", "-L", remote_socket, "capture-pane", "-p", "-t", "cc-" + remote_id],
             capture_output=True, text=True).stdout)
         assert "from far away" in y("read", remote_id[:8])
-        type_keys(marmota, "s")
-        wait_for("the Sessions box", lambda: in_sessions_box(marmota))
-        row = wait_for("the remote session's row", lambda: row_of_host(screen(marmota), host, ""))
-        remote_title = title_after(row, host)
-
-        def pick_remote() -> None:
-            """Puts the Sessions box on the remote row by its number: the Ask box
-            says whom it writes to."""
-            number = re.search(r"│\S?\s*(\d+) ", row_of(remote_title)).group(1)
-            for key in number + "g":
-                type_keys(marmota, key)
-                time.sleep(0.1)
-            wait_for("the remote session picked",
-                     lambda: (row_of_host(screen(marmota), host, remote_title) or "").startswith("│▌"))
-
-        def screen_of(pane_id: int) -> str:
-            """A pane's screen, or nothing if it closed since it was listed:
-            the viewer of another computer closes as this one opens."""
-            try:
-                return screen(pane_id)
-            except subprocess.CalledProcessError:
-                return ""
-
-        def row_of(title: str) -> str:
-            return wait_for(f"{title}'s row", lambda: row_of_host(screen(marmota), host, title))
-
-        pick_remote()
-        type_keys(marmota, "\r")
-        remote_viewer = wait_for("it beside Marmota", lambda: next(
-            (p for p in panes() if p["tab_id"] == marmota_tab and p["pane_id"] != marmota
-             and "and one more" in screen_of(p["pane_id"])), None))
-        type_keys(marmota, "\x1b")
-        wait_for("the files", lambda: not in_sessions_box(marmota))
-        type_keys(marmota, "s")
-        wait_for("the Sessions box", lambda: in_sessions_box(marmota))
-        pick_remote()
-        type_keys(marmota, "x")
-        wait_for("the stop question", lambda: "Stop" in screen(marmota))
-        type_keys(marmota, "\r")
-        wait_for("its window to close over there", lambda: "cc-" + remote_id not in subprocess.run(
-            ["tmux", "-L", remote_socket, "list-windows", "-a", "-F", "#{window_name}"],
-            capture_output=True, text=True).stdout)
-        wait_for("the pane beside Marmota to close", lambda: pane_by_id(remote_viewer["pane_id"]) is None)
-        type_keys(marmota, "\x1b")
+        # The Sessions box lists this computer's sessions, and claude.ai's of
+        # the others: not what y session reaches over a command.
+        time.sleep(5)  # more than one of its listings
+        assert listed(marmota) == again, f"the Sessions box changed: {listed(marmota)}"
         subprocess.run(["tmux", "-L", remote_socket, "kill-server"], capture_output=True)
-        print(f"ok   y session start --on started a session on {host}; it showed in the Sessions box with its "
-              "computer's name; send and read reached it; enter showed it beside Marmota; x stopped it")
+        print(f"ok   y session start --on started a session on {host}; list, send and read reached it; the "
+              "Sessions box kept to this computer's sessions")
 
-        # 8. a computer that needs a login: its session stays, marked; enter
-        # logs in, in a pane below Marmota, and it is reached again
+        # 8. a computer that can't be reached, as one whose login ran out:
+        # y session list names it with why, and lists its session again once
+        # it answers
         remote_socket2 = socket + "-remote2"
         marker = work / "logged-in"
         marker.touch()
@@ -341,51 +298,23 @@ def main() -> int:
                 f"export MARMOTA_TMUX_SOCKET={remote_socket2}; eval \"$1\"")
         on2 = f"/bin/sh -c {shlex.quote(gate)} sh"
         out2 = y("start", "--on", on2, "--cwd", str(project), "--", "behind a login")
+        remote_id2 = out2.split()[1]
         host2 = out2.split(" on ")[1].split(" in ")[0]
-        remotes_file = iso / "state" / "marmota" / "remotes.json"
-        hosts = json.loads(remotes_file.read_text())
-        for h in hosts:
-            if h["name"] == host2:
-                h["login"] = ["touch", str(marker)]
-        remotes_file.write_text(json.dumps(hosts))
-        row2 = wait_for("its row", lambda: row_of_host(screen(marmota), host2, ""))
-        title2 = title_after(row2, host2)
-
-        def screen_after(title: str) -> str:
-            """The line under a session's row: what it is doing."""
-            lines = screen(marmota).splitlines()
-            for i, line in enumerate(lines):
-                box = line.split("││", 1)[0]
-                if box.startswith("│") and " cc " in box and host2 + " · " in box and title[:3] in box \
-                        and i + 1 < len(lines):
-                    return lines[i + 1].split("││", 1)[0]
-            return ""
-
-        # The connection drops, and the login has run out.
+        assert any(s["id"] == remote_id2 for s in session_list()["sessions"]), session_list()
         marker.unlink()
-        clients = subprocess.run(["tmux", "-L", remote_socket2, "list-clients", "-F",
-                                  "#{client_name} #{client_control_mode}"], capture_output=True, text=True).stdout
-        for line in clients.splitlines():
-            name, control = line.rsplit(" ", 1)
-            if control == "1":
-                subprocess.run(["tmux", "-L", remote_socket2, "detach-client", "-t", name], capture_output=True)
-        wait_for("its row to say it needs a login", lambda: "needs login" in screen_after(title2), timeout=30)
-        type_keys(marmota, "s")
-        wait_for("the Sessions box", lambda: in_sessions_box(marmota))
-        number2 = re.search(r"│\S?\s*(\d+) ", row_of_host(screen(marmota), host2, title2)).group(1)
-        for key in number2 + "g":
-            type_keys(marmota, key)
-            time.sleep(0.1)
-        wait_for("its row picked", lambda: (row_of_host(screen(marmota), host2, title2) or "").startswith("│▌"))
-        type_keys(marmota, "\r")
-        wait_for("the login to run", lambda: marker.exists())
-        wait_for("it reached again", lambda: "waiting for your next" in screen_after(title2), timeout=40)
-        type_keys(marmota, "\x1b")
-        print(f"ok   {host2} needing a login kept its session in the list, marked; enter logged in in a pane, "
-              "and it was reached again")
+        away = session_list()
+        assert host2 in away.get("unreachable", {}), f"{host2} isn't said to be out of reach: {away}"
+        assert "Permission denied" in away["unreachable"][host2], away["unreachable"]
+        assert not any(s["id"] == remote_id2 for s in away["sessions"]), away
+        marker.touch()
+        back = session_list()
+        assert any(s["id"] == remote_id2 for s in back["sessions"]) and host2 not in back.get("unreachable", {}), back
+        subprocess.run(["tmux", "-L", remote_socket2, "kill-server"], capture_output=True)
+        print(f"ok   out of reach, {host2} was named with why and its session left out; reached again, its "
+              "session was listed")
 
-        # 9. Marmota restarts in its pane: the pane beside it that shows the
-        # other computer's session is taken back, not opened twice
+        # 9. Marmota restarts in its pane: the pane beside it that shows a
+        # session is taken back, not opened twice
         # Between the two, a line the test waits for: the second Marmota can
         # draw before a look at the screen finds the first one gone.
         marmota3 = spawn("/bin/sh", "-c", f"{shlex.quote(new)}; echo marmota-quit; sleep 2; {shlex.quote(new)}; sleep 600")
@@ -393,41 +322,35 @@ def main() -> int:
         main_screen(marmota3)
         type_keys(marmota3, "F")
 
-        def open_remote(pane: int) -> None:
-            type_keys(pane, "s")
+        def open_moved(pane: int) -> None:
+            """enter on the session that runs in tmux."""
+            type_keys(pane, SESSIONS_KEY)
             try:
                 wait_for("the Sessions box", lambda: in_sessions_box(pane), timeout=8)
             except AssertionError:
-                type_keys(pane, "s")
+                type_keys(pane, SESSIONS_KEY)
                 wait_for("the Sessions box", lambda: in_sessions_box(pane))
-            # Its computer has this one session: a narrow box cuts its title.
-            line = wait_for("the remote row", lambda: row_of_host(screen(pane), host2, ""))
-            number = re.search(r"│\S?\s*(\d+) ", line).group(1)
-            for key in number + "g":
-                type_keys(pane, key)
-                time.sleep(0.1)
-            wait_for("it picked", lambda: (row_of_host(screen(pane), host2, "") or "").startswith("│▌"))
+            select_session(pane, moved_title)
             type_keys(pane, "\r")
 
         def beside(pane: int) -> list[int]:
             return [p["pane_id"] for p in panes() if p["tab_id"] == tab3 and p["pane_id"] != pane]
 
-        open_remote(marmota3)
-        first_viewer = wait_for("the remote session beside Marmota", lambda: beside(marmota3))
+        open_moved(marmota3)
+        first_viewer = wait_for("the session beside Marmota", lambda: beside(marmota3))
         type_keys(marmota3, "\x1b")
         wait_for("the files", lambda: not in_sessions_box(marmota3))
         type_keys(marmota3, "q")
         wait_for("Marmota to quit", lambda: "marmota-quit" in screen(marmota3))
         main_screen(marmota3)
         type_keys(marmota3, "F")
-        time.sleep(3)  # its first refresh reaches the other computer
-        open_remote(marmota3)
+        time.sleep(3)  # its first listing of the sessions
+        open_moved(marmota3)
         time.sleep(3)
         assert beside(marmota3) == first_viewer, f"a second pane opened beside Marmota: {beside(marmota3)} vs {first_viewer}"
         type_keys(marmota3, "\x1b")
-        subprocess.run(["tmux", "-L", remote_socket2, "kill-server"], capture_output=True)
-        print("ok   restarted in its pane, Marmota took back the pane beside it that shows the other computer's "
-              "session; enter didn't open a second one")
+        print("ok   restarted in its pane, Marmota took back the pane beside it that shows the session; enter "
+              "didn't open a second one")
 
         # 10. a session someone started on the other computer, outside
         # Marmota: y session adopt moves it in, with the same id

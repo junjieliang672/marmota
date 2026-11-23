@@ -2,11 +2,12 @@ package internal
 
 // Sessions on other computers: each runs in Marmota's tmux over there (see
 // package sessionhost), started by `y session start --on <how to reach it>`,
-// which remembers the computer. Marmota keeps one connection to each and
-// lists the sessions in its windows there with this computer's, each with
-// its computer's name. A session's transcript is copied here a piece at a
-// time, so the preview, unread marks and titles come from the same code as
-// for a session here.
+// which remembers the computer. The y session commands reach each over a
+// connection of their own and list the sessions in its windows there, each
+// with its computer's name; a session's transcript is copied here a piece at
+// a time, so it is read by the same code as one here. The Sessions box
+// doesn't list them from there: its Remote section is claude.ai's list
+// (app_sessions.go).
 
 import (
 	"encoding/json"

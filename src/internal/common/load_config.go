@@ -209,8 +209,10 @@ func fillMissingHotkeysFromDefaults() {
 	if slices.Equal(Hotkeys.JumpToUnreadSession, oldSessionKey) {
 		Hotkeys.JumpToUnreadSession = defaultHotkeys.JumpToUnreadSession
 	}
-	if slices.Equal(Hotkeys.GoTo, oldGoToKeys) {
-		Hotkeys.GoTo = defaultHotkeys.GoTo
+	for _, old := range oldGoToKeys {
+		if slices.Equal(Hotkeys.GoTo, old) {
+			Hotkeys.GoTo = defaultHotkeys.GoTo
+		}
 	}
 }
 
@@ -218,9 +220,10 @@ func fillMissingHotkeysFromDefaults() {
 var (
 	// oldAskBarKeys are open_ask_bar's earlier defaults.
 	oldAskBarKeys = [][]string{{"ctrl+k", ""}, {"alt+k", ""}}
-	// oldSessionKey and oldGoToKeys are jump_to_unread_session's and go_to's.
+	// oldSessionKey and oldGoToKeys are jump_to_unread_session's and go_to's:
+	// the list opened on s alone from 2026-11-10, on s or z from 2026-11-17.
 	oldSessionKey = []string{"!", ""}
-	oldGoToKeys   = []string{"s", "z"}
+	oldGoToKeys   = [][]string{{"s", ""}, {"s", "z"}}
 
 	// oldKeyLines are the lines of a hotkeys file that still say an old
 	// default, with the line that says the new one.
@@ -237,7 +240,7 @@ var (
 			"jump_to_unread_session = ['s', '']",
 		},
 		{
-			regexp.MustCompile(`(?m)^go_to\s*=\s*\[\s*'s'\s*,\s*'z'\s*\]`),
+			regexp.MustCompile(`(?m)^go_to\s*=\s*\[\s*'s'\s*,\s*'z?'\s*\]`),
 			"go_to = ['z', '']",
 		},
 	}

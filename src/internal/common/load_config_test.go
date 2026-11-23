@@ -102,6 +102,18 @@ func TestTheOldSessionAndGoToKeysBecomeSAndZ(t *testing.T) {
 	assert.Equal(t, "go_to = ['z', '']\njump_to_unread_session = ['s', '']\nquit = ['q', '']\n", string(data))
 	assert.False(t, fixOldKeys(file), "nothing old left: the file isn't written again")
 
+	// The list opened on s alone for a week: that default goes the same way,
+	// or s would be two keys.
+	Hotkeys = HotkeysType{JumpToUnreadSession: []string{"!", ""}, GoTo: []string{"s", ""}}
+	fillMissingHotkeysFromDefaults()
+	assert.Equal(t, []string{"s", ""}, Hotkeys.JumpToUnreadSession)
+	assert.Equal(t, []string{"z", ""}, Hotkeys.GoTo)
+	require.NoError(t, os.WriteFile(file, []byte("go_to = ['s', '']\njump_to_unread_session = ['!', '']\n"), 0o600))
+	assert.True(t, fixOldKeys(file))
+	data, err = os.ReadFile(file)
+	require.NoError(t, err)
+	assert.Equal(t, "go_to = ['z', '']\njump_to_unread_session = ['s', '']\n", string(data))
+
 	// No default says ! any more, in either file of keys.
 	for _, name := range []string{"hotkeys.toml", "vimHotkeys.toml"} {
 		keys, err := os.ReadFile(filepath.Join("..", "..", "marmota_config", name))

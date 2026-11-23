@@ -16,7 +16,7 @@ to it.
 - **Sessions beside your files.** The Claude Code and Codex sessions Marmota starts run in tmux
   (a server of Marmota's own, out of sight), so they keep running when you close their pane, quit
   Marmota or quit WezTerm: run `y` again and they are all there. A pane beside Marmota shows the
-  one you pick. The Sessions box at the foot (`s`) lists the running ones; each row says `cc`
+  one you pick. The Sessions box under the preview (`s`) lists the running ones; each row says `cc`
   (Claude Code) or `co` (Codex), how it stands (working, needs you, replied) and what it is doing.
   The preview above shows the selected session's conversation.
 - **Sessions on other computers.** The Sessions box's Remote section lists your sessions on other
@@ -103,7 +103,7 @@ y
 | `w` · `r` · `x` · `m` | In the Sessions box: fork, rename, stop, mention a session |
 | `z` | Go to: pinned, sessions (running or ended, to resume), folders zoxide knows, recent files; `enter` on a running session puts the Sessions box on it and leaves the pane beside Marmota as it is |
 | `ctrl+r` | In the Ask box, writing to a new session: resume an ended one instead |
-| `M` · `F` | Focus the Details box · hide or show the boxes at the foot |
+| `M` · `F` | Focus the Details box · hide or show Details and the Ask box (the file panels take their room) |
 | `?` | All keys |
 | `q` | Quit |
 

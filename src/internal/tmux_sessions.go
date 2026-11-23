@@ -831,7 +831,7 @@ func (m *model) migrateToTmux() tea.Cmd {
 	var moved []string
 	gone := map[int]bool{}
 	for _, pane := range append([]weztermPane(nil), m.claude.panes...) {
-		if isTmuxPane(pane.PaneID) || pane.Workspace != managedAgentHiddenWorkspace {
+		if isTmuxPane(pane.PaneID) || !inHiddenWorkspace(pane) {
 			continue
 		}
 		s, found := m.sessionInPane(pane.PaneID)

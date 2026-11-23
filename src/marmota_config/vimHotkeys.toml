@@ -128,7 +128,7 @@ manage_tags = ['t', '']
 #                           Sessions box hotkeys                              #
 ###############################################################################
 
-# Note: These only work while the Sessions box at the foot (jump_to_unread_session)
+# Note: These only work while the Sessions box under the preview (jump_to_unread_session)
 # has the keyboard, so they can reuse keys from other sections.
 
 session_new = ['n', '']

@@ -26,6 +26,17 @@ const weztermSplitDividerCols = 1
 // parked here stay out of the tab bar until they're pulled back into a split.
 const managedAgentHiddenWorkspace = "marmota-agents"
 
+// oldHiddenWorkspace is what that workspace was called before the program
+// was Marmota (said here and nowhere else): sessions a build from then
+// parked there are still hidden ones, and move into tmux as any other.
+const oldHiddenWorkspace = "superfile-agents"
+
+// inHiddenWorkspace reports a pane that waits in the hidden workspace, under
+// either name.
+func inHiddenWorkspace(pane weztermPane) bool {
+	return pane.Workspace == managedAgentHiddenWorkspace || pane.Workspace == oldHiddenWorkspace
+}
+
 type managedAgentProvider string
 
 const (
@@ -722,7 +733,7 @@ func parkStrayManagedPanes(cwd string, sessions []managedAgentSession, visiblePa
 	}
 	for _, session := range sessions {
 		pane, ok := panesByID[session.PaneID]
-		if !ok || visible[pane.PaneID] || pane.Workspace == "" || pane.Workspace == managedAgentHiddenWorkspace {
+		if !ok || visible[pane.PaneID] || pane.Workspace == "" || inHiddenWorkspace(pane) {
 			continue
 		}
 		if err := parkWeztermPane(cwd, pane.PaneID); err != nil {
