@@ -238,6 +238,48 @@ func TestAPaneNeverStaysInCopyMode(t *testing.T) {
 	})
 }
 
+// ctrl+G pressed in a session's window keeps where the cursor is and what
+// the screen shows, then reaches the session as it always did: the editor
+// the session opens asks for them (y prompt-cursor).
+func TestCtrlGKeepsTheCursorAndTheScreenForTheEditor(t *testing.T) {
+	c := localClient(t)
+	out := t.TempDir() + "/got"
+	// A prompt of two rows, the cursor left four columns into the second,
+	// and whatever is typed next written to a file.
+	w, err := c.Start(NameFor(ClaudePrefix, "ctrlg"), t.TempDir(),
+		`printf '> first row\n  second row\r\033[4C'; stty raw -echo; head -c 1 > `+out+"; sleep 30")
+	require.NoError(t, err)
+	waitFor(t, "the prompt", func() bool {
+		screen, _ := c.Capture(w.PaneID)
+		return strings.Contains(screen, "second row")
+	})
+	time.Sleep(300 * time.Millisecond) // the cursor moved, and raw mode is on
+
+	// The key as a client presses it: looked up in tmux's keys, not handed
+	// to the window as send-keys otherwise does.
+	_, err = c.Command("select-window -t " + Quote(w.PaneID))
+	require.NoError(t, err)
+	clients, err := c.Command("list-clients -F '#{client_name}'")
+	require.NoError(t, err)
+	require.NotEmpty(t, clients)
+	_, err = c.Command("send-keys -K -c " + Quote(clients[0]) + " C-g")
+	require.NoError(t, err)
+
+	waitFor(t, "the key in the program", func() bool {
+		got, _ := os.ReadFile(out)
+		return len(got) == 1
+	})
+	got, _ := os.ReadFile(out)
+	assert.Equal(t, "\a", string(got), "ctrl+G still reaches the session")
+	at, err := c.Command("show-options -pqv -t " + Quote(w.PaneID) + " " + CursorOption)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"4 1"}, at, "the cursor's column and row, from 0")
+	screen, err := c.Command("show-buffer -b " + PromptBuffer)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, len(screen), 2)
+	assert.Equal(t, []string{"> first row", "  second row"}, screen[:2], "the screen as it was")
+}
+
 func TestKeysAreSentByTheirNames(t *testing.T) {
 	assert.Equal(t, []keyPart{{text: []byte("hi")}, {key: "Down"}, {key: "Enter"}, {key: "C-s"},
 		{text: []byte("a\nb")}, {key: "Escape"}, {text: []byte("x")}},

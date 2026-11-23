@@ -27,6 +27,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -100,7 +101,24 @@ set -g remain-on-exit off
 set -g detach-on-destroy on
 set -g visual-bell off
 set -g bell-action none
+# ctrl+G in a session opens its prompt in the editor (Claude Code, Codex),
+# with the text and nothing about the cursor, and the session has redrawn its
+# screen by the time the editor starts. So the cursor and the screen are kept
+# as the key is pressed, and the key goes on to the session: the editor opens
+# where the cursor was (y prompt-cursor, asked by scripts/micro/marmota/edit).
+bind-key -n C-g set-option -pF ` + CursorOption + ` "#{cursor_x} #{cursor_y}" \; capture-pane -b ` + PromptBuffer + ` \; send-keys C-g
 `
+
+const (
+	// CursorOption is the option of a window's pane that holds where its
+	// cursor was, column and row from 0, when ctrl+G was last pressed in it.
+	CursorOption = "@marmota-cursor"
+	// PromptBuffer is the tmux buffer that holds the screen as it was then.
+	PromptBuffer = "marmota-prompt"
+	// binOption holds the y that connected last on this computer, for a
+	// program in a window that has no PATH to find it by.
+	binOption = "@marmota-bin"
+)
 
 // remotePath is put after PATH over there: a command ssh runs gets no login
 // profile, so Homebrew's tmux and Claude Code's installer folder may be
@@ -364,6 +382,11 @@ func Dial(ctx context.Context, h Host) (*Client, error) {
 		return nil, err
 	}
 	c.reattachOnNewConfig()
+	// The editor a session opens asks this y where the prompt's cursor was.
+	// Only y itself is named, not a test of it or another program.
+	if exe, err := os.Executable(); err == nil && h.Local && filepath.Base(exe) == "y" {
+		_, _ = c.Command("set-option -g " + binOption + " " + Quote(exe))
+	}
 	return c, nil
 }
 

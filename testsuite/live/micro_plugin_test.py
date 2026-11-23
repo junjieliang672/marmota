@@ -89,11 +89,12 @@ ROWS = "".join(f"row {n}\n" for n in range(1, 61))
 class Micro:
     """micro in a tmux server of its own."""
 
-    def __init__(self, server: str, cwd: Path, env: dict[str, str], config: Path, file: str) -> None:
+    def __init__(self, server: str, cwd: Path, env: dict[str, str], config: Path, file: str, *before: str) -> None:
+        """before: what micro is given ahead of the file, as +LINE:COL."""
         self.server = server
         self.tmux("kill-server")
         words = ["env", "-u", "SSH_CONNECTION", "-u", "TMUX", "-u", "TMUX_PANE", "-u", "WEZTERM_PANE",
-                 *[f"{k}={v}" for k, v in env.items()], "micro", "-config-dir", str(config), file]
+                 *[f"{k}={v}" for k, v in env.items()], "micro", "-config-dir", str(config), *before, file]
         self.tmux("-f", "/dev/null", "new-session", "-d", "-s", "t", "-x", "150", "-y", "24", "-c", str(cwd),
                   " ".join("'" + w.replace("'", "'\\''") + "'" for w in words))
         wait_for("micro to start", lambda: file in self.screen())
@@ -321,6 +322,26 @@ def main() -> int:
             "a line that starts as an option does is a line all the same"
         print("ok   the Mac keys move, select and delete as in a text field; undo and redo work; in a line of "
               "Chinese they go by the system's words, and deleting takes what moving goes over")
+
+        # An editor opened on a prompt (the Ask box's question, a session's own on ctrl+G) starts where
+        # the prompt's cursor was, +LINE:COL, and says where its own is as the file closes: the line and
+        # the column, in characters, then the file, in the file MARMOTA_CURSOR_FILE names.
+        left_at = work / "cursor"
+        plan.write_text("first\nsecond 中文 line\nthird\n")
+        ed = Micro(server, project, {**env, "MARMOTA_BIN": y, "MARMOTA_CURSOR_FILE": str(left_at)}, config,
+                   "plan.md", "+2:9")
+        ed.type("X")
+        time.sleep(0.2)
+        assert ed.left()[1] == "second 中X文 line", f"+2:9 isn't the ninth character of line 2: {ed.left()}"
+        ed.press("cmd+z")
+        ed.press("down")  # to the end of "third", a shorter line: its sixth column
+        ed.press("cmd+w")
+        wait_for("micro to say where its cursor was", lambda: left_at.exists() and left_at.read_text().strip())
+        said = left_at.read_text().split()
+        assert said[:2] == ["3", "6"] and said[2].endswith("/plan.md"), f"micro left its cursor at {said}"
+        ed.quit()
+        print("ok   micro opened at +LINE:COL, counting a Chinese character as one, and wrote where its cursor "
+              "was as the file closed")
 
         # 2. cmd+G goes to a place, cmd+shift+G selects up to it
         assert after("cmd+g", "4", "enter", "!")[3] == "!line four", "cmd+G, a number: that line"

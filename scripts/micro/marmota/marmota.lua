@@ -1697,8 +1697,26 @@ function escape(bp)
 end
 
 -- Closing one of the column's panes (cmd+W) puts the column away.
+-- An editor opened on a prompt (the question in Marmota's Ask box, or a
+-- session's own on ctrl+G) says where its cursor is as the file closes, in
+-- the file MARMOTA_CURSOR_FILE names: the line and the column, from 1 and in
+-- characters, then the file. The prompt's cursor goes there, as the editor
+-- opened where the prompt's was.
+local function leaveCursor(bp)
+    local out = os.Getenv("MARMOTA_CURSOR_FILE")
+    if out == "" or bp.Buf.AbsPath == "" then
+        return
+    end
+    local f = io.open(out, "w")
+    if f ~= nil then
+        f:write((bp.Cursor.Y + 1) .. " " .. (bp.Cursor.X + 1) .. " " .. bp.Buf.AbsPath .. "\n")
+        f:close()
+    end
+end
+
 function preQuit(bp)
     if not inColumn(bp) then
+        leaveCursor(bp)
         return true
     end
     closeColumn()

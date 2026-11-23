@@ -17,5 +17,30 @@ if ! command -v micro > /dev/null 2>&1; then
         fi
     done
 fi
+# Opened on one file from a session in Marmota's tmux, as its prompt on
+# ctrl+G: micro starts where the prompt's cursor was, not at the file's start,
+# and when it closes the prompt's cursor goes where micro's was. The session
+# hands over the text only, so Marmota's tmux keeps the screen and the cursor
+# as the key is pressed, and the y that tmux names works the place out (y
+# prompt-cursor); micro, with Marmota's plugin, writes where its cursor is as
+# the file closes, and y moves the prompt's there once the session has drawn
+# it again. With no place to tell, micro opens as it always did.
+if [ $# -eq 1 ] && [ -f "$1" ] && [ -n "${TMUX:-}" ] && [ -n "${TMUX_PANE:-}" ]; then
+    y=$(tmux show-options -gqv @marmota-bin 2> /dev/null)
+    if [ -n "$y" ] && [ -x "$y" ]; then
+        file=$1
+        at=$("$y" prompt-cursor "$file" 2> /dev/null) || at=
+        case "$at" in
+            [0-9]*:[0-9]*) set -- "+$at" "$file" ;;
+        esac
+        left="${TMPDIR:-/tmp}/marmota-cursor.$$"
+        set -m
+        MARMOTA_CURSOR_FILE="$left" "$micro" "$@"
+        ended=$?
+        "$y" prompt-cursor --back "$file" "$left" > /dev/null 2>&1
+        rm -f "$left"
+        exit "$ended"
+    fi
+fi
 set -m
 "$micro" "$@"

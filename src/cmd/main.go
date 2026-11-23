@@ -45,6 +45,7 @@ func Run(content embed.FS) {
 		Commands: []*cli.Command{
 			sessionCommand(),
 			wordsCommand(),
+			promptCursorCommand(),
 			{
 				Name:    "path-list",
 				Aliases: []string{"pl"},

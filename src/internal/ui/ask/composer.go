@@ -110,6 +110,47 @@ func (c *Composer) Value() string {
 	return strings.ReplaceAll(c.input.Value(), string(lineBreak), "\n")
 }
 
+// CursorAt is where the cursor is in the question: the line and the column
+// of Value, both from 1 and counted in characters. An editor the question is
+// written in opens there.
+func (c *Composer) CursorAt() (int, int) {
+	value := []rune(c.input.Value())
+	line, col := 1, 1
+	for _, r := range value[:min(max(c.input.Position(), 0), len(value))] {
+		col++
+		if r == lineBreak {
+			line, col = line+1, 1
+		}
+	}
+	return line, col
+}
+
+// SetCursorAt puts the cursor at line and col of Value, both from 1 and in
+// characters: where an editor the question was written in left its own. A
+// place past the question's end is its end. A long question then shows
+// whole, not folded, since the cursor is somewhere in it.
+func (c *Composer) SetCursorAt(line, col int) {
+	value := []rune(c.input.Value())
+	pos := 0
+	for l := 1; l < line && pos < len(value); l++ {
+		next := slices.Index(value[pos:], lineBreak)
+		if next < 0 {
+			pos = len(value)
+			break
+		}
+		pos += next + 1
+	}
+	end := slices.Index(value[pos:], lineBreak)
+	if end < 0 {
+		end = len(value) - pos
+	}
+	pos += min(max(col-1, 0), end)
+	c.input.SetCursor(pos)
+	if pos < len(value) {
+		c.folded = false
+	}
+}
+
 // SetValue replaces the question, such as one kept from before.
 func (c *Composer) SetValue(text string) {
 	c.setInput(text)

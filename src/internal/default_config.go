@@ -304,7 +304,7 @@ func getHelpMenuData() []helpMenuModalData {
 		},
 		{
 			hotkey:         common.Hotkeys.AskEdit,
-			description:    "Write the question in the editor; when it closes, what it holds is the question",
+			description:    "Write the question in the editor, which opens where your cursor is; when it closes, what it holds is the question",
 			hotkeyWorkType: globalType,
 		},
 		{
