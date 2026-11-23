@@ -220,7 +220,7 @@ def main() -> int:
             return 0
 
     y = str(Path(args.binary).resolve())
-    work = Path(tempfile.mkdtemp(prefix="spf-micro-", dir="/private/tmp"))
+    work = Path(tempfile.mkdtemp(prefix="marmota-micro-", dir="/private/tmp"))
     project = work / "project"
     project.mkdir()
     (work / "home").mkdir()

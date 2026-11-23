@@ -25,8 +25,8 @@ class CopyTest(GenericTestImpl):
             test_files=[(FILE1, tconst.FILE_TEXT1)],
             key_inputs=[keys.KEY_CTRL_C, keys.KEY_PASTE],
             validate_exists=[FILE1, FILE1_COPY1],
-            # If you want to validate spf being close, wait time needs to be high
+            # If you want to validate Marmota being close, wait time needs to be high
             # Otherwise tests are flaky
-            validate_spf_closed=True,
+            validate_marmota_closed=True,
             close_wait_time=3
         )

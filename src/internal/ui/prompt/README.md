@@ -1,5 +1,5 @@
 # prompt package
-This is for the Prompt modal of superfile
+This is for the Prompt modal of Marmota
 
 Handles user input updates, the model's updates, and returns a PromptAction to model. 
 

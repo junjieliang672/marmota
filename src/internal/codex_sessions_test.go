@@ -70,7 +70,7 @@ func TestCodexPaneTitles(t *testing.T) {
 		require.True(t, ok, title)
 		assert.Equal(t, want, [2]string{name, folder}, title)
 	}
-	_, _, ok := codexPaneTitle("~/Developer/superfile")
+	_, _, ok := codexPaneTitle("~/Developer/marmota")
 	assert.False(t, ok, "a shell's title is a path")
 }
 
@@ -113,7 +113,7 @@ func TestCodexSessionsJoinTheList(t *testing.T) {
 	assert.False(t, closed.Live, "idle with no window: nothing runs")
 	assert.Equal(t, claudesession.StatusEnded, closed.Status)
 
-	bang(m)
+	toSessions(m)
 	var rows []string
 	for _, s := range m.dockSessions() {
 		rows = append(rows, s.ID)
@@ -147,7 +147,7 @@ func TestTheAskBoxStartsACodexSession(t *testing.T) {
 	ownAskHistory(t)
 	m := newClaudeTestModel(t)
 	dir := m.getFocusedFilePanel().location
-	wez := newFakeWezterm(t, superfileTab())
+	wez := newFakeWezterm(t, marmotaTab())
 	cx := newFakeCodex(t)
 	m.sessions.composer.SetStartsCodex(true)
 	press(m, common.Hotkeys.OpenAskBar[0])
@@ -196,7 +196,7 @@ func TestTheAskBoxStartsACodexSession(t *testing.T) {
 func TestACodexStartAsksToTrustItsFolderInItsRow(t *testing.T) {
 	ownAskHistory(t)
 	m := newClaudeTestModel(t)
-	wez := newFakeWezterm(t, superfileTab())
+	wez := newFakeWezterm(t, marmotaTab())
 	m.sessions.composer.SetStartsCodex(true)
 	ask(t, m, "group the logos")
 	require.Len(t, m.ask.starts, 1)
@@ -223,7 +223,7 @@ func TestACodexStartAsksToTrustItsFolderInItsRow(t *testing.T) {
 func TestTheAskBoxChoosesTheAgentOfANewSession(t *testing.T) {
 	ownAskHistory(t)
 	m := newClaudeTestModel(t)
-	newFakeWezterm(t, superfileTab())
+	newFakeWezterm(t, marmotaTab())
 	press(m, common.Hotkeys.OpenAskBar[0])
 	view := viewText(m)
 	assert.Contains(t, view, "Ask → new Claude Code session in")
@@ -242,7 +242,7 @@ func TestTheAskBoxChoosesTheAgentOfANewSession(t *testing.T) {
 	assert.Equal(t, [2]string{"", ""}, [2]string{model, effort})
 
 	d := dockTestModel(t)
-	bang(d)
+	toSessions(d)
 	press(d, common.Hotkeys.OpenAskBar[0])
 	require.False(t, d.sessions.list.NewSelected(), "writing to a running session")
 	press(d, "tab")
@@ -257,12 +257,12 @@ func TestTheAskBoxChoosesTheAgentOfANewSession(t *testing.T) {
 // The model is a flag. An effort, or Codex reviewing the approval requests
 // (auto), goes with the question, sent through Codex's server once the
 // session is found: as flags, Codex would run the session on a server of
-// its own, out of superfile's sight.
+// its own, out of Marmota's sight.
 func TestACodexStartGetsTheChosenModelAndEffort(t *testing.T) {
 	ownAskHistory(t)
 	m := newClaudeTestModel(t)
 	dir := m.getFocusedFilePanel().location
-	wez := newFakeWezterm(t, superfileTab())
+	wez := newFakeWezterm(t, marmotaTab())
 	cx := newFakeCodex(t)
 	m.sessions.composer.SetStartsCodex(true)
 	m.sessions.composer.SetCodexChoices("gpt-6-luna", "max")
@@ -316,7 +316,7 @@ func TestTheAskBoxSaysTheProgramAndModel(t *testing.T) {
 func TestASecondCodexStartInAFolderWaits(t *testing.T) {
 	ownAskHistory(t)
 	m := newClaudeTestModel(t)
-	newFakeWezterm(t, superfileTab())
+	newFakeWezterm(t, marmotaTab())
 	m.sessions.composer.SetStartsCodex(true)
 	ask(t, m, "first")
 	m.sessions.pendingSelect = "" // as when you chose another row since
@@ -342,7 +342,7 @@ func TestSendingToACodexSessionGoesThroughCodex(t *testing.T) {
 		Live: true, Status: claudesession.StatusWorking, TTY: "/dev/ttys030", Cwd: dir, Model: "gpt-6.1-sol",
 		Effort: "low"}}
 
-	bang(m)
+	toSessions(m)
 	require.True(t, m.sessions.list.Select("t1"))
 	press(m, common.Hotkeys.OpenAskBar[0])
 	view := viewText(m)
@@ -462,7 +462,7 @@ func TestCodexQuestionsAreCutFromItsScreen(t *testing.T) {
 }
 
 // A fork's pane has the forked session's title, so a title can't tell the
-// two apart: the fork is known by the pane superfile started it in, and the
+// two apart: the fork is known by the pane Marmota started it in, and the
 // session it was forked from keeps its own.
 func TestACodexForkIsKnownByItsPane(t *testing.T) {
 	m := newClaudeTestModel(t)
@@ -506,7 +506,7 @@ func TestACodexForkIsKnownByItsPane(t *testing.T) {
 	assert.Equal(t, map[string]string{"fork": "/dev/ttys061", "orig": "/dev/ttys030"}, got)
 	assert.Empty(t, m.codex.forks, "found")
 
-	// The next superfile reads the fork's pane back from the agent panes'
+	// The next Marmota reads the fork's pane back from the agent panes'
 	// state, both idle and listed the other way round.
 	m.codex = codexState{}
 	TeaUpdate(m, claudeSessionsSnapshotMsg{folder: dir, panesListed: true, layoutGen: m.claude.layoutGen,
@@ -574,7 +574,7 @@ func TestCodexMentionsSayWhyNot(t *testing.T) {
 // pane stays its own though the pane's title still names the old folder.
 func TestEqualsMovesACodexSessionHere(t *testing.T) {
 	m := newClaudeTestModel(t)
-	newFakeWezterm(t, superfileTab())
+	newFakeWezterm(t, marmotaTab())
 	here := m.getFocusedFilePanel().location
 	pane := weztermPane{PaneID: 31, TabID: 5, Title: "fix the login | web", TTYName: "/dev/ttys031"}
 	m.claude.panes = append(m.claude.panes, pane)

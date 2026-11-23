@@ -407,7 +407,7 @@ func (m *model) appKey(s claudesession.Session, key string) (tea.Cmd, bool) {
 	case slices.Contains(common.Hotkeys.Confirm, key):
 		url, id := s.App.URL, strings.TrimPrefix(s.ID, appIDPrefix)
 		was, had := m.app.seen[id]
-		m.setAppSeen(id, appSeen{At: s.LastActivity, Opened: true}) // so ! goes on to the next one
+		m.setAppSeen(id, appSeen{At: s.LastActivity, Opened: true}) // so s goes on to the next one
 		m.refreshSessionsList()
 		return tea.Batch(m.saveAppSeenCmd(),
 			func() tea.Msg { return appOpenedMsg{id: id, was: was, had: had, err: openAppURL(url)} }), true

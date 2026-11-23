@@ -53,7 +53,7 @@ func TestModel_getPromptAction(t *testing.T) {
 			shellMode:      false,
 			expectecAction: common.NoAction{},
 			expectedErr:    true,
-			expectedErrMsg: "Invalid spf command : abcd (use claude or codex)",
+			expectedErrMsg: "Invalid Marmota command : abcd (use claude or codex)",
 		},
 		{
 			name:           "Correct codex command",
@@ -77,7 +77,7 @@ func TestModel_getPromptAction(t *testing.T) {
 			shellMode:      false,
 			expectecAction: common.NoAction{},
 			expectedErr:    true,
-			expectedErrMsg: "Invalid spf command : cd (use claude or codex)",
+			expectedErrMsg: "Invalid Marmota command : cd (use claude or codex)",
 		},
 	}
 

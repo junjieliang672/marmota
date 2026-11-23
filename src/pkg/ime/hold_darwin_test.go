@@ -61,7 +61,7 @@ func TestCloseReleasesSynchronously(t *testing.T) {
 
 	h.Close()
 	// No polling: Close is documented to block until the release landed. If
-	// it did not, superfile would exit leaving the input method in ASCII mode.
+	// it did not, Marmota would exit leaving the input method in ASCII mode.
 	assert.False(t, exists(holdFile(dir)), "Close must release before returning")
 
 	h.Close()
@@ -176,7 +176,7 @@ func TestProcessAlive(t *testing.T) {
 }
 
 func TestUnusableDirectoryDegradesToNoop(t *testing.T) {
-	// A missing input method must never keep superfile from starting.
+	// A missing input method must never keep Marmota from starting.
 	h := New(true, filepath.Join(t.TempDir(), "file-in-the-way", "sub"))
 	require.NotNil(t, h)
 	h.Set(true)
@@ -209,5 +209,5 @@ func TestHoldFileCarriesTheScope(t *testing.T) {
 	body, err := os.ReadFile(holdFile(dir))
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"apps":["com.github.wez.wezterm"]}`, string(body),
-		"a background superfile must not disable Chinese input in other apps")
+		"a background Marmota must not disable Chinese input in other apps")
 }

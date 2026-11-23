@@ -1,12 +1,12 @@
-"""A throwaway HOME for one spf run, so tests never see the user's real state.
+"""A throwaway HOME for one Marmota run, so tests never see the user's real state.
 
-How spf resolves its directories (src/config/fixed_variable.go, adrg/xdg):
+How Marmota resolves its directories (src/config/fixed_variable.go, adrg/xdg):
 
 * config: ``$HOME/.config/marmota`` on macOS, ``$XDG_CONFIG_HOME/marmota``
   elsewhere.
 * data/state/cache: ``$XDG_{DATA,STATE,CACHE}_HOME/marmota``, which on macOS
   default to ``~/Library/Application Support`` and ``~/Library/Caches``.
-* trash on macOS: ``$HOME/.Trash`` (if that rename fails spf falls back to
+* trash on macOS: ``$HOME/.Trash`` (if that rename fails Marmota falls back to
   Finder through osascript, which is why ``.Trash`` is created and osascript
   is faked).
 
@@ -26,10 +26,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 REPO_ROOT: Path = Path(__file__).resolve().parents[2]
-REPO_CONFIG_DIR: Path = REPO_ROOT / "src" / "superfile_config"
+REPO_CONFIG_DIR: Path = REPO_ROOT / "src" / "marmota_config"
 FAKES_DIR: Path = Path(__file__).resolve().parent / "fakes"
 
-# Applied on top of the seeded config.toml for every run (none now: spf no
+# Applied on top of the seeded config.toml for every run (none now: Marmota no
 # longer goes online by itself).
 DEFAULT_CONFIG_OVERRIDES: Dict[str, Any] = {}
 
@@ -101,11 +101,11 @@ def _minimal_env(home: Path, path: str) -> Dict[str, str]:
 def read_binary_default_config(binary: Union[str, Path], scratch: Path) -> Dict[str, bytes]:
     """Return the config.toml/hotkeys.toml/theme files embedded in ``binary``.
 
-    spf writes its embedded defaults into a missing config dir before it
+    Marmota writes its embedded defaults into a missing config dir before it
     starts the TUI, then exits because stdin is not a terminal. Running it
     once that way with a scratch HOME yields exactly the defaults the binary
     was built with, which avoids drift when the working tree's
-    src/superfile_config has moved on since the binary was built.
+    src/marmota_config has moved on since the binary was built.
     """
     binary_path = Path(binary).resolve()
     key = (str(binary_path), binary_path.stat().st_mtime)
@@ -133,15 +133,15 @@ class Sandbox:
     """Temp HOME with a seeded Marmota config, fake tools and fixture files.
 
     Args:
-        config_source: "repo" copies src/superfile_config (config.toml,
+        config_source: "repo" copies src/marmota_config (config.toml,
             hotkeys.toml, theme/), "binary" extracts the defaults embedded in
             ``binary``, or a directory path to copy from.
-        binary: spf binary, required for config_source="binary".
+        binary: Marmota binary, required for config_source="binary".
         config_overrides: ``key = value`` lines to set in config.toml, on top
             of DEFAULT_CONFIG_OVERRIDES.
         hotkey_overrides: lines to set in hotkeys.toml, e.g.
             ``{"quit": ["q", ""]}``.
-        first_use: leave out ``firstUseCheck`` so spf shows its intro modal
+        first_use: leave out ``firstUseCheck`` so Marmota shows its intro modal
             (which swallows the first key press).
         claude_home: True creates an empty ``~/.claude/projects``; a path
             copies that tree into ``~/.claude``. False leaves no ``~/.claude``
@@ -178,15 +178,15 @@ class Sandbox:
         if self.parent_dir is not None:
             self.parent_dir.mkdir(parents=True, exist_ok=True)
         # resolve(): macOS temp dirs live behind the /var -> /private/var symlink,
-        # and spf reports real paths.
-        self._root = Path(tempfile.mkdtemp(prefix="spf-tui-", dir=self.parent_dir)).resolve()
+        # and Marmota reports real paths.
+        self._root = Path(tempfile.mkdtemp(prefix="marmota-tui-", dir=self.parent_dir)).resolve()
         for directory in (self.home, self.config_home, self.data_home, self.state_home,
                           self.cache_home, self.tmp_dir, self.logs_dir, self.fixtures_dir,
-                          self.bin_dir, self.home / ".Trash", self.spf_data_dir):
+                          self.bin_dir, self.home / ".Trash", self.marmota_data_dir):
             directory.mkdir(parents=True, exist_ok=True)
         self._seed_config()
         if not self.first_use:
-            (self.spf_data_dir / "firstUseCheck").write_bytes(b"")
+            (self.marmota_data_dir / "firstUseCheck").write_bytes(b"")
         self._seed_claude_home()
         self.set_claude_agents([])
         self.set_wezterm_panes([])
@@ -250,20 +250,20 @@ class Sandbox:
         return self.root / "bin"
 
     @property
-    def spf_config_dir(self) -> Path:
+    def marmota_config_dir(self) -> Path:
         return self.config_home / "marmota"
 
     @property
-    def spf_data_dir(self) -> Path:
+    def marmota_data_dir(self) -> Path:
         return self.data_home / "marmota"
 
     @property
-    def spf_state_dir(self) -> Path:
+    def marmota_state_dir(self) -> Path:
         return self.state_home / "marmota"
 
     @property
-    def spf_log_file(self) -> Path:
-        return self.spf_state_dir / "marmota.log"
+    def marmota_log_file(self) -> Path:
+        return self.marmota_state_dir / "marmota.log"
 
     @property
     def claude_dir(self) -> Path:
@@ -303,7 +303,7 @@ class Sandbox:
             "FAKE_WEZTERM_TEXT": str(self.fixtures_dir / "wezterm-text.txt"),
             "FAKE_WEZTERM_STATE": str(self.root / "wezterm-next-pane-id"),
             "FAKE_CLIPBOARD_FILE": str(self.clipboard_file),
-            # spf reads transcripts from $CLAUDE_CONFIG_DIR/projects, falling
+            # Marmota reads transcripts from $CLAUDE_CONFIG_DIR/projects, falling
             # back to $HOME/.claude/projects; both point into the sandbox.
             "CLAUDE_CONFIG_DIR": str(self.claude_dir),
         })
@@ -326,28 +326,28 @@ class Sandbox:
             resolved = Path(value).resolve()
             if resolved != self.root and self.root not in resolved.parents:
                 raise ValueError(f"{name}={value} points outside the sandbox {self.root}; "
-                                 "refusing to run spf against real user state")
+                                 "refusing to run Marmota against real user state")
 
     # ----- seeding -------------------------------------------------------------
 
     def _seed_config(self) -> None:
         files = self._config_files()
         for relative, content in files.items():
-            target = self.spf_config_dir / relative
+            target = self.marmota_config_dir / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(content)
-        config = self.spf_config_dir / "config.toml"
+        config = self.marmota_config_dir / "config.toml"
         config.write_text(apply_toml_overrides(config.read_text("utf-8"),
                                                self.config_overrides), "utf-8")
         if self.hotkey_overrides:
-            hotkeys = self.spf_config_dir / "hotkeys.toml"
+            hotkeys = self.marmota_config_dir / "hotkeys.toml"
             hotkeys.write_text(apply_toml_overrides(hotkeys.read_text("utf-8"),
                                                     self.hotkey_overrides), "utf-8")
 
     def _config_files(self) -> Dict[str, bytes]:
         if self.config_source == "binary":
             if self.binary is None:
-                raise ValueError("config_source='binary' needs binary=<path to spf>")
+                raise ValueError("config_source='binary' needs binary=<path to marmota>")
             scratch = self.root / "bootstrap"
             try:
                 return read_binary_default_config(self.binary, scratch)
@@ -407,7 +407,7 @@ class Sandbox:
         return calls
 
     def clipboard(self) -> str:
-        """What spf copied through the fake pbcopy."""
+        """What Marmota copied through the fake pbcopy."""
         if not self.clipboard_file.exists():
             return ""
         return self.clipboard_file.read_text("utf-8")

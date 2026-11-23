@@ -110,7 +110,7 @@ func typedText(msg tea.Msg) tea.Msg {
 }
 
 // syncIMEHold tells the input method whether to pass keys through as plain
-// ASCII. Held whenever superfile owns the keyboard and is reading hotkeys;
+// ASCII. Held whenever Marmota owns the keyboard and is reading hotkeys;
 // released as soon as a text field has focus, the terminal loses focus, or a
 // child process takes over the terminal.
 //
@@ -171,7 +171,7 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sessions.selection = previewSelection{} // a key puts the selection away
 		inputCmd = m.handleKeyInput(msg)
 
-	// Focus reporting exists for the IME ascii-hold. superfile stays in hotkey
+	// Focus reporting exists for the IME ascii-hold. Marmota stays in hotkey
 	// mode while it is in a background tab, and a hold left in place from there
 	// would force ASCII input in whatever the user switched to.
 	case tea.FocusMsg:
@@ -460,8 +460,8 @@ func (m *model) scheduleRefreshes(forcePreviewRender bool) tea.Cmd {
 }
 
 // restoreMouseReporting turns mouse reporting back on once a program that ran
-// in superfile's terminal, such as the editor, hands it back: bubbletea turns
-// it off for the program and leaves it off. superfile takes only the wheel,
+// in Marmota's terminal, such as the editor, hands it back: bubbletea turns
+// it off for the program and leaves it off. Marmota takes only the wheel,
 // over a preview, but unreported, WezTerm sends scrolling as arrow keys. A
 // trackpad's sideways scroll, which WezTerm sends to the focused pane even
 // while you scroll the one beside it, then went to the parent folder or into
@@ -522,7 +522,7 @@ func (m *model) getFilePreviewCmd(forcePreviewRender bool) tea.Cmd {
 	}
 }
 
-// previewPath is the file or folder the preview shows: the s list's item
+// previewPath is the file or folder the preview shows: the go to list's item
 // while it is open, else the item under the panel's cursor.
 func (m *model) previewPath() (string, bool) {
 	if m.jumpUI.IsOpen() {
@@ -753,7 +753,7 @@ func (m *model) handleKeyInput(msg tea.KeyMsg) tea.Cmd {
 		m.helpMenuKey(msg.String())
 
 	// esc puts a toast away ("esc later"); what it is about stays in the
-	// Inbox for !.
+	// Inbox for s.
 	case msg.String() == "esc" && m.dismissClaudeToast():
 
 	case slices.Contains(common.Hotkeys.Quit, msg.String()):
@@ -795,7 +795,7 @@ func (m *model) regularKey(msg tea.KeyMsg) tea.Cmd {
 	return m.mainKey(msg.String())
 }
 
-// quitIfAsked quits superfile when a quit key was pressed: it asks first
+// quitIfAsked quits Marmota when a quit key was pressed: it asks first
 // while processes still run, else quits at once.
 func (m *model) quitIfAsked(cmd tea.Cmd, cdOnQuit bool) tea.Cmd {
 	if m.modelQuitState == quitInitiated && m.editorAway != nil {
@@ -813,7 +813,7 @@ func (m *model) quitIfAsked(cmd tea.Cmd, cdOnQuit bool) tea.Cmd {
 		m.modelQuitState = quitConfirmationReceived
 	}
 	if m.modelQuitState == quitConfirmationReceived {
-		m.quitSuperfile(cdOnQuit)
+		m.quitMarmota(cdOnQuit)
 		return tea.Quit
 	}
 	return cmd
@@ -874,9 +874,9 @@ func (m *model) updateFilePanelsState(msg tea.Msg) tea.Cmd {
 func (m *model) applyPromptModalAction(action common.ModelAction) {
 	successMsg, actionErr := m.logAndExecuteAction(action)
 	if actionErr != nil {
-		m.promptModal.HandleSPFActionResults(false, actionErr.Error())
+		m.promptModal.HandleMarmotaActionResults(false, actionErr.Error())
 	} else if successMsg != "" {
-		m.promptModal.HandleSPFActionResults(true, successMsg)
+		m.promptModal.HandleMarmotaActionResults(true, successMsg)
 	}
 
 	// Close prompt immediately after successful managed agent command
@@ -930,9 +930,9 @@ func (m *model) applyShellCommandAction(shellCommand string) {
 	}
 }
 
-// launchAgentBesideSuperfile starts an agent in the focused panel's folder
-// and shows it beside superfile, with the keyboard in it.
-func (m *model) launchAgentBesideSuperfile(command string, provider managedAgentProvider,
+// launchAgentBesideMarmota starts an agent in the focused panel's folder
+// and shows it beside Marmota, with the keyboard in it.
+func (m *model) launchAgentBesideMarmota(command string, provider managedAgentProvider,
 	message string,
 ) (string, error) {
 	return m.launchVisibleAgent(m.fileModel.filePanels[m.filePanelFocusIndex].location, command, provider, message,
@@ -941,13 +941,13 @@ func (m *model) launchAgentBesideSuperfile(command string, provider managedAgent
 
 func (m *model) launchClaudeInWezterm(remoteControl bool) (string, error) {
 	if remoteControl {
-		return m.launchAgentBesideSuperfile(
+		return m.launchAgentBesideMarmota(
 			"claude --dangerously-skip-permissions --remote-control",
 			managedAgentProviderClaude,
 			"Claude Code (Remote Control) launched in new pane",
 		)
 	}
-	return m.launchAgentBesideSuperfile(
+	return m.launchAgentBesideMarmota(
 		"claude --dangerously-skip-permissions",
 		managedAgentProviderClaude,
 		"Claude Code launched in new pane",
@@ -955,7 +955,7 @@ func (m *model) launchClaudeInWezterm(remoteControl bool) (string, error) {
 }
 
 func (m *model) launchCodexInWezterm() (string, error) {
-	return m.launchAgentBesideSuperfile(
+	return m.launchAgentBesideMarmota(
 		codexLaunch(codexsession.LaunchArgs()...),
 		managedAgentProviderCodex,
 		"Codex CLI launched in new pane",
@@ -1030,7 +1030,7 @@ func (m *model) View() string {
 	if m.lay.preview.shown() {
 		filePreview := m.filePreviewPanelRender()
 		if s, ok := m.jumpPreviewSession(); ok {
-			// The s list is on a session: the preview shows it.
+			// The go to list is on a session: the preview shows it.
 			filePreview = m.jumpSessionPreview(s, m.fileModel.filePreview.GetWidth(),
 				m.fileModel.filePreview.GetHeight()) + filepreview.ClearKittyImages()
 		} else if m.previewShowsASession() {
@@ -1372,9 +1372,9 @@ func (panel *filePanel) applyTargetFileCursor() {
 	panel.targetFile = ""
 }
 
-// Close superfile application. Cd into the current dir if CdOnQuit on and save
+// Close Marmota application. Cd into the current dir if CdOnQuit on and save
 // the path in state direcotory
-func (m *model) quitSuperfile(cdOnQuit bool) {
+func (m *model) quitMarmota(cdOnQuit bool) {
 	m.saveAskHistory() // the question being written
 	// Resource cleanup
 	if common.Config.Metadata && et != nil {

@@ -25,9 +25,10 @@ nc='\033[0m' # No Color
 DRY_RUN=false
 CONFIGURE_WEZTERM=true
 CONFIGURE_NEOVIM=true
-CONFIGURE_SUPERFILE=true
+CONFIGURE_MARMOTA=true
 PATCH_CMD_K=false
 WEZTERM_LOOK=false
+MARMOTA_KEYS=false
 CONFIGURE_MICRO=true
 NO_COLOR=false
 
@@ -71,7 +72,13 @@ Options:
                     for it in ~/.config/micro (yours are backed up), the keys
                     block in ~/.wezterm.lua, and sets editor = "micro" in
                     Marmota's config and $EDITOR to micro in ~/.zshenv, for
-                    Claude Code's ctrl+G
+                    Claude Code's ctrl+G; and Marmota's keys, as --keys
+                    (./build.sh runs this)
+  --keys            Only bring Marmota's own keys up to date in
+                    ~/.config/marmota/hotkeys.toml: a key that still has an
+                    old default gets today's (s: the session that needs you,
+                    z: go to), a missing key is added, a key you chose stays;
+                    the file as it was is kept beside it
   --all             Configure everything (default)
   --no-color        Disable colored output
   -h, --help        Show this help message
@@ -80,7 +87,8 @@ Description:
   This script sets up macOS-style hotkeys for:
   - WezTerm: Cmd+Arrow navigation, Opt+Arrow word movement, etc.
   - Neovim: gy to yank an @file#L12-15 reference (what Claude Code attaches) instead of the text; gY absolute
-  - Marmota: Sets nvim as default editor
+  - Marmota: its keys, brought up to date in ~/.config/marmota/hotkeys.toml,
+    and micro as its editor
 
   Existing configs are backed up with timestamps before being overwritten.
 
@@ -144,7 +152,7 @@ parse_args() {
                 if [[ $specific_requested == false ]]; then
                     CONFIGURE_WEZTERM=false
                     CONFIGURE_NEOVIM=false
-                    CONFIGURE_SUPERFILE=false
+                    CONFIGURE_MARMOTA=false
                     CONFIGURE_MICRO=false
                     specific_requested=true
                 fi
@@ -155,7 +163,7 @@ parse_args() {
                 if [[ $specific_requested == false ]]; then
                     CONFIGURE_WEZTERM=false
                     CONFIGURE_NEOVIM=false
-                    CONFIGURE_SUPERFILE=false
+                    CONFIGURE_MARMOTA=false
                     CONFIGURE_MICRO=false
                     specific_requested=true
                 fi
@@ -166,18 +174,18 @@ parse_args() {
                 if [[ $specific_requested == false ]]; then
                     CONFIGURE_WEZTERM=false
                     CONFIGURE_NEOVIM=false
-                    CONFIGURE_SUPERFILE=false
+                    CONFIGURE_MARMOTA=false
                     CONFIGURE_MICRO=false
                     specific_requested=true
                 fi
-                CONFIGURE_SUPERFILE=true
+                CONFIGURE_MARMOTA=true
                 shift
                 ;;
             --cmd-k)
                 if [[ $specific_requested == false ]]; then
                     CONFIGURE_WEZTERM=false
                     CONFIGURE_NEOVIM=false
-                    CONFIGURE_SUPERFILE=false
+                    CONFIGURE_MARMOTA=false
                     CONFIGURE_MICRO=false
                     specific_requested=true
                 fi
@@ -188,7 +196,7 @@ parse_args() {
                 if [[ $specific_requested == false ]]; then
                     CONFIGURE_WEZTERM=false
                     CONFIGURE_NEOVIM=false
-                    CONFIGURE_SUPERFILE=false
+                    CONFIGURE_MARMOTA=false
                     CONFIGURE_MICRO=false
                     specific_requested=true
                 fi
@@ -200,17 +208,28 @@ parse_args() {
                 if [[ $specific_requested == false ]]; then
                     CONFIGURE_WEZTERM=false
                     CONFIGURE_NEOVIM=false
-                    CONFIGURE_SUPERFILE=false
+                    CONFIGURE_MARMOTA=false
                     CONFIGURE_MICRO=false
                     specific_requested=true
                 fi
                 WEZTERM_LOOK=true
                 shift
                 ;;
+            --keys)
+                if [[ $specific_requested == false ]]; then
+                    CONFIGURE_WEZTERM=false
+                    CONFIGURE_NEOVIM=false
+                    CONFIGURE_MARMOTA=false
+                    CONFIGURE_MICRO=false
+                    specific_requested=true
+                fi
+                MARMOTA_KEYS=true
+                shift
+                ;;
             --all)
                 CONFIGURE_WEZTERM=true
                 CONFIGURE_NEOVIM=true
-                CONFIGURE_SUPERFILE=true
+                CONFIGURE_MARMOTA=true
                 CONFIGURE_MICRO=true
                 shift
                 ;;
@@ -266,7 +285,7 @@ wezterm_cmd_k_block() {
     mods = 'CMD',
     action = wezterm.action_callback(function(window, pane)
       local program = (pane:get_foreground_process_name() or ''):match('[^/\\]+$')
-      if program == 'y' or program == 'spf' or program == 'superfile' then
+      if program == 'y' then
         return
       end
       window:perform_action(wezterm.action.ClearScrollback 'ScrollbackAndViewport', pane)
@@ -294,14 +313,6 @@ patch_wezterm_cmd_k() {
         log_success "Cmd+K already leaves Marmota alone"
         return
     fi
-    if grep -q "program == 'spf'" "$wezterm_config"; then
-        # Set up before the binary was called y: Marmota runs as y now
-        [[ $DRY_RUN == true ]] && { log_info "[DRY RUN] Would add y to Cmd+K's check"; return; }
-        backup_file "$wezterm_config"
-        sed -i '' "s/if program == 'spf' or/if program == 'y' or program == 'spf' or/" "$wezterm_config"
-        log_success "Cmd+K leaves Marmota alone as y too"
-        return
-    fi
     if ! grep -q "ClearScrollback 'ScrollbackAndViewport'" "$wezterm_config"; then
         log_warning "Cmd+K has no entry in $wezterm_config to change; add this to config.keys:"
         wezterm_cmd_k_block
@@ -313,8 +324,8 @@ patch_wezterm_cmd_k() {
     fi
 
     backup_file "$wezterm_config"
-    SPF_CMD_K="$(wezterm_cmd_k_block)" perl -0777 -pi -e \
-        's/(?:[ \t]*-- Clear scrollback[^\n]*\n)?[ \t]*\{\s*key = .k.,\s*mods = .CMD.,\s*action = wezterm\.action\.ClearScrollback .ScrollbackAndViewport.,\s*\},[ \t]*\n/$ENV{SPF_CMD_K}\n/' \
+    MARMOTA_CMD_K="$(wezterm_cmd_k_block)" perl -0777 -pi -e \
+        's/(?:[ \t]*-- Clear scrollback[^\n]*\n)?[ \t]*\{\s*key = .k.,\s*mods = .CMD.,\s*action = wezterm\.action\.ClearScrollback .ScrollbackAndViewport.,\s*\},[ \t]*\n/$ENV{MARMOTA_CMD_K}\n/' \
         "$wezterm_config"
     if grep -q "program == 'y'" "$wezterm_config"; then
         log_success "Cmd+K leaves Marmota alone now; WezTerm reloads its config by itself"
@@ -650,7 +661,7 @@ WEZTERM_EOF
 # =============================================================================
 # macOS Command-key hotkeys are not configured: Neovide has been removed and
 # terminal neovim cannot capture Command combinations anyway. What we do install
-# is the spf_yank_ref module, so files opened from superfile with `e` can yank an
+# is the marmota_yank_ref module, so files opened from Marmota with `e` can yank an
 # @file#L12-15 reference, which Claude Code attaches when pasted, instead of the
 # selected text.
 # =============================================================================
@@ -664,24 +675,49 @@ configure_neovim() {
     log_info "Configuring Neovim..."
 
     local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    local source_module="$script_dir/scripts/nvim/spf_yank_ref.lua"
+    local source_module="$script_dir/scripts/nvim/marmota_yank_ref.lua"
     local nvim_lua_dir="$HOME/.config/nvim/lua"
-    local target_module="$nvim_lua_dir/spf_yank_ref.lua"
+    local target_module="$nvim_lua_dir/marmota_yank_ref.lua"
 
     if [[ ! -f "$source_module" ]]; then
-        log_error "Missing $source_module - skipping spf_yank_ref install"
+        log_error "Missing $source_module - skipping marmota_yank_ref install"
         return
     fi
 
     if [[ ! -d "$nvim_lua_dir" ]]; then
-        log_warning "No $nvim_lua_dir found - skipping spf_yank_ref install"
+        log_warning "No $nvim_lua_dir found - skipping marmota_yank_ref install"
         log_info "Install a neovim config (e.g. NvChad) and re-run with --neovim"
         return
     fi
 
+    # The module's name from before the program was Marmota (the one line
+    # here that says it): that file goes, and the line that loads it loads
+    # this one.
+    local old_module="spf_yank_ref" old_loader
+    if [[ -f "$nvim_lua_dir/$old_module.lua" ]]; then
+        if [[ $DRY_RUN == true ]]; then
+            log_info "[DRY RUN] Would remove $nvim_lua_dir/$old_module.lua, for marmota_yank_ref.lua"
+        else
+            rm -f "$nvim_lua_dir/$old_module.lua"
+            log_success "Removed $nvim_lua_dir/$old_module.lua (it is marmota_yank_ref.lua now)"
+        fi
+    fi
+    for old_loader in "$nvim_lua_dir/mappings.lua" "$HOME/.config/nvim/init.lua"; do
+        if [[ -f "$old_loader" ]] && grep -q "$old_module" "$old_loader"; then
+            if [[ $DRY_RUN == true ]]; then
+                log_info "[DRY RUN] Would load marmota_yank_ref in $old_loader"
+            else
+                backup_file "$old_loader"
+                sed -i.tmp -e "s/$old_module/marmota_yank_ref/g" "$old_loader"
+                rm -f "$old_loader.tmp"
+                log_success "$old_loader loads marmota_yank_ref"
+            fi
+        fi
+    done
+
     # Install the module itself
     if cmp -s "$source_module" "$target_module"; then
-        log_success "spf_yank_ref.lua already up to date"
+        log_success "marmota_yank_ref.lua already up to date"
     else
         backup_file "$target_module"
         if [[ $DRY_RUN == true ]]; then
@@ -694,7 +730,7 @@ configure_neovim() {
 
     # Make sure something requires it. NvChad keeps user mappings in
     # lua/mappings.lua; otherwise fall back to init.lua.
-    local require_line='require "spf_yank_ref"'
+    local require_line='require "marmota_yank_ref"'
     local loader="$nvim_lua_dir/mappings.lua"
     if [[ ! -f "$loader" ]]; then
         loader="$HOME/.config/nvim/init.lua"
@@ -703,8 +739,8 @@ configure_neovim() {
     if [[ ! -f "$loader" ]]; then
         log_warning "No mappings.lua or init.lua found - add this line yourself:"
         echo "      $require_line"
-    elif grep -q "spf_yank_ref" "$loader"; then
-        log_success "$loader already loads spf_yank_ref"
+    elif grep -q "marmota_yank_ref" "$loader"; then
+        log_success "$loader already loads marmota_yank_ref"
     elif [[ $DRY_RUN == true ]]; then
         log_info "[DRY RUN] Would append '$require_line' to $loader"
     else
@@ -721,52 +757,52 @@ configure_neovim() {
 # Marmota Configuration
 # =============================================================================
 
-configure_superfile() {
-    if [[ $CONFIGURE_SUPERFILE == false ]]; then
+configure_marmota() {
+    if [[ $CONFIGURE_MARMOTA == false ]]; then
         return
     fi
 
     echo ""
     log_info "Configuring Marmota..."
 
-    local spf_config_dir="$HOME/.config/marmota"
-    local spf_config_file="$spf_config_dir/config.toml"
+    local marmota_config_dir="$HOME/.config/marmota"
+    local marmota_config_file="$marmota_config_dir/config.toml"
     local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    local default_config="$script_dir/src/superfile_config/config.toml"
+    local default_config="$script_dir/src/marmota_config/config.toml"
 
     # Ensure directory exists
     if [[ $DRY_RUN == false ]]; then
-        mkdir -p "$spf_config_dir"
+        mkdir -p "$marmota_config_dir"
     fi
 
     # If config doesn't exist or is incomplete, copy the full default config
-    if [[ ! -f "$spf_config_file" ]] || ! grep -q "^border_top" "$spf_config_file" 2>/dev/null; then
+    if [[ ! -f "$marmota_config_file" ]] || ! grep -q "^border_top" "$marmota_config_file" 2>/dev/null; then
         if [[ -f "$default_config" ]]; then
             if [[ $DRY_RUN == true ]]; then
-                log_info "[DRY RUN] Would copy default config to $spf_config_file"
+                log_info "[DRY RUN] Would copy default config to $marmota_config_file"
             else
                 # Backup existing config if it exists
-                if [[ -f "$spf_config_file" ]]; then
-                    local backup_file="$spf_config_file.backup.$(date +%Y%m%d-%H%M%S)"
-                    cp "$spf_config_file" "$backup_file"
+                if [[ -f "$marmota_config_file" ]]; then
+                    local backup_file="$marmota_config_file.backup.$(date +%Y%m%d-%H%M%S)"
+                    cp "$marmota_config_file" "$backup_file"
                     log_success "Backed up existing config to $backup_file"
                 fi
                 # Copy the full default config (which already has editor=nvim and zoxide_support=true)
-                cp "$default_config" "$spf_config_file"
+                cp "$default_config" "$marmota_config_file"
                 # Update second_editor to open nvim in new WezTerm tab
                 if [[ "$(uname)" == "Darwin" ]]; then
-                    sed -i '' 's/^second_editor.*=.*/second_editor = "wezterm cli spawn -- nvim"/' "$spf_config_file"
+                    sed -i '' 's/^second_editor.*=.*/second_editor = "wezterm cli spawn -- nvim"/' "$marmota_config_file"
                 else
-                    sed -i 's/^second_editor.*=.*/second_editor = "wezterm cli spawn -- nvim"/' "$spf_config_file"
+                    sed -i 's/^second_editor.*=.*/second_editor = "wezterm cli spawn -- nvim"/' "$marmota_config_file"
                 fi
-                log_success "Copied full default config to $spf_config_file"
+                log_success "Copied full default config to $marmota_config_file"
             fi
         else
             log_warning "Default config not found at $default_config"
             # Fallback: just set editor if we can't find default config
             if [[ $DRY_RUN == false ]]; then
-                if [[ ! -f "$spf_config_file" ]]; then
-                    cat > "$spf_config_file" << 'MINIMAL_CONFIG'
+                if [[ ! -f "$marmota_config_file" ]]; then
+                    cat > "$marmota_config_file" << 'MINIMAL_CONFIG'
 editor = "nvim"
 second_editor = "wezterm cli spawn -- nvim"
 zoxide_support = true
@@ -778,33 +814,81 @@ MINIMAL_CONFIG
     else
         # Config exists and appears complete, just update editor and zoxide
         if [[ $DRY_RUN == true ]]; then
-            log_info "[DRY RUN] Would update editor settings in $spf_config_file"
+            log_info "[DRY RUN] Would update editor settings in $marmota_config_file"
         else
             # Update editor lines - e opens nvim, E opens nvim in new WezTerm tab
             if [[ "$(uname)" == "Darwin" ]]; then
-                sed -i '' 's/^editor[[:space:]]*=.*/editor = "nvim"/' "$spf_config_file"
+                sed -i '' 's/^editor[[:space:]]*=.*/editor = "nvim"/' "$marmota_config_file"
                 # Add second_editor if it doesn't exist
-                if ! grep -q "^second_editor" "$spf_config_file"; then
+                if ! grep -q "^second_editor" "$marmota_config_file"; then
                     sed -i '' '/^editor[[:space:]]*=/a\
 second_editor = "wezterm cli spawn -- nvim"
-' "$spf_config_file"
+' "$marmota_config_file"
                 else
-                    sed -i '' 's/^second_editor.*=.*/second_editor = "wezterm cli spawn -- nvim"/' "$spf_config_file"
+                    sed -i '' 's/^second_editor.*=.*/second_editor = "wezterm cli spawn -- nvim"/' "$marmota_config_file"
                 fi
-                sed -i '' 's/^zoxide_support.*=.*/zoxide_support = true/' "$spf_config_file"
+                sed -i '' 's/^zoxide_support.*=.*/zoxide_support = true/' "$marmota_config_file"
             else
-                sed -i 's/^editor[[:space:]]*=.*/editor = "nvim"/' "$spf_config_file"
+                sed -i 's/^editor[[:space:]]*=.*/editor = "nvim"/' "$marmota_config_file"
                 # Add second_editor if it doesn't exist
-                if ! grep -q "^second_editor" "$spf_config_file"; then
-                    sed -i '/^editor[[:space:]]*=/a second_editor = "wezterm cli spawn -- nvim"' "$spf_config_file"
+                if ! grep -q "^second_editor" "$marmota_config_file"; then
+                    sed -i '/^editor[[:space:]]*=/a second_editor = "wezterm cli spawn -- nvim"' "$marmota_config_file"
                 else
-                    sed -i 's/^second_editor.*=.*/second_editor = "wezterm cli spawn -- nvim"/' "$spf_config_file"
+                    sed -i 's/^second_editor.*=.*/second_editor = "wezterm cli spawn -- nvim"/' "$marmota_config_file"
                 fi
-                sed -i 's/^zoxide_support.*=.*/zoxide_support = true/' "$spf_config_file"
+                sed -i 's/^zoxide_support.*=.*/zoxide_support = true/' "$marmota_config_file"
             fi
-            log_success "Updated editor=nvim, second_editor opens nvim in new tab, and enabled zoxide in $spf_config_file"
+            log_success "Updated editor=nvim, second_editor opens nvim in new tab, and enabled zoxide in $marmota_config_file"
         fi
     fi
+}
+
+# configure_marmota_keys brings Marmota's own keys up to date in your
+# ~/.config/marmota/hotkeys.toml: a key that still has an old default gets
+# today's (s for the session that needs you, z for the go to list), a key
+# the file lacks is added, and a key you chose stays. The keys themselves
+# are in src/marmota_config/hotkeys.toml, built into y, which does the
+# writing (y --fix-hotkeys --fix-only); the file as it was is kept beside
+# it. ./build.sh runs this after every build.
+configure_marmota_keys() {
+    if [[ $CONFIGURE_MARMOTA == false && $CONFIGURE_MICRO == false && $MARMOTA_KEYS == false ]]; then
+        return
+    fi
+
+    local script_dir keys="$HOME/.config/marmota/hotkeys.toml" y
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    y="$script_dir/bin/y"
+    if [[ ! -x $y ]]; then
+        y="$(command -v y 2> /dev/null || true)"
+    fi
+    if [[ -z $y || ! -x $y ]]; then
+        log_warning "Marmota's keys: y isn't built yet (./build.sh builds it, and runs this again)"
+        return
+    fi
+    if [[ ! -f $keys ]]; then
+        log_info "Marmota's keys: no $keys yet; y writes it, with today's keys, when it first runs"
+        return
+    fi
+    if [[ $DRY_RUN == true ]]; then
+        log_info "[DRY RUN] Would bring Marmota's keys up to date in $keys"
+        return
+    fi
+
+    local before changed
+    before="$(mktemp)"
+    cp "$keys" "$before"
+    "$y" --fix-hotkeys --fix-only > /dev/null 2>&1 || true
+    if cmp -s "$before" "$keys"; then
+        log_success "Marmota's keys are up to date in $keys"
+        rm -f "$before"
+        return
+    fi
+    local backup
+    backup="$keys.backup.$(date +%Y%m%d-%H%M%S)"
+    mv "$before" "$backup"
+    # On one line, for build.sh, which shows only the lines that name Marmota
+    changed="$(diff "$backup" "$keys" | sed -n 's/^> //p' | grep -v -E '^[[:space:]]*(#|$)' | paste -s -d ';' - | sed 's/;/; /g')"
+    log_success "Marmota's keys brought up to date in $keys: ${changed:-its layout only} (as it was: $backup)"
 }
 
 # =============================================================================
@@ -829,15 +913,18 @@ print_summary() {
         echo "  - WezTerm: ~/.wezterm.lua"
     fi
     if [[ $CONFIGURE_NEOVIM == true ]]; then
-        echo "  - Neovim: ~/.config/nvim/lua/spf_yank_ref.lua (yank @file#L refs)"
+        echo "  - Neovim: ~/.config/nvim/lua/marmota_yank_ref.lua (yank @file#L refs)"
     fi
-    if [[ $CONFIGURE_SUPERFILE == true ]]; then
+    if [[ $CONFIGURE_MARMOTA == true ]]; then
         echo "  - Marmota: ~/.config/marmota/config.toml"
+    fi
+    if [[ $CONFIGURE_MARMOTA == true || $CONFIGURE_MICRO == true || $MARMOTA_KEYS == true ]]; then
+        echo "  - Marmota's keys: ~/.config/marmota/hotkeys.toml"
     fi
     if [[ $PATCH_CMD_K == true ]]; then
         echo "  - WezTerm: Cmd+K leaves Marmota alone (~/.wezterm.lua)"
     fi
-    if [[ $CONFIGURE_WEZTERM == false && $CONFIGURE_NEOVIM == false && $CONFIGURE_SUPERFILE == false ]]; then
+    if [[ $CONFIGURE_WEZTERM == false && $CONFIGURE_NEOVIM == false && $CONFIGURE_MARMOTA == false ]]; then
         echo ""
         return
     fi
@@ -1235,26 +1322,26 @@ configure_micro() {
         log_success "micro's settings, keys and plugins are up to date"
     fi
 
-    local spf_config_file="$HOME/.config/marmota/config.toml"
-    if [[ ! -f "$spf_config_file" && -f "$script_dir/src/superfile_config/config.toml" ]]; then
-        mkdir -p "$(dirname "$spf_config_file")"
-        cp "$script_dir/src/superfile_config/config.toml" "$spf_config_file"
+    local marmota_config_file="$HOME/.config/marmota/config.toml"
+    if [[ ! -f "$marmota_config_file" && -f "$script_dir/src/marmota_config/config.toml" ]]; then
+        mkdir -p "$(dirname "$marmota_config_file")"
+        cp "$script_dir/src/marmota_config/config.toml" "$marmota_config_file"
     fi
-    if [[ ! -f "$spf_config_file" ]]; then
-        log_warning "No $spf_config_file: Marmota's editor isn't set"
+    if [[ ! -f "$marmota_config_file" ]]; then
+        log_warning "No $marmota_config_file: Marmota's editor isn't set"
         return
     fi
     local editor
-    editor="$(sed -n "s/^editor[[:space:]]*=[[:space:]]*[\"']\\{0,1\\}\\([^\"']*\\)[\"']\\{0,1\\}[[:space:]]*$/\\1/p" "$spf_config_file" | head -n 1)"
+    editor="$(sed -n "s/^editor[[:space:]]*=[[:space:]]*[\"']\\{0,1\\}\\([^\"']*\\)[\"']\\{0,1\\}[[:space:]]*$/\\1/p" "$marmota_config_file" | head -n 1)"
     case "$editor" in
         micro)
             log_success "Marmota's editor is micro"
             ;;
         "" | nvim)
-            backup_file "$spf_config_file"
-            sed -i.tmp -e 's/^editor[[:space:]]*=.*/editor = "micro"/' "$spf_config_file"
-            rm -f "$spf_config_file.tmp"
-            grep -q '^editor[[:space:]]*=' "$spf_config_file" || printf '\neditor = "micro"\n' >> "$spf_config_file"
+            backup_file "$marmota_config_file"
+            sed -i.tmp -e 's/^editor[[:space:]]*=.*/editor = "micro"/' "$marmota_config_file"
+            rm -f "$marmota_config_file.tmp"
+            grep -q '^editor[[:space:]]*=' "$marmota_config_file" || printf '\neditor = "micro"\n' >> "$marmota_config_file"
             log_success "Marmota opens files in micro, in its own place (e)"
             ;;
         *)
@@ -1263,9 +1350,9 @@ configure_micro() {
     esac
     # E opened nvim in a new tab (or neovide, the first default): micro there
     # too, unless you set another
-    if grep -q -E "^second_editor[[:space:]]*=[[:space:]]*[\"'](wezterm cli spawn -- nvim|neovide)[\"']" "$spf_config_file"; then
-        sed -i.tmp -e 's/^second_editor[[:space:]]*=.*/second_editor = "wezterm cli spawn -- micro"/' "$spf_config_file"
-        rm -f "$spf_config_file.tmp"
+    if grep -q -E "^second_editor[[:space:]]*=[[:space:]]*[\"'](wezterm cli spawn -- nvim|neovide)[\"']" "$marmota_config_file"; then
+        sed -i.tmp -e 's/^second_editor[[:space:]]*=.*/second_editor = "wezterm cli spawn -- micro"/' "$marmota_config_file"
+        rm -f "$marmota_config_file.tmp"
         log_success "E opens files in micro in a new tab"
     fi
 
@@ -1417,7 +1504,8 @@ main() {
         ensure_wezterm_look
     fi
     configure_neovim
-    configure_superfile
+    configure_marmota
+    configure_marmota_keys
     configure_micro
 
     if [[ $DRY_RUN == false ]]; then

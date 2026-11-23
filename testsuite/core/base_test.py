@@ -49,15 +49,15 @@ class GenericTestImpl(BaseTest):
         test_files : List[Tuple[Path, str]] = None,
         validate_exists : List[Path] = None,
         validate_not_exists : List[Path] = None,
-        validate_spf_closed: bool = False,
-        validate_spf_running: bool = False,
+        validate_marmota_closed: bool = False,
+        validate_marmota_running: bool = False,
         start_wait_time : float = tconst.START_WAIT_TIME,
         close_wait_time : float = tconst.CLOSE_WAIT_TIME ):
 
         super().__init__(test_env)
         self.test_root = test_root
         self.start_dir = start_dir
-        self.spf_opts : List[str] = ["-c", str(tconst.CONFIG_FILE), "--hf", str(tconst.HOTKEY_FILE)]
+        self.marmota_opts : List[str] = ["-c", str(tconst.CONFIG_FILE), "--hf", str(tconst.HOTKEY_FILE)]
         
         self.test_dirs = test_dirs
         self.test_files = test_files
@@ -71,8 +71,8 @@ class GenericTestImpl(BaseTest):
         self.key_inputs = key_inputs
         self.validate_exists = validate_exists
         self.validate_not_exists = validate_not_exists
-        self.validate_spf_closed = validate_spf_closed
-        self.validate_spf_running = validate_spf_running
+        self.validate_marmota_closed = validate_marmota_closed
+        self.validate_marmota_running = validate_marmota_running
 
         if start_wait_time < 0 or close_wait_time < 0:
             raise ValueError("wait times must be non-negative")
@@ -91,13 +91,13 @@ class GenericTestImpl(BaseTest):
             self.env.fs_mgr.tree(self.test_root))
         
     
-    def start_spf(self) -> None:
-        self.env.spf_mgr.start_spf(self.env.fs_mgr.abspath(self.start_dir), self.spf_opts)
+    def start_marmota(self) -> None:
+        self.env.marmota_mgr.start_marmota(self.env.fs_mgr.abspath(self.start_dir), self.marmota_opts)
         time.sleep(self.start_wait_time)
-        assert self.env.spf_mgr.is_spf_running(), "superfile is not running"
+        assert self.env.marmota_mgr.is_marmota_running(), "Marmota is not running"
 
     def end_execution(self) -> None:
-        self.env.spf_mgr.send_special_input(keys.KEY_ESC)    
+        self.env.marmota_mgr.send_special_input(keys.KEY_ESC)    
         time.sleep(self.close_wait_time)
         self.logger.debug("Finished Execution")
 
@@ -105,16 +105,16 @@ class GenericTestImpl(BaseTest):
         if self.key_inputs is not None:
             for cur_input in self.key_inputs:
                 if isinstance(cur_input, keys.Keys):
-                    self.env.spf_mgr.send_special_input(cur_input)
+                    self.env.marmota_mgr.send_special_input(cur_input)
                 else:
                     assert isinstance(cur_input, str), "Invalid input type"
-                    self.env.spf_mgr.send_text_input(cur_input)
+                    self.env.marmota_mgr.send_text_input(cur_input)
                 time.sleep(tconst.KEY_DELAY)
 
     def test_execute(self) -> None:
         """Execute the test
         """
-        self.start_spf()
+        self.start_marmota()
         self.send_input()    
         time.sleep(tconst.OPERATION_DELAY)
         self.end_execution()
@@ -125,13 +125,13 @@ class GenericTestImpl(BaseTest):
         Returns:
             bool: True if validation passed
         """
-        self.logger.debug("spf_manager info : %s, Current file structure : \n%s",
-            self.env.spf_mgr.runtime_info(), self.env.fs_mgr.tree(self.test_root))
+        self.logger.debug("marmota_manager info : %s, Current file structure : \n%s",
+            self.env.marmota_mgr.runtime_info(), self.env.fs_mgr.tree(self.test_root))
         try:
-            if self.validate_spf_closed :
-                assert not self.env.spf_mgr.is_spf_running(), "superfile is still running"
-            if self.validate_spf_running :
-                assert self.env.spf_mgr.is_spf_running(), "superfile is not running"
+            if self.validate_marmota_closed :
+                assert not self.env.marmota_mgr.is_marmota_running(), "Marmota is still running"
+            if self.validate_marmota_running :
+                assert self.env.marmota_mgr.is_marmota_running(), "Marmota is not running"
 
             if self.validate_exists is not None:
                 for file_path in self.validate_exists:
@@ -148,8 +148,8 @@ class GenericTestImpl(BaseTest):
 
     def cleanup(self) -> None:
         # Cleanup after test is done
-        if self.env.spf_mgr.is_spf_running():
-            self.env.spf_mgr.close_spf()
+        if self.env.marmota_mgr.is_marmota_running():
+            self.env.marmota_mgr.close_marmota()
     
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}"

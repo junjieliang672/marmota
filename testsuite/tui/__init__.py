@@ -1,4 +1,4 @@
-"""pty + pyte harness that drives the real spf binary without tmux. See README.md.
+"""pty + pyte harness that drives the real Marmota binary without tmux. See README.md.
 
 PIL is only needed for screenshots and is imported lazily (tui.screenshot).
 """

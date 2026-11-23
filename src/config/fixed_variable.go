@@ -13,7 +13,8 @@ import (
 )
 
 // appDirName names Marmota's folders; oldDirName is what they were called
-// before the program was Marmota (superfile).
+// before the program was Marmota. It is said here and nowhere else in the
+// program: MoveOldDirs needs it to find those folders.
 const (
 	appDirName = "marmota"
 	oldDirName = "superfile"
@@ -30,16 +31,16 @@ func getConfigDir(name string) string {
 }
 
 // MoveOldDirs moves the folders an install from before the rename used
-// (~/.config/superfile, and its data, state and cache folders) to Marmota's,
+// (its config folder, and its data, state and cache folders) to Marmota's,
 // each where Marmota's doesn't exist yet, so settings and state carry over.
 // It reports what it moved.
 func MoveOldDirs() []string {
 	var moved []string
 	for _, p := range [][2]string{
-		{getConfigDir(oldDirName), SuperFileMainDir},
-		{filepath.Join(xdg.DataHome, oldDirName), SuperFileDataDir},
-		{filepath.Join(xdg.StateHome, oldDirName), SuperFileStateDir},
-		{filepath.Join(xdg.CacheHome, oldDirName), SuperFileCacheDir},
+		{getConfigDir(oldDirName), MarmotaMainDir},
+		{filepath.Join(xdg.DataHome, oldDirName), MarmotaDataDir},
+		{filepath.Join(xdg.StateHome, oldDirName), MarmotaStateDir},
+		{filepath.Join(xdg.CacheHome, oldDirName), MarmotaCacheDir},
 	} {
 		if _, err := os.Stat(p[1]); err == nil {
 			continue
@@ -66,7 +67,7 @@ const (
 	PreReleaseSuffix = ""
 
 	// This will not break in windows. This is a relative path for Embed FS. It uses "/" only
-	EmbedConfigDir           = "src/superfile_config"
+	EmbedConfigDir           = "src/marmota_config"
 	EmbedConfigFile          = EmbedConfigDir + "/config.toml"
 	EmbedHotkeysFile         = EmbedConfigDir + "/hotkeys.toml"
 	EmbedThemeDir            = EmbedConfigDir + "/theme"
@@ -74,55 +75,55 @@ const (
 )
 
 var (
-	HomeDir           = xdg.Home
-	DownloadsDir      = xdg.UserDirs.Download
-	SuperFileMainDir  = getConfigDir(appDirName)
-	SuperFileCacheDir = filepath.Join(xdg.CacheHome, appDirName)
-	SuperFileDataDir  = filepath.Join(xdg.DataHome, appDirName)
-	SuperFileStateDir = filepath.Join(xdg.StateHome, appDirName)
+	HomeDir         = xdg.Home
+	DownloadsDir    = xdg.UserDirs.Download
+	MarmotaMainDir  = getConfigDir(appDirName)
+	MarmotaCacheDir = filepath.Join(xdg.CacheHome, appDirName)
+	MarmotaDataDir  = filepath.Join(xdg.DataHome, appDirName)
+	MarmotaStateDir = filepath.Join(xdg.StateHome, appDirName)
 
 	// MainDir files
-	ThemeFolder = filepath.Join(SuperFileMainDir, "theme")
+	ThemeFolder = filepath.Join(MarmotaMainDir, "theme")
 
 	// DataDir files
-	ThemeFileVersion = filepath.Join(SuperFileDataDir, "themeFileVersion")
-	FirstUseCheck    = filepath.Join(SuperFileDataDir, "firstUseCheck")
-	PinnedFile       = filepath.Join(SuperFileDataDir, "pinned.json")
-	RecentEditsFile  = filepath.Join(SuperFileDataDir, "recent_edits.json")
-	ToggleDotFile    = filepath.Join(SuperFileDataDir, "toggleDotFile")
-	ToggleFooter     = filepath.Join(SuperFileDataDir, "toggleFooter")
+	ThemeFileVersion = filepath.Join(MarmotaDataDir, "themeFileVersion")
+	FirstUseCheck    = filepath.Join(MarmotaDataDir, "firstUseCheck")
+	PinnedFile       = filepath.Join(MarmotaDataDir, "pinned.json")
+	RecentEditsFile  = filepath.Join(MarmotaDataDir, "recent_edits.json")
+	ToggleDotFile    = filepath.Join(MarmotaDataDir, "toggleDotFile")
+	ToggleFooter     = filepath.Join(MarmotaDataDir, "toggleFooter")
 
 	// StateDir files
-	LogFile     = filepath.Join(SuperFileStateDir, "marmota.log")
-	LastDirFile = filepath.Join(SuperFileStateDir, "lastdir")
+	LogFile     = filepath.Join(MarmotaStateDir, "marmota.log")
+	LastDirFile = filepath.Join(MarmotaStateDir, "lastdir")
 	// When you last looked at each Claude session, for unread markers.
-	ClaudeSessionsSeenFile = filepath.Join(SuperFileStateDir, "claude_sessions_seen.json")
+	ClaudeSessionsSeenFile = filepath.Join(MarmotaStateDir, "claude_sessions_seen.json")
 	// What was sent from the Ask bar, and its model and effort choices.
-	AskHistoryFile = filepath.Join(SuperFileStateDir, "ask_history.json")
+	AskHistoryFile = filepath.Join(MarmotaStateDir, "ask_history.json")
 	// The order of the Sessions list for the day, so a restart keeps it.
-	ClaudeSessionsOrderFile = filepath.Join(SuperFileStateDir, "claude_sessions_order.json")
+	ClaudeSessionsOrderFile = filepath.Join(MarmotaStateDir, "claude_sessions_order.json")
 	// TmuxSinceFile holds when sessions first ran in tmux: running sessions
 	// Marmota didn't start are listed only when they started before.
-	TmuxSinceFile = filepath.Join(SuperFileStateDir, "tmux_since")
+	TmuxSinceFile = filepath.Join(MarmotaStateDir, "tmux_since")
 	// RemotesFile holds the other computers sessions were started on, and
 	// how to reach them.
-	RemotesFile = filepath.Join(SuperFileStateDir, "remotes.json")
+	RemotesFile = filepath.Join(MarmotaStateDir, "remotes.json")
 	// TemporarySessionsFile holds the sessions started to answer one
 	// program's questions, as the editor's: Marmota doesn't list them.
-	TemporarySessionsFile = filepath.Join(SuperFileStateDir, "temporary_sessions.json")
+	TemporarySessionsFile = filepath.Join(MarmotaStateDir, "temporary_sessions.json")
 	// SessionsRowsFile holds how many lines the Sessions box last had, so
 	// the next start gives it that height before the sessions are listed,
 	// and no box moves when they are.
-	SessionsRowsFile = filepath.Join(SuperFileStateDir, "sessions_rows")
+	SessionsRowsFile = filepath.Join(MarmotaStateDir, "sessions_rows")
 	// AppSessionsSeenFile holds how far each session of the Sessions box's
 	// Remote section has been seen, so a restart doesn't show them unread.
-	AppSessionsSeenFile = filepath.Join(SuperFileStateDir, "app_sessions_seen.json")
+	AppSessionsSeenFile = filepath.Join(MarmotaStateDir, "app_sessions_seen.json")
 	// TranscriptSummariesFile holds what was read of each transcript, so a
 	// start reads only what was written since and not every one whole.
-	TranscriptSummariesFile = filepath.Join(SuperFileCacheDir, "transcript_summaries.json")
+	TranscriptSummariesFile = filepath.Join(MarmotaCacheDir, "transcript_summaries.json")
 	// RemoteTranscriptsDir holds copies of the transcripts of sessions on
 	// other computers, read a piece at a time.
-	RemoteTranscriptsDir = filepath.Join(SuperFileCacheDir, "remote-transcripts")
+	RemoteTranscriptsDir = filepath.Join(MarmotaCacheDir, "remote-transcripts")
 
 	// Trash Directories
 	DarwinTrashDirectory = filepath.Join(HomeDir, ".Trash")
@@ -136,10 +137,10 @@ var (
 
 // These variables are actually not fixed, they are sometimes updated dynamically
 var (
-	ConfigFile  = filepath.Join(SuperFileMainDir, "config.toml")
-	HotkeysFile = filepath.Join(SuperFileMainDir, "hotkeys.toml")
+	ConfigFile  = filepath.Join(MarmotaMainDir, "config.toml")
+	HotkeysFile = filepath.Join(MarmotaMainDir, "hotkeys.toml")
 
-	// ChooserFile is the path where superfile will write the file's path, which is to be
+	// ChooserFile is the path where Marmota will write the file's path, which is to be
 	// opened, before exiting
 	ChooserFile = ""
 

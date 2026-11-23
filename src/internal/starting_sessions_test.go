@@ -130,7 +130,7 @@ func TestANewSessionsTrustQuestionIsAnsweredInThePreview(t *testing.T) {
 	m := newClaudeTestModel(t)
 	m.fileModel.filePreview.SetOpen(true)
 	m.setFilePreviewPanelSize()
-	wez := newFakeWezterm(t, superfileTab())
+	wez := newFakeWezterm(t, marmotaTab())
 	newAskID(t, "n-1")
 	ask(t, m, "group the logos")
 	paneID := m.ask.starts["n-1"].paneID
@@ -153,7 +153,7 @@ func TestANewSessionsTrustQuestionIsAnsweredInThePreview(t *testing.T) {
 	press(m, "esc")
 	runQuestionRead(t, m, press(m, common.Hotkeys.JumpToUnreadSession[0]))
 	require.Equal(t, dockSessionsFocus, m.focusPanel)
-	require.Equal(t, "n-1", m.sessions.list.SelectedID(), "! lands on it")
+	require.Equal(t, "n-1", m.sessions.list.SelectedID(), "s lands on it")
 	press(m, common.Hotkeys.OpenAskBar[0])
 	require.Equal(t, sessionsFocusAnswer, m.sessions.focus, "K hands the keyboard to the question")
 	runQuestionRead(t, m, press(m, "enter"))
@@ -174,7 +174,7 @@ func TestANewSessionsTrustQuestionIsAnsweredInThePreview(t *testing.T) {
 func TestEnterBringsAStartingSessionBesideMarmota(t *testing.T) {
 	ownAskHistory(t)
 	m := newClaudeTestModel(t)
-	wez := newFakeWezterm(t, superfileTab())
+	wez := newFakeWezterm(t, marmotaTab())
 	newAskID(t, "n-1")
 	ask(t, m, "group the logos")
 	paneID := m.ask.starts["n-1"].paneID

@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Entry is a pinned or recently edited path, for the s list.
+// Entry is a pinned or recently edited path, for the go to list.
 type Entry struct {
 	Location string
 	// Name is what the list calls it: a pin's own name, else its base name.

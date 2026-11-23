@@ -25,7 +25,7 @@ type Options struct {
 	Timeout     time.Duration
 	// Folders are the folders whose finished sessions are listed, PerFolder
 	// of each, newest first. Sessions only `claude -p` ever ran, such as
-	// the questions superfile's Ask sent, are left out.
+	// the questions Marmota's Ask sent, are left out.
 	Folders   []string
 	PerFolder int
 	// RecentFolders adds this many of the folders sessions were last active

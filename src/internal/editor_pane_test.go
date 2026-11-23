@@ -22,7 +22,7 @@ func editorBesideModel(t *testing.T) (*model, *fakeWezterm, *[]string) {
 	t.Setenv("WEZTERM_PANE", "10")
 	setForTest(t, &common.Config.Editor, "micro")
 	setForTest(t, &common.Config.EditorBeside, true)
-	wez := newFakeWezterm(t, superfileTab())
+	wez := newFakeWezterm(t, marmotaTab())
 	typed := &[]string{}
 	setForTest(t, &weztermSendKeys, func(pane int, keys string) error {
 		*typed = append(*typed, keys)
@@ -92,7 +92,7 @@ func TestMicroQuote(t *testing.T) {
 // Codex as Codex reads it.
 func TestTheEditorIsToldTheSessionTheAskBoxWritesTo(t *testing.T) {
 	m := dockTestModel(t)
-	bang(m)
+	toSessions(m)
 	require.True(t, m.sessions.list.Select("s50"))
 
 	env := strings.Join(m.editorEnv(), "\n")

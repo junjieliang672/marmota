@@ -100,7 +100,7 @@ func Models(home string) []Model {
 	return models
 }
 
-// LaunchArgs are the flags of a Codex session superfile starts without the
+// LaunchArgs are the flags of a Codex session Marmota starts without the
 // Ask box's choices (>codex, resume, fork): full access, asking when Codex
 // thinks it should.
 func LaunchArgs() []string {
@@ -109,7 +109,7 @@ func LaunchArgs() []string {
 
 // A Codex window started with --config (-c) or --approve-for-me runs its
 // session on a server of its own rather than Codex's shared one, where
-// superfile can't see it. Those settings go with the first prompt instead
+// Marmota can't see it. Those settings go with the first prompt instead
 // (TurnOptions); the flags here keep a session on the shared server.
 
 // PermissionArgs are the flags for one of the Ask box's permission modes
@@ -157,7 +157,7 @@ var foundBinary struct {
 
 // Binary is the codex to run: the newest that runs of those on PATH and the
 // ChatGPT app's, "codex" when none answers. An old one would start
-// sessions superfile can't see (before Codex's server), and an install
+// sessions Marmota can't see (before Codex's server), and an install
 // can be broken, so each is asked its version. It is looked for once.
 func Binary() string {
 	foundBinary.once.Do(func() {

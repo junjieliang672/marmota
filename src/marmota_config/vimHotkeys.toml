@@ -1,12 +1,12 @@
 ##############################################
 #                                            #
-#         Superfile vim-like Hotkeys         #
+#         Marmota vim-like Hotkeys         #
 #                                            #
 ##############################################
 
 #-- Maintainer: nonepork <https://github.com/nonepork>
 
-# This contains a hotkey config file for superfile, themed around vim
+# This contains a hotkey config file for Marmota, themed around vim
 # controls. To use it, copy it over hotkeys.toml (y path-list prints where).
 
 ###############################################################################
@@ -38,7 +38,7 @@ toggle_reverse_sort = ['R', '']
 #-- Focus Manipulation
 go_to = ['ctrl+s', '']
 focus_on_metadata = ['M', '']
-jump_to_unread_session = ['!', '']
+jump_to_unread_session = ['s', '']
 next_session = [']', '']
 previous_session = ['[', '']
 send_to_agent = ['@', '']

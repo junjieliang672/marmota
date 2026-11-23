@@ -51,7 +51,7 @@ func TestVInTheSessionsBoxPinsTheSelectedOneAndGoesBackToTheFiles(t *testing.T) 
 	m := dockTestModel(t)
 	m.fileModel.filePreview.SetOpen(true)
 	m.setFilePreviewPanelSize()
-	bang(m)
+	toSessions(m)
 	pressKey(m, "j")
 	picked := m.sessions.list.SelectedID()
 

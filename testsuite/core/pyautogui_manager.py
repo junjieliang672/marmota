@@ -2,28 +2,28 @@ import time
 import subprocess
 import pyautogui
 import core.keys as keys
-from core.spf_manager import BaseSPFManager
+from core.marmota_manager import BaseMarmotaManager
 
-class PyAutoGuiSPFManager(BaseSPFManager):
-    """Manage SPF via subprocesses and pyautogui
+class PyAutoGuiMarmotaManager(BaseMarmotaManager):
+    """Manage Marmota via subprocesses and pyautogui
     Cross platform, but it globally takes over the input, so you need the terminal 
     constantly on focus during test run
     """
-    SPF_START_DELAY : float = 0.5
-    def __init__(self, spf_path : str):
-        super().__init__(spf_path)
-        self.spf_process = None
+    MARMOTA_START_DELAY : float = 0.5
+    def __init__(self, marmota_path : str):
+        super().__init__(marmota_path)
+        self.marmota_process = None
 
 
-    def start_spf(self, start_dir : str = None, args : list[str] = None) -> None:
-        spf_args = [self.spf_path]
+    def start_marmota(self, start_dir : str = None, args : list[str] = None) -> None:
+        marmota_args = [self.marmota_path]
         if args :
-            spf_args += args
-        spf_args.append(start_dir)
+            marmota_args += args
+        marmota_args.append(start_dir)
 
-        self.spf_process = subprocess.Popen(spf_args,
+        self.marmota_process = subprocess.Popen(marmota_args,
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        time.sleep(PyAutoGuiSPFManager.SPF_START_DELAY)
+        time.sleep(PyAutoGuiMarmotaManager.MARMOTA_START_DELAY)
 
         # Need to send a sample keypress otherwise it ignores first keypress
         self.send_text_input('x')
@@ -48,20 +48,20 @@ class PyAutoGuiSPFManager(BaseSPFManager):
         return "[Not supported yet]" 
     
     
-    def is_spf_running(self) -> bool:
-        self._is_spf_running = (self.spf_process is not None) and (self.spf_process.poll() is None)
-        return self._is_spf_running
+    def is_marmota_running(self) -> bool:
+        self._is_marmota_running = (self.marmota_process is not None) and (self.marmota_process.poll() is None)
+        return self._is_marmota_running
     
-    def close_spf(self) -> None:
-        if self.spf_process is not None:
-            self.spf_process.terminate()
+    def close_marmota(self) -> None:
+        if self.marmota_process is not None:
+            self.marmota_process.terminate()
     
     # Override
     def runtime_info(self) -> str:
-        if self.spf_process is None:
+        if self.marmota_process is None:
             return "[No process]"
         else:
-            return f"[PID : {self.spf_process.pid}, poll : {self.spf_process.poll()}]"  
+            return f"[PID : {self.marmota_process.pid}, poll : {self.marmota_process.poll()}]"  
 
 
 

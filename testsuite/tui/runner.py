@@ -1,9 +1,9 @@
-"""Tiny runner for pty-driven spf tests, with the same discovery rules as core/runner.py.
+"""Tiny runner for pty-driven Marmota tests, with the same discovery rules as core/runner.py.
 
 Any subclass of TuiTest whose name ends with ``Test`` in ``tui/tests/*_test.py``
 is run. A test fails by raising (AssertionError, WaitTimeout, ...). On failure
 the runner saves, for every session the test started, a PNG screenshot, the
-screen text, the raw pty output, and spf's own log and fake-tool logs from the
+screen text, the raw pty output, and Marmota's own log and fake-tool logs from the
 sandbox into ``<artifacts>/<TestName>/``.
 """
 from __future__ import annotations
@@ -102,9 +102,9 @@ class TuiContext:
         for index, sandbox in enumerate(self._sandboxes):
             target = self.artifacts / f"sandbox-{index}"
             try:
-                if sandbox.spf_log_file.exists():
+                if sandbox.marmota_log_file.exists():
                     target.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(sandbox.spf_log_file, target / "superfile.log")
+                    shutil.copy2(sandbox.marmota_log_file, target / "marmota.log")
                 if any(sandbox.logs_dir.iterdir()):
                     shutil.copytree(sandbox.logs_dir, target / "fake-logs", dirs_exist_ok=True)
             except OSError:
@@ -131,7 +131,7 @@ class TuiTest(ABC):
 
     @abstractmethod
     def run(self) -> None:
-        """Drive spf and assert. Raise AssertionError (or anything) on failure."""
+        """Drive marmota and assert. Raise AssertionError (or anything) on failure."""
 
     def cleanup(self) -> None:
         """Optional cleanup; sessions and sandboxes are closed by the runner."""

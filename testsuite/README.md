@@ -29,10 +29,10 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
 
-### Make sure you build spf
+### Make sure you build Marmota
 ```
-# cd to the superfile repo root (parent of this)
-cd <superfile_root>
+# cd to the Marmota repo root (parent of this)
+cd <marmota_root>
 ./build.sh
 ```
 
@@ -56,10 +56,10 @@ python3 -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
 ```
 
-### Make sure you build spf
+### Make sure you build Marmota
 ```
-# cd to the superfile repo root (parent of this)
-cd <superfile_root>
+# cd to the Marmota repo root (parent of this)
+cd <marmota_root>
 go build -o bin/y.exe
 ```
 
@@ -73,8 +73,8 @@ Notes
 
 ## Tips while running tests
 - Use `-d` or `--debug` to enable debug logs during test run.
-- If you see flakiness in test runs due to superfile being still open, consider using `--close-wait-time` options to increase wait time for superfile to close. Note : For now we have enforcing superfile to close within a specific time window in tests to reduce test flakiness
+- If you see flakiness in test runs due to Marmota being still open, consider using `--close-wait-time` options to increase wait time for Marmota to close. Note : For now we have enforcing Marmota to close within a specific time window in tests to reduce test flakiness
 - Make sure that your hotkeys are set to default hotkeys. Tests use default hotkeys for now.
 - Use `-t` or `--tests` to only run specific tests
   - Example `python main.py -d -t RenameTest CopyTest`
-- If you see `libtmux` errors like `libtmux.exc.LibTmuxException: ['no server running on /private/tmp/tmux-501/superfile']` Make sure your python version is up to date
+- If you see `libtmux` errors like `libtmux.exc.LibTmuxException: ['no server running on /private/tmp/tmux-501/marmota-testsuite']` Make sure your python version is up to date

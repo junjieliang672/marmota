@@ -75,7 +75,7 @@ func TestAQuestionIsAnsweredFromTheSessionsBox(t *testing.T) {
 	m, pane := waitingTestModel(t)
 
 	runQuestionRead(t, m, press(m, common.Hotkeys.JumpToUnreadSession[0]))
-	require.Equal(t, "s20", m.sessions.list.SelectedID(), "! lands on the session that needs you")
+	require.Equal(t, "s20", m.sessions.list.SelectedID(), "s lands on the session that needs you")
 
 	view := ansi.Strip(m.View())
 	assert.Contains(t, view, "Question")
@@ -107,7 +107,7 @@ func TestAQuestionIsAnsweredFromTheSessionsBox(t *testing.T) {
 	assert.NotContains(t, ansi.Strip(m.View()), "❯ 1. Red")
 }
 
-// A session that isn't in a pane superfile can read says what it asks, and
+// A session that isn't in a pane Marmota can read says what it asks, and
 // how to get to it.
 func TestQuestionReadsForAnotherSessionAreDropped(t *testing.T) {
 	m, _ := waitingTestModel(t)

@@ -56,7 +56,7 @@ func configureSidebarPinnedAndRecentForTest(t *testing.T, tempDir string, pinned
 	setForTest(t, &variable.RecentEditsFile, recentFile)
 }
 
-// jumpTestModel is a model whose s list lists a pinned folder and a pinned
+// jumpTestModel is a model whose go to list lists a pinned folder and a pinned
 // file, two recently edited files, the two running sessions of
 // dockTestModel and an ended one.
 type jumpFixture struct {
@@ -426,7 +426,7 @@ func TestAnEndedSessionIsPreviewedFromItsTranscript(t *testing.T) {
 func TestEnterOnASessionPicksItInTheSessionsBoxAndLeavesThePaneBesideAlone(t *testing.T) {
 	f := jumpTestModel(t)
 	m := f.m
-	wez := newFakeWezterm(t, superfileTab())
+	wez := newFakeWezterm(t, marmotaTab())
 	pressKey(m, common.Hotkeys.GoTo[0])
 	typeInto(m, "provider")
 

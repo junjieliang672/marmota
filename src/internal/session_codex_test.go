@@ -308,7 +308,7 @@ printf '  1. Run without daemon this time\n> 2. Cancel\n'; sleep 60`)
 func TestACodexWindowIsNamedForItsSession(t *testing.T) {
 	ownTmux(t)
 	m := newClaudeTestModel(t)
-	newFakeWezterm(t, superfileTab())
+	newFakeWezterm(t, marmotaTab())
 	restoreSeams(t)
 	paneID, err := m.launchParkedAgent(t.TempDir(), "echo codex; sleep 60", managedAgentProviderCodex, "")
 	require.NoError(t, err)

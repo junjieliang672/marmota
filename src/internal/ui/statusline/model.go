@@ -303,10 +303,10 @@ func (m *Model) RenderCompact() string {
 	hotkeys := []Hotkey{
 		{"?", "help"},
 		{">", "cmd"},
-		{"s", "sidebar"},
+		{firstKey(common.Hotkeys.JumpToUnreadSession), "sessions"},
 		{"tab", "panel"},
 		{"o", "order"},
-		{"z", "zoxide"},
+		{firstKey(common.Hotkeys.GoTo), "go to"},
 		{"/", "filter"},
 		{"f", "fzf"},
 		{"q", "quit"},

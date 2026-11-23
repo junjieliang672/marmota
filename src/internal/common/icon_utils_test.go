@@ -59,12 +59,12 @@ func TestGetElementIcon(t *testing.T) {
 			expected: icon.Folders[".git"],
 		},
 		{
-			name:     "superfile directory",
-			file:     "superfile",
+			name:     "Marmota directory",
+			file:     "marmota",
 			isDir:    true,
 			isLink:   false,
 			nerdFont: true,
-			expected: icon.Folders["superfile"],
+			expected: icon.Folders["marmota"],
 		},
 		{
 			name:     "package.json file",

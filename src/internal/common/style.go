@@ -260,6 +260,6 @@ func TransparentAllBackgroundColor() {
 	ModalBGColor = lipgloss.Color(TransparentBackgroundColor)
 }
 
-// renameInputWidth is how wide a pin's rename field starts; the s list
+// renameInputWidth is how wide a pin's rename field starts; the go to list
 // widens it to fit.
 const renameInputWidth = 40

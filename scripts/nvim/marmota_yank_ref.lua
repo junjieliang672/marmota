@@ -1,10 +1,10 @@
--- spf_yank_ref.lua
+-- marmota_yank_ref.lua
 --
 -- Yank a reference to the lines you're on instead of the text itself, in the
 -- form Claude Code attaches when you paste it into a session: an @mention
 -- with the lines after it.
 --
--- Useful when superfile opens a file with `e` (nvim) and you want to hand a
+-- Useful when Marmota opens a file with `e` (nvim) and you want to hand a
 -- location to a Claude session rather than the code itself.
 --
 --   normal mode           gy / <leader>yl  ->  @src/internal/render.go#L42 (repo-relative)
@@ -19,7 +19,7 @@
 -- NvChad), after which <Space> runs as a motion instead.
 --
 -- Install: drop this file in ~/.config/nvim/lua/ and add
---   require "spf_yank_ref"
+--   require "marmota_yank_ref"
 -- to your config (NvChad: lua/mappings.lua). `setup-macos-hotkeys.sh --neovim`
 -- does both for you.
 
@@ -84,7 +84,7 @@ end
 local function current_path(style)
   local abs_path = vim.api.nvim_buf_get_name(0)
   if abs_path == "" then
-    vim.notify("spf_yank_ref: buffer has no file name", vim.log.levels.WARN)
+    vim.notify("marmota_yank_ref: buffer has no file name", vim.log.levels.WARN)
     return nil
   end
   return display_path(vim.fn.fnamemodify(abs_path, ":p"), style)
@@ -192,9 +192,9 @@ local function create_keymaps()
 end
 
 local function create_commands()
-  -- :SpfYankRef yanks the cursor line, :'<,'>SpfYankRef the range, and the
+  -- :MarmotaYankRef yanks the cursor line, :'<,'>MarmotaYankRef the range, and the
   -- bang variant uses the absolute path instead of the relative one.
-  vim.api.nvim_create_user_command("SpfYankRef", function(args)
+  vim.api.nvim_create_user_command("MarmotaYankRef", function(args)
     local style = args.bang and M.config.absolute_path_style or nil
     if args.range > 0 then
       local reference = M.reference(args.line1, args.line2, style)
@@ -206,8 +206,8 @@ local function create_commands()
     end
   end, { range = true, bang = true, force = true, desc = "Yank an @file#L reference" })
 
-  -- :SpfYankPath yanks the absolute path, :SpfYankPath! the relative one.
-  vim.api.nvim_create_user_command("SpfYankPath", function(args)
+  -- :MarmotaYankPath yanks the absolute path, :MarmotaYankPath! the relative one.
+  vim.api.nvim_create_user_command("MarmotaYankPath", function(args)
     M.yank_path({ style = args.bang and M.config.path_style or nil })
   end, { bang = true, force = true, desc = "Yank the file path" })
 end

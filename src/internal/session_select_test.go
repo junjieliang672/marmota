@@ -19,7 +19,7 @@ func sessionPreviewModel(t *testing.T) (*model, *string) {
 	m.fileModel.filePreview.SetOpen(true)
 	m.setFilePreviewPanelSize()
 	m.claude.snapshot.Live[0].TranscriptPath = longTranscript(t)
-	bang(m)
+	toSessions(m)
 	require.True(t, m.sessions.list.Select("s20"))
 	m.sessionsSelectionChanged()
 	copied := new(string)

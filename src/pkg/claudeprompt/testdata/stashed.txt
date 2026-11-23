@@ -41,8 +41,8 @@
 
 [38:2::102:102:102m✻[39m [38:2::102:102:102mWorked for 12s · done 11:42 AM
 
-[48:2::240:240:240m❯[39m [38:2::0:0:0m/cd /private/tmp/spf-e2e-b87hogr0/project[39m[K
-[38:2::102:102:102m[49m  ⎿  [39mMoved to (B[0;1m/private/tmp/spf-e2e-b87hogr0/project
+[48:2::240:240:240m❯[39m [38:2::0:0:0m/cd /private/tmp/tmp-e2e-b87hogr0/project[39m[K
+[38:2::102:102:102m[49m  ⎿  [39mMoved to (B[0;1m/private/tmp/tmp-e2e-b87hogr0/project
 (B[0m                                                                                        [38:2::102:102:102m › stashed
 [38:2::138:138:138m─────────────────────────────────────────────────────────────────────────────────────── Stash test ─
 [39m❯ 

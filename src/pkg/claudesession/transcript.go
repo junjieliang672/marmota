@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-// Summary is what superfile needs from one transcript file.
+// Summary is what Marmota needs from one transcript file.
 type Summary struct {
 	SessionID string
 	// Title is Claude's generated title; CustomTitle is a name the person
@@ -46,7 +46,7 @@ type Summary struct {
 	// was renamed.
 	AgentName string
 	// PrintOnly reports a session only `claude -p` ever ran, such as a
-	// question asked from superfile's Ask.
+	// question asked from Marmota's Ask.
 	PrintOnly bool
 
 	pendingToolID string

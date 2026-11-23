@@ -1,11 +1,11 @@
 """Run any command inside a fresh sandbox (temp HOME, XDG dirs, fakes on PATH).
 
-Useful for tools that start spf themselves, such as the tmux based suite::
+Useful for tools that start Marmota themselves, such as the tmux based suite::
 
     cd testsuite
-    .venv/bin/python -m tui.run_in_sandbox -- .venv/bin/python main.py --spf-path ../bin/y
+    .venv/bin/python -m tui.run_in_sandbox -- .venv/bin/python main.py --marmota-path ../bin/y
 
-The command inherits the sandbox environment (see tui.sandbox), so spf and
+The command inherits the sandbox environment (see tui.sandbox), so Marmota and
 everything it launches read and write only the sandbox. Exit code is the
 command's.
 """
@@ -26,9 +26,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--config-source", default="repo",
                         help="repo (default), binary, or a directory to copy config from")
     parser.add_argument("--binary", type=Path, default=None,
-                        help="spf binary, needed for --config-source binary")
+                        help="marmota binary, needed for --config-source binary")
     parser.add_argument("--first-use", action="store_true",
-                        help="let spf show its first-use intro (it swallows the first key)")
+                        help="let Marmota show its first-use intro (it swallows the first key)")
     parser.add_argument("--keep", action="store_true", help="keep the sandbox afterwards")
     parser.add_argument("--print-env", action="store_true", help="print the environment")
     parser.add_argument("command", nargs=argparse.REMAINDER, help="-- command [args...]")

@@ -67,7 +67,7 @@ func TestOpenClaudeSession_ResumesPastSessionInBypassMode(t *testing.T) {
 
 	require.Len(t, *calls, 3)
 	assert.Equal(t, "wezterm cli activate-pane --pane-id 10", (*calls)[2].cmd,
-		"the new pane took the keyboard; superfile gets it back")
+		"the new pane took the keyboard; Marmota gets it back")
 	assert.Contains(t, (*calls)[1].cmd, "--cwd \""+sessionDir+"\"", "resumes in the session's own folder")
 	assert.True(t, strings.HasSuffix((*calls)[1].cmd,
 		"-- claude --resume past1 --dangerously-skip-permissions --remote-control"),
@@ -75,11 +75,11 @@ func TestOpenClaudeSession_ResumesPastSessionInBypassMode(t *testing.T) {
 	assert.Equal(t, "Resumed Old work", m.claude.flash)
 }
 
-func TestOpenClaudeSession_ShowsHiddenManagedPaneBesideSuperfile(t *testing.T) {
+func TestOpenClaudeSession_ShowsHiddenManagedPaneBesideMarmota(t *testing.T) {
 	m := newClaudeTestModel(t)
 	state := weztermPaneLayoutState{
-		ManagedPaneIDs:     []int{20},
-		FixedSuperfileCols: 74,
+		ManagedPaneIDs:   []int{20},
+		FixedMarmotaCols: 74,
 		Sessions: []managedAgentSession{
 			{PaneID: 20, Provider: managedAgentProviderClaude, Cwd: "/tmp/a", VisibleSlot: managedAgentSlotOne},
 			{PaneID: 30, Provider: managedAgentProviderClaude, Cwd: "/tmp/b"},
@@ -104,15 +104,15 @@ func TestOpenClaudeSession_ShowsHiddenManagedPaneBesideSuperfile(t *testing.T) {
 		fakeExecResult{retCode: 0, output: ""},     // park the shown pane
 		fakeExecResult{retCode: 0, output: afterPark},
 		fakeExecResult{retCode: 0, output: "30\n"}, // pull the hidden pane in
-		fakeExecResult{retCode: 0, output: ""},     // give the keyboard back to superfile
+		fakeExecResult{retCode: 0, output: ""},     // give the keyboard back to Marmota
 	)
 
 	m.openClaudeSession("s30")
 
 	require.Len(t, *calls, 6)
 	assert.Equal(t, "wezterm cli activate-pane --pane-id 10", (*calls)[5].cmd,
-		"showing a session leaves the keyboard in superfile")
-	assert.Equal(t, "wezterm cli move-pane-to-new-tab --pane-id 20 --new-window --workspace superfile-agents",
+		"showing a session leaves the keyboard in Marmota")
+	assert.Equal(t, "wezterm cli move-pane-to-new-tab --pane-id 20 --new-window --workspace marmota-agents",
 		(*calls)[2].cmd, "the shown session is parked in the hidden workspace, not in a visible tab")
 	assert.Equal(t, "wezterm cli split-pane --pane-id 10 --right --cells 148 --move-pane-id 30", (*calls)[4].cmd)
 	assert.Equal(t, 30, m.managedWeztermState.ForegroundPaneID)
@@ -125,7 +125,7 @@ func TestOpenClaudeSession_ShowsHiddenManagedPaneBesideSuperfile(t *testing.T) {
 	assert.Equal(t, -1, parked.TabID, "the pane that was shown is known to be parked")
 }
 
-func TestOpenClaudeSession_FocusesSessionAlreadyBesideSuperfile(t *testing.T) {
+func TestOpenClaudeSession_FocusesSessionAlreadyBesideMarmota(t *testing.T) {
 	m := newClaudeTestModel(t)
 	m.claude.panes = tabPanes()
 	m.claude.snapshot = claudesession.Snapshot{Live: []claudesession.Session{
@@ -202,7 +202,7 @@ func TestApplySnapshot_FlagsNewTurnsUnlessTheSessionIsOnScreen(t *testing.T) {
 		"a new turn is unread, except in the session shown beside Marmota")
 
 	summary := ansi.Strip(m.claudeStatusSummary())
-	assert.Contains(t, summary, "● 1 unread (!)")
+	assert.Contains(t, summary, "● 1 unread (s)")
 	assert.NotContains(t, summary, "remote", "Remote Control sessions aren't counted separately")
 }
 
@@ -238,7 +238,7 @@ func TestClaudePaneConversationTitle(t *testing.T) {
 		"✳ Fix the login bug": "Fix the login bug",
 		"⠂ Fix the login bug": "Fix the login bug",
 		"✳ Claude Code":       "",
-		"superfile":           "",
+		"marmota":             "",
 		"zsh in ~/repo":       "",
 		"":                    "",
 	} {
@@ -246,7 +246,7 @@ func TestClaudePaneConversationTitle(t *testing.T) {
 	}
 }
 
-func TestSendSelectionToAgent_TypesMentionsIntoTheSessionBesideSuperfile(t *testing.T) {
+func TestSendSelectionToAgent_TypesMentionsIntoTheSessionBesideMarmota(t *testing.T) {
 	setupWeztermStateDirForTest(t)
 	t.Setenv("WEZTERM_PANE", "10")
 	root := t.TempDir()
@@ -282,7 +282,7 @@ func TestSendSelectionToAgent_TypesMentionsIntoTheSessionBesideSuperfile(t *test
 	assert.Equal(t, "Sent 1 item to shown", m.claude.flash)
 }
 
-func TestSendSelectionToAgent_NeedsASessionBesideSuperfile(t *testing.T) {
+func TestSendSelectionToAgent_NeedsASessionBesideMarmota(t *testing.T) {
 	m := newClaudeTestModel(t)
 	TeaUpdate(m, nil)
 	m.claude.panes = tabPanes()
@@ -290,7 +290,7 @@ func TestSendSelectionToAgent_NeedsASessionBesideSuperfile(t *testing.T) {
 	TeaUpdate(m, nil)
 
 	m.sendSelectionToAgent()
-	assert.Equal(t, "No session next to Marmota. Pick one with ! then enter, or start one with >claude or >codex",
+	assert.Equal(t, "No session next to Marmota. Pick one with s then enter, or start one with >claude or >codex",
 		m.claude.flash)
 }
 
@@ -318,7 +318,7 @@ func TestReconcileParksStrayHiddenPanesInHiddenWorkspace(t *testing.T) {
 		fakeExecResult{retCode: 0, output: marshalWeztermPanesForTest(
 			weztermPane{TabID: 1, PaneID: 10, Workspace: "default"},
 			weztermPane{TabID: 1, PaneID: 20, LeftCol: 75, Workspace: "default"},
-			// parked by an older superfile in an ordinary, visible tab
+			// parked by an older Marmota in an ordinary, visible tab
 			weztermPane{TabID: 4, PaneID: 40, Workspace: "default"},
 		)},
 		fakeExecResult{retCode: 0, output: ""},
@@ -328,7 +328,7 @@ func TestReconcileParksStrayHiddenPanesInHiddenWorkspace(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, *calls, 2)
-	assert.Equal(t, "wezterm cli move-pane-to-new-tab --pane-id 40 --new-window --workspace superfile-agents",
+	assert.Equal(t, "wezterm cli move-pane-to-new-tab --pane-id 40 --new-window --workspace marmota-agents",
 		(*calls)[1].cmd)
 }
 
@@ -338,7 +338,7 @@ func TestApplySnapshot_IgnoresPaneListsFromBeforeASwap(t *testing.T) {
 	stale := claudeSessionsSnapshotMsg{panes: []weztermPane{{PaneID: 99}}, panesListed: true,
 		layoutGen: m.claude.layoutGen}
 
-	m.markPaneTabLocally(30) // superfile moved a pane while the refresh ran
+	m.markPaneTabLocally(30) // Marmota moved a pane while the refresh ran
 	m.applyClaudeSessionsSnapshot(stale)
 
 	_, ok := m.weztermPaneForSession(claudesession.Session{TTY: "/dev/ttys030"})

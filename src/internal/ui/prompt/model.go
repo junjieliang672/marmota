@@ -119,7 +119,7 @@ func (m *Model) HandleShellCommandResults(retCode int, _ string) {
 
 // After action is performed, model will update the prompt.Model with results
 // In case of NoAction, this method should not be called.
-func (m *Model) HandleSPFActionResults(success bool, msg string) {
+func (m *Model) HandleMarmotaActionResults(success bool, msg string) {
 	m.actionSuccess = success
 	m.resultMsg = msg
 	m.CloseOnSuccessIfNeeded()

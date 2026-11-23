@@ -41,7 +41,7 @@ func sessionsTestModel(t *testing.T) *model {
 	return m
 }
 
-// paneListResult answers the pane listing superfile makes before it switches
+// paneListResult answers the pane listing Marmota makes before it switches
 // WezTerm to a pane outside its own agent panes.
 func paneListResult() fakeExecResult {
 	return fakeExecResult{retCode: 0, output: marshalWeztermPanesForTest(tabPanes()...)}
@@ -56,7 +56,7 @@ func TestTheSessionsBoxListsLiveSessionsAndThePreviewTheSelectedOne(t *testing.T
 	m.fileModel.filePreview.SetOpen(true)
 	m.setFilePreviewPanelSize()
 
-	bang(m)
+	toSessions(m)
 	require.True(t, m.sessions.list.Select("s20"))
 	TeaUpdate(m, nil)
 
@@ -73,14 +73,14 @@ func TestTheSessionsBoxListsLiveSessionsAndThePreviewTheSelectedOne(t *testing.T
 
 // enter on a session in another tab brings it in beside Marmota, in place
 // of the one there, instead of switching WezTerm to that tab.
-func TestEnterInTheSessionsBoxBringsTheSessionBesideSuperfile(t *testing.T) {
+func TestEnterInTheSessionsBoxBringsTheSessionBesideMarmota(t *testing.T) {
 	m := dockTestModel(t)
 	require.NoError(t, saveWeztermPaneLayoutState(10, weztermPaneLayoutState{
-		FixedSuperfileCols: 74,
-		Sessions:           []managedAgentSession{{PaneID: 20, Provider: managedAgentProviderClaude, VisibleSlot: 1}},
+		FixedMarmotaCols: 74,
+		Sessions:         []managedAgentSession{{PaneID: 20, Provider: managedAgentProviderClaude, VisibleSlot: 1}},
 	}))
 	wez := newFakeWezterm(t, tabPanes()...)
-	bang(m)
+	toSessions(m)
 	require.True(t, m.sessions.list.Select("s50"))
 	require.Equal(t, "s50", m.sessions.list.SelectedID())
 
@@ -93,9 +93,9 @@ func TestEnterInTheSessionsBoxBringsTheSessionBesideSuperfile(t *testing.T) {
 }
 
 // enter on the session beside Marmota puts the keyboard in it.
-func TestEnterInTheSessionsBoxTypesInTheSessionBesideSuperfile(t *testing.T) {
+func TestEnterInTheSessionsBoxTypesInTheSessionBesideMarmota(t *testing.T) {
 	m := dockTestModel(t)
-	bang(m)
+	toSessions(m)
 	require.True(t, m.sessions.list.Select("s20"), "the one beside Marmota")
 	calls := installFakeExec(t, fakeExecResult{retCode: 0, output: ""})
 
@@ -113,7 +113,7 @@ func TestTheSessionsBoxListsOnlySessionsInWeztermPanes(t *testing.T) {
 	m.claude.snapshot.Live = append(m.claude.snapshot.Live,
 		claudesession.Session{ID: "iterm", Title: "in iTerm", Live: true, PID: 42, TTY: "/dev/ttys099", Cwd: "/repo"},
 		claudesession.Session{ID: "bg", Title: "in the background", Live: true, Background: true, Cwd: "/repo"},
-		claudesession.Session{ID: "own", Title: "on superfile's terminal", Live: true, TTY: "/dev/ttys010",
+		claudesession.Session{ID: "own", Title: "on Marmota's terminal", Live: true, TTY: "/dev/ttys010",
 			Cwd: "/repo"},
 	)
 	m.claude.panes[0].TTYName = "/dev/ttys010"
@@ -123,14 +123,14 @@ func TestTheSessionsBoxListsOnlySessionsInWeztermPanes(t *testing.T) {
 		ids = append(ids, s.ID)
 	}
 	assert.ElementsMatch(t, []string{"s20", "s50"}, ids,
-		"not the finished one, nor those in iTerm, in the background or on superfile's terminal")
+		"not the finished one, nor those in iTerm, in the background or on Marmota's terminal")
 }
 
 func TestTheSessionsBoxForksIntoAWorktree(t *testing.T) {
 	m := dockTestModel(t)
 	dir := t.TempDir()
 	m.claude.snapshot.Live[0].Cwd = dir
-	bang(m)
+	toSessions(m)
 	require.True(t, m.sessions.list.Select("s20"))
 
 	pressKey(m, common.Hotkeys.SessionFork[0])
@@ -154,7 +154,7 @@ func TestTheSessionsBoxForksIntoAWorktree(t *testing.T) {
 
 func TestTheSessionsBoxStopAsksThenClosesThePane(t *testing.T) {
 	m := dockTestModel(t)
-	bang(m)
+	toSessions(m)
 	require.True(t, m.sessions.list.Select("s50"))
 
 	pressKey(m, common.Hotkeys.SessionStop[0])
@@ -169,7 +169,7 @@ func TestTheSessionsBoxStopAsksThenClosesThePane(t *testing.T) {
 	require.NotEmpty(t, *calls)
 	assert.Equal(t, "wezterm cli kill-pane --pane-id 50", (*calls)[0].cmd)
 	assert.Equal(t, "wezterm cli activate-pane --pane-id 10", (*calls)[len(*calls)-1].cmd,
-		"the keyboard stays with superfile")
+		"the keyboard stays with Marmota")
 	assert.Equal(t, "Stopped ime hold tests", m.claude.flash)
 	for _, s := range m.dockSessions() {
 		assert.NotEqual(t, "s50", s.ID, "the box no longer lists it")
@@ -185,7 +185,7 @@ func TestAStoppedSessionIsFinishedAtOnce(t *testing.T) {
 	stillRunning := m.claude.snapshot
 	stillRunning.Live = slices.Clone(stillRunning.Live)
 	stillRunning.Past = slices.Clone(stillRunning.Past)
-	bang(m)
+	toSessions(m)
 	require.True(t, m.sessions.list.Select("s20"))
 	pressKey(m, common.Hotkeys.SessionStop[0])
 	installFakeExec(t, fakeExecResult{retCode: 0, output: ""}, paneListResult(), fakeExecResult{retCode: 0, output: ""})
@@ -216,23 +216,23 @@ func TestAStoppedSessionIsFinishedAtOnce(t *testing.T) {
 	assert.Empty(t, m.claude.stopped, "and the stop is forgotten")
 }
 
-// esc leaves the Sessions box; q quits superfile there, as in the files,
+// esc leaves the Sessions box; q quits Marmota there, as in the files,
 // unless you're typing a name.
 func TestTheSessionsBoxEscLeavesItAndQQuits(t *testing.T) {
 	ownAskHistory(t)
 	m := dockTestModel(t)
-	bang(m)
+	toSessions(m)
 	pressKey(m, "esc")
 	assert.Equal(t, nonePanelFocus, m.focusPanel, "esc goes back to the files")
 	assert.Equal(t, notQuitting, m.modelQuitState)
 
-	bang(m)
+	toSessions(m)
 	pressKey(m, common.Hotkeys.SessionRename[0])
 	pressKey(m, common.Hotkeys.Quit[0])
 	assert.Equal(t, notQuitting, m.modelQuitState, "a q typed in a name is a q")
 	pressKey(m, "esc")
 
-	assert.True(t, IsTeaQuit(press(m, common.Hotkeys.Quit[0])), "q quits superfile")
+	assert.True(t, IsTeaQuit(press(m, common.Hotkeys.Quit[0])), "q quits Marmota")
 }
 
 // r renames a session in the Sessions box, as a file is renamed: the name is
@@ -242,7 +242,7 @@ func TestTheSessionsBoxRenamesASession(t *testing.T) {
 	m := dockTestModel(t)
 	pane := newFakeClaudePane(t)
 	pane.set("half typed", nil)
-	bang(m)
+	toSessions(m)
 	require.True(t, m.sessions.list.Select("s20"))
 
 	pressKey(m, common.Hotkeys.SessionRename[0])
@@ -272,7 +272,7 @@ func TestTheSessionsBoxRenamesASession(t *testing.T) {
 	assert.False(t, m.sessions.list.IsRenaming())
 	assert.Equal(t, dockSessionsFocus, m.focusPanel, "esc cancels the rename, and stays in the box")
 
-	// superfile can't type into a pane it can't read; with no transcript
+	// Marmota can't type into a pane it can't read; with no transcript
 	// either, there is nowhere to keep the name yet.
 	require.True(t, m.sessions.list.Select("s50"))
 	pressKey(m, common.Hotkeys.SessionRename[0])
@@ -289,7 +289,7 @@ func TestRenamingARunningSessionThatIsAskingSomething(t *testing.T) {
 	m.claude.snapshot.Live[0].TranscriptPath = transcript
 	pane := newFakeClaudePane(t)
 	pane.question = true
-	bang(m)
+	toSessions(m)
 	require.True(t, m.sessions.list.Select("s20"))
 	pressKey(m, common.Hotkeys.SessionRename[0])
 	TeaUpdate(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})

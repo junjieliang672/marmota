@@ -1,9 +1,9 @@
 """Shared helpers for the fake tools in this directory (stdlib only, py3.6+).
 
 Every fake appends its argv as one JSON array per line to a log file, so a
-test can assert exactly what spf ran. Fixture variables (FAKE_*_JSON etc.)
+test can assert exactly what Marmota ran. Fixture variables (FAKE_*_JSON etc.)
 hold either an absolute path to a file, whose current contents are used (so a
-test can change them while spf runs), or the literal content itself.
+test can change them while Marmota runs), or the literal content itself.
 """
 import fcntl
 import json

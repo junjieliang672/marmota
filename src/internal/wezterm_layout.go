@@ -22,9 +22,9 @@ var execInShell = utils.ExecuteCommandInShell //nolint:gochecknoglobals // test 
 const weztermSplitDividerCols = 1
 
 // managedAgentHiddenWorkspace is where agent panes wait while another one is
-// shown beside superfile. WezTerm only draws the active workspace, so panes
+// shown beside Marmota. WezTerm only draws the active workspace, so panes
 // parked here stay out of the tab bar until they're pulled back into a split.
-const managedAgentHiddenWorkspace = "superfile-agents"
+const managedAgentHiddenWorkspace = "marmota-agents"
 
 type managedAgentProvider string
 
@@ -58,12 +58,12 @@ func (s managedAgentSession) providerToken() string {
 }
 
 type weztermPaneLayoutState struct {
-	// ManagedPaneIDs are kept in SPF slot order:
+	// ManagedPaneIDs are kept in Marmota slot order:
 	// 1 = the single foreground managed agent pane.
-	ManagedPaneIDs     []int                 `json:"managed_pane_ids"`
-	ForegroundPaneID   int                   `json:"foreground_pane_id,omitempty"`
-	FixedSuperfileCols int                   `json:"fixed_superfile_cols,omitempty"`
-	Sessions           []managedAgentSession `json:"sessions,omitempty"`
+	ManagedPaneIDs   []int                 `json:"managed_pane_ids"`
+	ForegroundPaneID int                   `json:"foreground_pane_id,omitempty"`
+	FixedMarmotaCols int                   `json:"fixed_marmota_cols,omitempty"`
+	Sessions         []managedAgentSession `json:"sessions,omitempty"`
 
 	loaded bool `json:"-"`
 }
@@ -97,25 +97,25 @@ type weztermManagedLayoutPlan struct {
 func (m *model) launchManagedSessionInWeztermAt(cwd string, command string, provider managedAgentProvider,
 	successMessage string,
 ) (string, error) {
-	superfilePaneID, err := currentWeztermPaneID()
+	marmotaPaneID, err := currentWeztermPaneID()
 	if err != nil {
 		return "", err
 	}
-	return m.launchManagedSessionInWeztermForPaneAt(superfilePaneID, cwd, command, provider, successMessage)
+	return m.launchManagedSessionInWeztermForPaneAt(marmotaPaneID, cwd, command, provider, successMessage)
 }
 
-func (m *model) launchManagedSessionInWeztermForPaneAt(superfilePaneID int, focusPanelDir string, command string,
+func (m *model) launchManagedSessionInWeztermForPaneAt(marmotaPaneID int, focusPanelDir string, command string,
 	provider managedAgentProvider, successMessage string,
 ) (string, error) {
-	state, err := loadWeztermPaneLayoutState(superfilePaneID)
+	state, err := loadWeztermPaneLayoutState(marmotaPaneID)
 	if err != nil {
-		slog.Warn("Ignoring unreadable WezTerm pane state", "paneID", superfilePaneID, "error", err)
+		slog.Warn("Ignoring unreadable WezTerm pane state", "paneID", marmotaPaneID, "error", err)
 		state = weztermPaneLayoutState{}
 	}
 
 	state = normalizeWeztermPaneLayoutState(state)
 	if len(state.ManagedPaneIDs) == 0 && len(state.Sessions) == 0 {
-		return m.launchFirstManagedSessionInWezterm(focusPanelDir, superfilePaneID, command, provider, successMessage,
+		return m.launchFirstManagedSessionInWezterm(focusPanelDir, marmotaPaneID, command, provider, successMessage,
 			nil)
 	}
 
@@ -123,10 +123,10 @@ func (m *model) launchManagedSessionInWeztermForPaneAt(superfilePaneID int, focu
 	if err != nil {
 		return "", fmt.Errorf("failed to inspect wezterm panes: %w", err)
 	}
-	if _, err = findWeztermPaneByID(allPanes, superfilePaneID); err != nil {
+	if _, err = findWeztermPaneByID(allPanes, marmotaPaneID); err != nil {
 		return "", err
 	}
-	tabPanes, err := filterWeztermTabPanes(allPanes, superfilePaneID)
+	tabPanes, err := filterWeztermTabPanes(allPanes, marmotaPaneID)
 	if err != nil {
 		return "", fmt.Errorf("failed to inspect wezterm panes: %w", err)
 	}
@@ -135,21 +135,21 @@ func (m *model) launchManagedSessionInWeztermForPaneAt(superfilePaneID int, focu
 	state = normalizeWeztermPaneLayoutState(state)
 
 	if len(state.ManagedPaneIDs) == 0 {
-		// Nothing is beside superfile, but parked sessions stay managed.
-		return m.launchFirstManagedSessionInWezterm(focusPanelDir, superfilePaneID, command, provider, successMessage,
+		// Nothing is beside Marmota, but parked sessions stay managed.
+		return m.launchFirstManagedSessionInWezterm(focusPanelDir, marmotaPaneID, command, provider, successMessage,
 			state.Sessions)
 	}
 
-	if hasUnmanagedWeztermTabPanes(tabPanes, superfilePaneID, state.ManagedPaneIDs) {
+	if hasUnmanagedWeztermTabPanes(tabPanes, marmotaPaneID, state.ManagedPaneIDs) {
 		return "", errors.New("managed agent layout requires the tab to contain only Marmota and managed agent panes")
 	}
 
-	superfilePane, err := findWeztermPaneByID(tabPanes, superfilePaneID)
+	marmotaPane, err := findWeztermPaneByID(tabPanes, marmotaPaneID)
 	if err != nil {
 		return "", err
 	}
-	if state.FixedSuperfileCols == 0 {
-		state.FixedSuperfileCols = superfilePane.Size.Cols
+	if state.FixedMarmotaCols == 0 {
+		state.FixedMarmotaCols = marmotaPane.Size.Cols
 	}
 
 	hiddenPaneID, hiddenErr := spawnBackgroundManagedSessionInWezterm(focusPanelDir, command)
@@ -166,35 +166,35 @@ func (m *model) launchManagedSessionInWeztermForPaneAt(superfilePaneID int, focu
 	})
 	state = normalizeWeztermPaneLayoutState(state)
 
-	persistWeztermPaneLayoutState(superfilePaneID, state)
+	persistWeztermPaneLayoutState(marmotaPaneID, state)
 	state.loaded = true
-	m.setManagedWeztermState(superfilePaneID, state)
+	m.setManagedWeztermState(marmotaPaneID, state)
 	return successMessage, nil
 }
 
-// launchFirstManagedSessionInWezterm splits superfile's pane for a new agent
-// when no agent is beside superfile. Parked sessions in keep stay parked.
-func (m *model) launchFirstManagedSessionInWezterm(focusPanelDir string, superfilePaneID int,
+// launchFirstManagedSessionInWezterm splits Marmota's pane for a new agent
+// when no agent is beside Marmota. Parked sessions in keep stay parked.
+func (m *model) launchFirstManagedSessionInWezterm(focusPanelDir string, marmotaPaneID int,
 	command string, provider managedAgentProvider, successMessage string, keep []managedAgentSession,
 ) (string, error) {
-	tabPanes, err := listWeztermTabPanes(focusPanelDir, superfilePaneID)
+	tabPanes, err := listWeztermTabPanes(focusPanelDir, marmotaPaneID)
 	if err != nil {
 		return "", fmt.Errorf("failed to inspect wezterm panes: %w", err)
 	}
 
-	superfilePane, err := findWeztermPaneByID(tabPanes, superfilePaneID)
+	marmotaPane, err := findWeztermPaneByID(tabPanes, marmotaPaneID)
 	if err != nil {
 		return "", err
 	}
 
-	superfileCols, agentCols, err := initialManagedWeztermSplitWidths(superfilePane.Size.Cols)
+	marmotaCols, agentCols, err := initialManagedWeztermSplitWidths(marmotaPane.Size.Cols)
 	if err != nil {
 		return "", err
 	}
 
 	newPaneID, err := splitWeztermPane(focusPanelDir,
 		fmt.Sprintf("wezterm cli split-pane --pane-id %d --right --cells %d --cwd %q -- %s",
-			superfilePaneID, agentCols, focusPanelDir, command))
+			marmotaPaneID, agentCols, focusPanelDir, command))
 	if err != nil {
 		return "", fmt.Errorf("failed to split pane: %w", err)
 	}
@@ -205,9 +205,9 @@ func (m *model) launchFirstManagedSessionInWezterm(focusPanelDir string, superfi
 		sessions = append(sessions, session)
 	}
 	state := normalizeWeztermPaneLayoutState(weztermPaneLayoutState{
-		ManagedPaneIDs:     []int{newPaneID},
-		ForegroundPaneID:   newPaneID,
-		FixedSuperfileCols: superfileCols,
+		ManagedPaneIDs:   []int{newPaneID},
+		ForegroundPaneID: newPaneID,
+		FixedMarmotaCols: marmotaCols,
 		Sessions: append(sessions, managedAgentSession{
 			PaneID:      newPaneID,
 			Provider:    provider,
@@ -217,20 +217,20 @@ func (m *model) launchFirstManagedSessionInWezterm(focusPanelDir string, superfi
 		}),
 	})
 
-	persistWeztermPaneLayoutState(superfilePaneID, state)
+	persistWeztermPaneLayoutState(marmotaPaneID, state)
 	state.loaded = true
-	m.setManagedWeztermState(superfilePaneID, state)
+	m.setManagedWeztermState(marmotaPaneID, state)
 
 	return successMessage, nil
 }
 
-// managedAgentSplitWidth is the width of an agent pane split off superfile
-// in a tab totalCols wide. It keeps superfile at its recorded width, or at
+// managedAgentSplitWidth is the width of an agent pane split off Marmota
+// in a tab totalCols wide. It keeps Marmota at its recorded width, or at
 // the first split's width when none is recorded or the recorded one would
 // leave no room for the agent.
-func managedAgentSplitWidth(totalCols, superfileCols int) (int, error) {
-	agentCols := totalCols - superfileCols - weztermSplitDividerCols
-	if superfileCols > 0 && agentCols > 0 {
+func managedAgentSplitWidth(totalCols, marmotaCols int) (int, error) {
+	agentCols := totalCols - marmotaCols - weztermSplitDividerCols
+	if marmotaCols > 0 && agentCols > 0 {
 		return agentCols, nil
 	}
 	_, agentCols, err := initialManagedWeztermSplitWidths(totalCols)
@@ -242,18 +242,18 @@ func initialManagedWeztermSplitWidths(totalCols int) (int, int, error) {
 		return 0, 0, fmt.Errorf("wezterm pane width must be positive, got %d", totalCols)
 	}
 
-	superfileCols := max(totalCols*common.SuperfileInitialWidthPct/100, //nolint:mnd // a percentage
-		common.SuperfileManagedMinCols)
-	agentCols := totalCols - superfileCols - weztermSplitDividerCols
+	marmotaCols := max(totalCols*common.MarmotaInitialWidthPct/100, //nolint:mnd // a percentage
+		common.MarmotaManagedMinCols)
+	agentCols := totalCols - marmotaCols - weztermSplitDividerCols
 	if agentCols <= 0 {
 		return 0, 0, fmt.Errorf(
 			"wezterm pane width %d is too small to keep the Marmota pane at %d columns and still split an agent pane",
 			totalCols,
-			superfileCols,
+			marmotaCols,
 		)
 	}
 
-	return superfileCols, agentCols, nil
+	return marmotaCols, agentCols, nil
 }
 
 func currentWeztermPaneID() (int, error) {
@@ -506,9 +506,9 @@ func totalWeztermTabWidth(tabPanes []weztermPane) int {
 	return maxRight - minLeft
 }
 
-func hasUnmanagedWeztermTabPanes(tabPanes []weztermPane, superfilePaneID int, managedPaneIDs []int) bool {
+func hasUnmanagedWeztermTabPanes(tabPanes []weztermPane, marmotaPaneID int, managedPaneIDs []int) bool {
 	knownPaneIDs := make(map[int]struct{}, len(managedPaneIDs)+1)
-	knownPaneIDs[superfilePaneID] = struct{}{}
+	knownPaneIDs[marmotaPaneID] = struct{}{}
 	for _, paneID := range managedPaneIDs {
 		knownPaneIDs[paneID] = struct{}{}
 	}
@@ -604,7 +604,7 @@ func pruneManagedAgentSessions(sessions []managedAgentSession, panes []weztermPa
 	return pruned
 }
 
-func reconcileManagedAgentSessionsWithWezterm(cwd string, superfilePaneID int,
+func reconcileManagedAgentSessionsWithWezterm(cwd string, marmotaPaneID int,
 	state weztermPaneLayoutState,
 ) (weztermPaneLayoutState, error) {
 	allPanes, err := listWeztermPanes(cwd)
@@ -612,12 +612,12 @@ func reconcileManagedAgentSessionsWithWezterm(cwd string, superfilePaneID int,
 		return state, fmt.Errorf("failed to inspect wezterm panes: %w", err)
 	}
 
-	superfilePane, err := findWeztermPaneByID(allPanes, superfilePaneID)
+	marmotaPane, err := findWeztermPaneByID(allPanes, marmotaPaneID)
 	if err != nil {
 		return state, err
 	}
 
-	tabPanes, err := filterWeztermTabPanes(allPanes, superfilePaneID)
+	tabPanes, err := filterWeztermTabPanes(allPanes, marmotaPaneID)
 	if err != nil {
 		return state, fmt.Errorf("failed to inspect wezterm panes: %w", err)
 	}
@@ -631,12 +631,12 @@ func reconcileManagedAgentSessionsWithWezterm(cwd string, superfilePaneID int,
 	}
 
 	sessionIndexByPaneID := refreshManagedSessions(cwd, state.Sessions, panesByID)
-	visiblePanes := visibleManagedPanes(tabPanes, superfilePaneID, sessionIndexByPaneID)
+	visiblePanes := visibleManagedPanes(tabPanes, marmotaPaneID, sessionIndexByPaneID)
 
 	foregroundPaneID := state.ForegroundPaneID
 	if len(visiblePanes) > 0 {
-		if superfilePane.Size.Cols > 0 {
-			state.FixedSuperfileCols = superfilePane.Size.Cols
+		if marmotaPane.Size.Cols > 0 {
+			state.FixedMarmotaCols = marmotaPane.Size.Cols
 		}
 		foregroundPaneID = visiblePanes[0].PaneID
 	}
@@ -686,14 +686,14 @@ func refreshManagedSessions(cwd string, sessions []managedAgentSession,
 	return indexByPaneID
 }
 
-// visibleManagedPanes are the agent panes in superfile's tab, left to right,
+// visibleManagedPanes are the agent panes in Marmota's tab, left to right,
 // then top to bottom.
-func visibleManagedPanes(tabPanes []weztermPane, superfilePaneID int,
+func visibleManagedPanes(tabPanes []weztermPane, marmotaPaneID int,
 	sessionIndexByPaneID map[int]int,
 ) []weztermPane {
 	visiblePanes := make([]weztermPane, 0, 1)
 	for _, pane := range tabPanes {
-		if pane.PaneID == superfilePaneID {
+		if pane.PaneID == marmotaPaneID {
 			continue
 		}
 		if _, ok := sessionIndexByPaneID[pane.PaneID]; ok {
@@ -711,7 +711,7 @@ func visibleManagedPanes(tabPanes []weztermPane, superfilePaneID int,
 }
 
 // parkStrayManagedPanes moves hidden agent panes that still sit in an ordinary
-// tab (older superfile versions parked them that way) into the hidden
+// tab (older Marmota versions parked them that way) into the hidden
 // workspace, so they stop cluttering the tab bar.
 func parkStrayManagedPanes(cwd string, sessions []managedAgentSession, visiblePanes []weztermPane,
 	panesByID map[int]weztermPane,
@@ -735,7 +735,7 @@ func parkStrayManagedPanes(cwd string, sessions []managedAgentSession, visiblePa
 }
 
 func (m *model) foregroundManagedAgentSessionByPaneID(
-	superfilePaneID int,
+	marmotaPaneID int,
 	state weztermPaneLayoutState,
 	targetPaneID int,
 ) (weztermPaneLayoutState, error) {
@@ -756,13 +756,13 @@ func (m *model) foregroundManagedAgentSessionByPaneID(
 	if err != nil {
 		return state, fmt.Errorf("failed to inspect wezterm panes: %w", err)
 	}
-	// superfile's pane and its tab must be there before anything moves.
-	superfilePane, err := findWeztermPaneByID(allPanes, superfilePaneID)
+	// Marmota's pane and its tab must be there before anything moves.
+	marmotaPane, err := findWeztermPaneByID(allPanes, marmotaPaneID)
 	if err != nil {
 		return state, err
 	}
-	superfileTabID := superfilePane.TabID
-	if _, err = filterWeztermTabPanes(allPanes, superfilePaneID); err != nil {
+	marmotaTabID := marmotaPane.TabID
+	if _, err = filterWeztermTabPanes(allPanes, marmotaPaneID); err != nil {
 		return state, fmt.Errorf("failed to inspect wezterm panes: %w", err)
 	}
 
@@ -776,7 +776,7 @@ func (m *model) foregroundManagedAgentSessionByPaneID(
 		// A session that has exited has no pane left to park, and one
 		// another Marmota took beside it is no longer ours to park.
 		if foreground, findErr := findWeztermPaneByID(allPanes,
-			state.Sessions[currentForegroundIdx].PaneID); findErr == nil && foreground.TabID == superfileTabID {
+			state.Sessions[currentForegroundIdx].PaneID); findErr == nil && foreground.TabID == marmotaTabID {
 			if err = parkWeztermPane(focusPanelDir, state.Sessions[currentForegroundIdx].PaneID); err != nil {
 				return state, err
 			}
@@ -788,11 +788,11 @@ func (m *model) foregroundManagedAgentSessionByPaneID(
 	if err != nil {
 		return state, fmt.Errorf("failed to inspect wezterm panes: %w", err)
 	}
-	currentPane, err := findWeztermPaneByID(allPanes, superfilePaneID)
+	currentPane, err := findWeztermPaneByID(allPanes, marmotaPaneID)
 	if err != nil {
 		return state, err
 	}
-	tabPanes, err := filterWeztermTabPanes(allPanes, superfilePaneID)
+	tabPanes, err := filterWeztermTabPanes(allPanes, marmotaPaneID)
 	if err != nil {
 		return state, fmt.Errorf("failed to inspect wezterm panes: %w", err)
 	}
@@ -819,15 +819,15 @@ func (m *model) foregroundManagedAgentSessionByPaneID(
 // releasePaneFromOtherMarmotas takes a pane out of the agent panes every
 // other Marmota manages, so that none of them parks it again or swaps it
 // out of the tab it was moved to.
-func releasePaneFromOtherMarmotas(superfilePaneID, paneID int) {
-	paths, err := filepath.Glob(filepath.Join(variable.SuperFileStateDir, "wezterm-pane-state-*.json"))
+func releasePaneFromOtherMarmotas(marmotaPaneID, paneID int) {
+	paths, err := filepath.Glob(filepath.Join(variable.MarmotaStateDir, "wezterm-pane-state-*.json"))
 	if err != nil {
 		return
 	}
 	for _, path := range paths {
 		var otherPaneID int
 		if _, err := fmt.Sscanf(filepath.Base(path), "wezterm-pane-state-%d.json", &otherPaneID); err != nil ||
-			otherPaneID == superfilePaneID {
+			otherPaneID == marmotaPaneID {
 			continue
 		}
 		state, err := loadWeztermPaneLayoutState(otherPaneID)
@@ -847,8 +847,8 @@ func releasePaneFromOtherMarmotas(superfilePaneID, paneID int) {
 	}
 }
 
-func loadWeztermPaneLayoutState(superfilePaneID int) (weztermPaneLayoutState, error) {
-	data, err := os.ReadFile(weztermPaneStatePath(superfilePaneID))
+func loadWeztermPaneLayoutState(marmotaPaneID int) (weztermPaneLayoutState, error) {
+	data, err := os.ReadFile(weztermPaneStatePath(marmotaPaneID))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return weztermPaneLayoutState{}, nil
@@ -864,16 +864,16 @@ func loadWeztermPaneLayoutState(superfilePaneID int) (weztermPaneLayoutState, er
 	return normalizeWeztermPaneLayoutState(state), nil
 }
 
-func persistWeztermPaneLayoutState(superfilePaneID int, state weztermPaneLayoutState) {
-	if err := saveWeztermPaneLayoutState(superfilePaneID, state); err != nil {
-		slog.Warn("Failed to persist WezTerm pane state", "paneID", superfilePaneID, "error", err)
+func persistWeztermPaneLayoutState(marmotaPaneID int, state weztermPaneLayoutState) {
+	if err := saveWeztermPaneLayoutState(marmotaPaneID, state); err != nil {
+		slog.Warn("Failed to persist WezTerm pane state", "paneID", marmotaPaneID, "error", err)
 	}
 }
 
-func saveWeztermPaneLayoutState(superfilePaneID int, state weztermPaneLayoutState) error {
+func saveWeztermPaneLayoutState(marmotaPaneID int, state weztermPaneLayoutState) error {
 	state = normalizeWeztermPaneLayoutState(state)
 
-	statePath := weztermPaneStatePath(superfilePaneID)
+	statePath := weztermPaneStatePath(marmotaPaneID)
 	if len(state.ManagedPaneIDs) == 0 && len(state.Sessions) == 0 {
 		if err := os.Remove(statePath); err != nil && !os.IsNotExist(err) {
 			return err
@@ -916,7 +916,7 @@ func attachManagedPaneToSlot(cwd string, currentPane weztermPane, tabPanes []wez
 	visiblePaneIDs := visibleManagedAgentPaneIDs(state.Sessions)
 	switch len(visiblePaneIDs) {
 	case 0:
-		agentWidth, err := managedAgentSplitWidth(totalWeztermTabWidth(tabPanes), state.FixedSuperfileCols)
+		agentWidth, err := managedAgentSplitWidth(totalWeztermTabWidth(tabPanes), state.FixedMarmotaCols)
 		if err != nil {
 			// A split WezTerm refuses can still take the moved pane out of
 			// its tab, stranding the session; never ask for one.
@@ -943,8 +943,8 @@ func attachManagedPaneToSlot(cwd string, currentPane weztermPane, tabPanes []wez
 	}
 }
 
-func weztermPaneStatePath(superfilePaneID int) string {
-	return filepath.Join(variable.SuperFileStateDir, fmt.Sprintf("wezterm-pane-state-%d.json", superfilePaneID))
+func weztermPaneStatePath(marmotaPaneID int) string {
+	return filepath.Join(variable.MarmotaStateDir, fmt.Sprintf("wezterm-pane-state-%d.json", marmotaPaneID))
 }
 
 func weztermCommandError(prefix string, retCode int, err error) error {

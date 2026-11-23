@@ -24,7 +24,7 @@ import (
 )
 
 // sidebarRender draws the sidebar: the file panels one under another, each
-// as tall as the layout gave it, then Details. The s list takes all of it
+// as tall as the layout gave it, then Details. The go to list takes all of it
 // while it is open.
 func (m *model) sidebarRender() string {
 	if m.jumpUI.IsOpen() {
@@ -438,7 +438,7 @@ func (m *model) introduceModalRender() string {
 	title := common.SidebarTitleStyle.Render(" Thanks for using Marmota!!") +
 		common.ModalStyle.Render("\n You can read the following information before starting to use it!")
 	vimUserWarn := common.ProcessErrorStyle.Render("  ** If you use Vim keys **, copy vimHotkeys.toml from the repository's\n" +
-		"  src/superfile_config over your hotkeys.toml (y path-list prints where it is)")
+		"  src/marmota_config over your hotkeys.toml (y path-list prints where it is)")
 	subOne := common.SidebarTitleStyle.Render("  (1)") +
 		common.ModalStyle.Render(" If this is your first time, a short tour shows what is where:\n"+
 			"      "+variable.TutorialURL)
@@ -446,7 +446,9 @@ func (m *model) introduceModalRender() string {
 		common.ModalStyle.Render(" If you forget the relevant keys during use,\n"+
 			"      you can press \"?\" (shift+/) at any time to query the keys!")
 	subThree := common.SidebarTitleStyle.Render("  (3)") +
-		common.ModalStyle.Render(" ! opens the Sessions box, K the Ask box, > starts Claude Code or\n"+
+		common.ModalStyle.Render(" "+firstKey(common.Hotkeys.JumpToUnreadSession)+" opens the Sessions box, "+
+			firstKey(common.Hotkeys.OpenAskBar)+" the Ask box, "+firstKey(common.Hotkeys.OpenAgentPrompt)+
+			" starts Claude Code or\n"+
 			"      Codex beside Marmota")
 	subFour := common.SidebarTitleStyle.Render("  (4)") +
 		common.ModalStyle.Render(" Thank you again for using Marmota.\n"+

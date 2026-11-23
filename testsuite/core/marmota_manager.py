@@ -1,15 +1,15 @@
 from abc import ABC, abstractmethod
 import core.keys as keys
 
-class BaseSPFManager(ABC):
+class BaseMarmotaManager(ABC):
 
-    def __init__(self, spf_path : str):
-        self.spf_path = spf_path
+    def __init__(self, marmota_path : str):
+        self.marmota_path = marmota_path
         # _ denotes the internal variables, anyone should not directly read/modify
-        self._is_spf_running : bool = False
+        self._is_marmota_running : bool = False
 
     @abstractmethod
-    def start_spf(self, start_dir : str = None, args : list[str] = None) -> None:
+    def start_marmota(self, start_dir : str = None, args : list[str] = None) -> None:
         pass 
     
     @abstractmethod
@@ -26,17 +26,17 @@ class BaseSPFManager(ABC):
     
     
     @abstractmethod
-    def is_spf_running(self) -> bool:
+    def is_marmota_running(self) -> bool:
         """
-        We allow using _is_spf_running variable for efficiency
+        We allow using _is_marmota_running variable for efficiency
         But this method should give the true state, although this might have some calculations
         """
-        return self._is_spf_running
+        return self._is_marmota_running
     
     @abstractmethod
-    def close_spf(self) -> None:
+    def close_marmota(self) -> None:
         """
-        Close spf if its running and cleanup any other resources
+        Close marmota if its running and cleanup any other resources
         """
     
     def runtime_info(self) -> str:

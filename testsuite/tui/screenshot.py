@@ -1,8 +1,8 @@
 """Render a ScreenSnapshot to a PNG with Pillow.
 
 * Text uses a monospace system font (Menlo, then SF Mono / Monaco on macOS,
-  DejaVu / Liberation Mono on Linux, $SPF_TUI_FONT to override). Glyphs the
-  font lacks fall back per character to a Nerd Font (for superfile's icons),
+  DejaVu / Liberation Mono on Linux, $MARMOTA_TUI_FONT to override). Glyphs the
+  font lacks fall back per character to a Nerd Font (for Marmota's icons),
   symbol and CJK fonts, then color emoji, then a "tofu" box.
 * Box drawing (U+2500-257F), block elements (U+2580-259F) and braille
   (U+2800-28FF) are drawn as shapes, so borders join and half-block image
@@ -84,11 +84,11 @@ def _truetype(path: str, size: int, index: int = 0) -> Optional[ImageFont.FreeTy
 
 
 def _load_mono(size: int) -> Tuple[Font, Font, Font, Font]:
-    override = os.environ.get("SPF_TUI_FONT")
+    override = os.environ.get("MARMOTA_TUI_FONT")
     if override:
         font = _truetype(override, size)
         if font is not None:
-            bold = _truetype(os.environ.get("SPF_TUI_FONT_BOLD", ""), size) or font
+            bold = _truetype(os.environ.get("MARMOTA_TUI_FONT_BOLD", ""), size) or font
             return font, bold, font, bold
     for path, faces in _MONO_FONTS:
         if not os.path.exists(path):

@@ -61,7 +61,7 @@ func newestFirstFiles(files []string, cwd string) []string {
 	return out
 }
 
-// focusClaudeSession shows a session beside superfile and puts the keyboard
+// focusClaudeSession shows a session beside Marmota and puts the keyboard
 // in it; a finished session is resumed first.
 func (m *model) focusClaudeSession(s claudesession.Session) {
 	m.markClaudeSessionSeen(s)
@@ -75,12 +75,12 @@ func (m *model) focusClaudeSession(s claudesession.Session) {
 }
 
 // launchVisibleSession runs command in a new agent pane and shows it beside
-// superfile; with focus the keyboard moves into it.
+// Marmota; with focus the keyboard moves into it.
 func (m *model) launchVisibleSession(cwd, command, message string, focus bool, id string) (string, error) {
 	return m.launchVisibleAgent(cwd, command, managedAgentProviderClaude, message, focus, id)
 }
 
-// launchVisibleAgent starts an agent beside superfile. When another agent
+// launchVisibleAgent starts an agent beside Marmota. When another agent
 // is shown there, the new one takes its place and the other is parked. id
 // is the session's, when known, to name its tmux window.
 func (m *model) launchVisibleAgent(cwd, command string, provider managedAgentProvider, message string,
@@ -105,12 +105,12 @@ func (m *model) launchVisibleAgent(cwd, command string, provider managedAgentPro
 		return message, nil
 	}
 	launched := sessions[len(sessions)-1]
-	superfilePaneID, err := currentWeztermPaneID()
+	marmotaPaneID, err := currentWeztermPaneID()
 	if err != nil {
 		return message, nil //nolint:nilerr // launched; only the swap is skipped
 	}
 	if launched.VisibleSlot != managedAgentSlotOne {
-		if err := m.foregroundManagedPane(superfilePaneID, launched.PaneID); err != nil {
+		if err := m.foregroundManagedPane(marmotaPaneID, launched.PaneID); err != nil {
 			return message, err
 		}
 	}
@@ -121,45 +121,45 @@ func (m *model) launchVisibleAgent(cwd, command string, provider managedAgentPro
 		return message, nil
 	}
 	// A new pane takes the keyboard; give it back, so the next key still
-	// reaches superfile.
-	if err := activateWeztermPane(cwd, superfilePaneID); err != nil {
+	// reaches Marmota.
+	if err := activateWeztermPane(cwd, marmotaPaneID); err != nil {
 		slog.Warn("Could not give the keyboard back to Marmota", "error", err)
 	}
 	return message, nil
 }
 
-// foregroundManagedPane shows a managed agent pane beside superfile,
+// foregroundManagedPane shows a managed agent pane beside Marmota,
 // parking the one shown there.
-func (m *model) foregroundManagedPane(superfilePaneID, paneID int) error {
+func (m *model) foregroundManagedPane(marmotaPaneID, paneID int) error {
 	if isTmuxPane(paneID) {
 		_, err := m.showTmuxPane(paneID, "", false)
 		return err
 	}
-	state, err := m.foregroundManagedAgentSessionByPaneID(superfilePaneID, m.managedWeztermState, paneID)
+	state, err := m.foregroundManagedAgentSessionByPaneID(marmotaPaneID, m.managedWeztermState, paneID)
 	if err != nil {
 		return err
 	}
-	persistWeztermPaneLayoutState(superfilePaneID, state)
+	persistWeztermPaneLayoutState(marmotaPaneID, state)
 	state.loaded = true
-	m.setManagedWeztermState(superfilePaneID, state)
+	m.setManagedWeztermState(marmotaPaneID, state)
 	m.markPaneTabLocally(paneID)
 	return nil
 }
 
 // launchParkedAgent starts an agent in a new pane in the hidden workspace,
-// where it works without taking the place of the agent beside superfile;
-// the keyboard stays with superfile. It returns the new pane.
+// where it works without taking the place of the agent beside Marmota;
+// the keyboard stays with Marmota. It returns the new pane.
 func (m *model) launchParkedAgent(cwd, command string, provider managedAgentProvider, id string) (int, error) {
 	if m.tmuxSessionsOn() {
 		return m.startTmuxAgent(cwd, command, provider, id)
 	}
-	superfilePaneID, err := currentWeztermPaneID()
+	marmotaPaneID, err := currentWeztermPaneID()
 	if err != nil {
 		return 0, err
 	}
-	state, err := loadWeztermPaneLayoutState(superfilePaneID)
+	state, err := loadWeztermPaneLayoutState(marmotaPaneID)
 	if err != nil {
-		slog.Warn("Ignoring unreadable WezTerm pane state", "paneID", superfilePaneID, "error", err)
+		slog.Warn("Ignoring unreadable WezTerm pane state", "paneID", marmotaPaneID, "error", err)
 		state = weztermPaneLayoutState{}
 	}
 	if allPanes, listErr := listWeztermPanes(cwd); listErr == nil {
@@ -177,15 +177,15 @@ func (m *model) launchParkedAgent(cwd, command string, provider managedAgentProv
 		VisibleSlot: managedAgentHiddenSlot,
 	})
 	// Normalizing puts a session in front when none is, which would claim
-	// the new one is beside superfile: only a state with one there is.
+	// the new one is beside Marmota: only a state with one there is.
 	if len(state.ManagedPaneIDs) > 0 {
 		state = normalizeWeztermPaneLayoutState(state)
 	}
-	persistWeztermPaneLayoutState(superfilePaneID, state)
+	persistWeztermPaneLayoutState(marmotaPaneID, state)
 	state.loaded = true
-	m.setManagedWeztermState(superfilePaneID, state)
-	// Should the new pane have taken the keyboard, superfile takes it back.
-	if err := activateWeztermPane(cwd, superfilePaneID); err != nil {
+	m.setManagedWeztermState(marmotaPaneID, state)
+	// Should the new pane have taken the keyboard, Marmota takes it back.
+	if err := activateWeztermPane(cwd, marmotaPaneID); err != nil {
 		slog.Warn("Could not keep the keyboard in Marmota", "error", err)
 	}
 	return paneID, nil
@@ -402,9 +402,9 @@ func (m *model) stopPendingClaudeSession() {
 			// Drops the closed pane and shows a parked session in its place.
 			m.refreshManagedWeztermState()
 			// WezTerm moves the keyboard to another pane when one closes, but
-			// you are still in superfile.
-			if superfilePaneID, idErr := currentWeztermPaneID(); idErr == nil {
-				if actErr := activateWeztermPane(cwd, superfilePaneID); actErr != nil {
+			// you are still in Marmota.
+			if marmotaPaneID, idErr := currentWeztermPaneID(); idErr == nil {
+				if actErr := activateWeztermPane(cwd, marmotaPaneID); actErr != nil {
 					slog.Debug("Could not give the keyboard back to Marmota", "error", actErr)
 				}
 			}
@@ -449,7 +449,7 @@ type stoppedClaudeSession struct {
 	at  time.Time
 }
 
-// endLiveClaudeSession shows a session superfile stopped as finished at
+// endLiveClaudeSession shows a session Marmota stopped as finished at
 // once, instead of when a refresh no longer lists it as running.
 func (m *model) endLiveClaudeSession(s claudesession.Session) {
 	if m.claude.stopped == nil {
@@ -461,7 +461,7 @@ func (m *model) endLiveClaudeSession(s claudesession.Session) {
 	m.refreshSessionsList()
 }
 
-// settleStoppedClaudeSessions moves the sessions superfile stopped from the
+// settleStoppedClaudeSessions moves the sessions Marmota stopped from the
 // running list to the finished ones, which is where the next refresh lists
 // them once they have exited. With fresh set the snapshot was
 // just collected, and sessions it no longer lists as running are forgotten.

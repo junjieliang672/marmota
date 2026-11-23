@@ -121,7 +121,7 @@ func (m *model) sessionsHere() string {
 }
 
 // sessionsGroups lays out the sessions the list shows: those running in a
-// WezTerm pane, the only ones it can bring beside superfile and type into,
+// WezTerm pane, the only ones it can bring beside Marmota and type into,
 // and those the Ask box started that aren't listed yet. Finished sessions,
 // and those in another terminal or in the background, aren't listed.
 func (m *model) sessionsGroups() ([]claudeSessionsGroup, string) {
@@ -257,14 +257,14 @@ var conversationsInBackground = true //nolint:gochecknoglobals // test seam
 const conversationsKept = 8
 
 // conversationReadMsg is a session's conversation, read and laid out in
-// the background, for the preview of the Sessions box or of the s list.
+// the background, for the preview of the Sessions box or of the go to list.
 type conversationReadMsg struct {
 	convo sessionsConversation
 	slot  convoSlot
 }
 
 // convoSlot is which preview a conversation is read for: the Sessions
-// box's, or the s list's.
+// box's, or the go to list's.
 type convoSlot int
 
 const (
@@ -480,7 +480,7 @@ func (m *model) addPickToQuestion(onlyWhenEmpty bool) {
 	}
 }
 
-// isDockQuitKey reports whether key quits superfile while the Sessions box
+// isDockQuitKey reports whether key quits Marmota while the Sessions box
 // has the keyboard: q does, unless you're typing a name or an answer.
 func (m *model) isDockQuitKey(key string) bool {
 	return m.sessions.focus != sessionsFocusAnswer && !m.sessions.list.IsRenaming() &&

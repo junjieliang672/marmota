@@ -212,7 +212,7 @@ func TestSendToClaudePromptKeepsYourStashStashed(t *testing.T) {
 	input, stash, sent := f.state()
 	assert.Equal(t, []string{"/rename fix sidebar"}, sent)
 	assert.Empty(t, input)
-	require.NotNil(t, stash, "sending brought it back into the box; superfile stashes it again")
+	require.NotNil(t, stash, "sending brought it back into the box; Marmota stashes it again")
 	assert.Equal(t, "for later", *stash)
 }
 
@@ -236,7 +236,7 @@ func TestSendToClaudePromptTakesBackAPasteThatLandedWrong(t *testing.T) {
 	_, err := sendToClaudePrompt(20, "/rename fix sidebar")
 	require.ErrorIs(t, err, errClaudePromptTyping)
 	input, stash, sent := f.state()
-	assert.Empty(t, sent, "enter is never pressed on text superfile didn't type")
+	assert.Empty(t, sent, "enter is never pressed on text Marmota didn't type")
 	assert.Equal(t, "half typed", input, "the paste is undone and your text comes back")
 	assert.Nil(t, stash)
 }

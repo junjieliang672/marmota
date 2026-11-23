@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	//go:embed src/superfile_config/*
+	//go:embed src/marmota_config/*
 	content embed.FS
 )
 

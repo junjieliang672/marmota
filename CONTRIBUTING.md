@@ -17,10 +17,10 @@ python3 testsuite/live/wezterm_sessions_test.py --binary ./bin/y   # a real y in
 [CLAUDE.md](./CLAUDE.md) maps the code: where the file panels, the Sessions and Ask boxes, Claude Code
 and Codex sessions, the previews and the WezTerm panes live.
 
-- **A new hotkey**: `src/internal/common/config_type.go`, `src/superfile_config/hotkeys.toml` and
+- **A new hotkey**: `src/internal/common/config_type.go`, `src/marmota_config/hotkeys.toml` and
   `vimHotkeys.toml`, `src/internal/key_function.go`, and a help entry in
   `src/internal/default_config.go` (`TestHelpMenuListsEveryHotkey` fails without one).
-- **A new theme**: copy a file in `src/superfile_config/theme/`, rename it, change its colors.
+- **A new theme**: copy a file in `src/marmota_config/theme/`, rename it, change its colors.
 
 ## Pull requests
 

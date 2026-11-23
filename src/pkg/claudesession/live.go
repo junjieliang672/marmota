@@ -157,7 +157,7 @@ func LookupProcesses(ctx context.Context, run Runner, pids []int) (map[int]ProcI
 
 // commandIsPrintRun reports whether a claude command line is a print-mode
 // run (`claude -p`): it answers once and exits, so there is nothing to
-// switch to or type into. superfile's own Ask bar starts such runs, and
+// switch to or type into. Marmota's own Ask bar starts such runs, and
 // Claude Code lists them as interactive sessions while they work.
 func commandIsPrintRun(command string) bool {
 	for _, f := range strings.Fields(command) {

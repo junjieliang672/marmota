@@ -1,4 +1,4 @@
-// Package jump is the s list, drawn in the focused file panel's place: one
+// Package jump is the go to list, drawn in the focused file panel's place: one
 // place to go to a pinned folder or file,
 // a session (running, or ended to resume), a folder zoxide knows, or a file
 // edited lately. It has two modes. Searching, what you type filters every

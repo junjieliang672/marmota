@@ -32,7 +32,7 @@ func LoadSeen(path string) *SeenStore {
 
 // Unread reports whether the session has an update newer than the last time
 // you looked. The first time a session is observed, its current state counts
-// as seen, so nothing is flagged just because superfile started.
+// as seen, so nothing is flagged just because Marmota started.
 func (s *SeenStore) Unread(id string, update time.Time) bool {
 	if id == "" || update.IsZero() {
 		return false

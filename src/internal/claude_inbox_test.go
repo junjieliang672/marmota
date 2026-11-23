@@ -13,8 +13,8 @@ import (
 	"github.com/junjieliang672/marmota/src/pkg/claudesession"
 )
 
-// inboxTestModel has superfile in pane 10, "beside" running in pane 20 next
-// to it and "hidden" waiting in the superfile-agents workspace (pane 30).
+// inboxTestModel has Marmota in pane 10, "beside" running in pane 20 next
+// to it and "hidden" waiting in the marmota-agents workspace (pane 30).
 func inboxTestModel(t *testing.T) *model {
 	t.Helper()
 	m := newClaudeTestModel(t)
@@ -57,12 +57,12 @@ func refreshInbox(m *model, live []claudesession.Session) []string {
 func TestInboxToastsWhenASessionYouCantSeeNeedsYou(t *testing.T) {
 	m := inboxTestModel(t)
 	_, ok := m.visibleClaudeToast()
-	require.False(t, ok, "what was already so when superfile started is no news")
+	require.False(t, ok, "what was already so when Marmota started is no news")
 
 	live := idleSessions(inboxTurnEnd)
 	live[1].Status, live[1].WaitingFor = claudesession.StatusWaiting, "dialog open"
 	live[1].PendingTool = "Bash(go test ./src/pkg/ime/...)"
-	assert.Empty(t, refreshInbox(m, live), "superfile is focused: the toast is enough")
+	assert.Empty(t, refreshInbox(m, live), "Marmota is focused: the toast is enough")
 
 	toast, ok := m.visibleClaudeToast()
 	require.True(t, ok)
@@ -71,7 +71,7 @@ func TestInboxToastsWhenASessionYouCantSeeNeedsYou(t *testing.T) {
 	assert.Contains(t, view, "⚑ ime hold tests · needs you")
 	assert.Contains(t, view, "Bash(go test ./src/pkg/ime/...)")
 	assert.Contains(t, view, "hidden")
-	assert.Contains(t, view, "! open  esc later")
+	assert.Contains(t, view, "s open  esc later")
 	m.fullWidth = 60
 	narrow := ansi.Strip(m.View())
 	assert.Contains(t, narrow, "· needs you", "the name gives way first")
@@ -102,7 +102,7 @@ func TestInboxToastGoesOnceTheSessionNoLongerWaits(t *testing.T) {
 	assert.False(t, ok, "it was answered")
 }
 
-func TestInboxNotifiesWhileSuperfileIsntFocused(t *testing.T) {
+func TestInboxNotifiesWhileMarmotaIsntFocused(t *testing.T) {
 	m := inboxTestModel(t)
 	m.terminalFocused = false
 	live := idleSessions(inboxTurnEnd)
@@ -126,7 +126,7 @@ func TestInboxToastsAFinishedReplyForAWhile(t *testing.T) {
 
 	m.claude.toast.until = time.Now().Add(-time.Second)
 	_, ok = m.visibleClaudeToast()
-	assert.False(t, ok, "it goes after a while; the reply stays unread for !")
+	assert.False(t, ok, "it goes after a while; the reply stays unread for s")
 	assert.True(t, m.claude.unread["hidden"])
 }
 
@@ -142,14 +142,14 @@ func TestInboxKeyGoesToTheToastsSession(t *testing.T) {
 	refreshInbox(m, live)
 	require.True(t, m.claude.unread["older"], "an older reply waits too")
 
-	wez := newFakeWezterm(t, superfileTab(), weztermPane{PaneID: 30, TabID: 30, WindowID: 30,
+	wez := newFakeWezterm(t, marmotaTab(), weztermPane{PaneID: 30, TabID: 30, WindowID: 30,
 		Workspace: managedAgentHiddenWorkspace, TTYName: "/dev/ttys030", Size: weztermPaneSize{Rows: 24, Cols: 80}})
 	m.claude.panes = wez.paneList()
 	toast, ok := m.visibleClaudeToast()
 	require.True(t, ok)
 	m.toggleFooter = true
 	TeaUpdate(m, utils.TeaKeyMsg(common.Hotkeys.JumpToUnreadSession[0]))
-	assert.Equal(t, dockSessionsFocus, m.focusPanel, "! gives the Sessions box the keyboard")
+	assert.Equal(t, dockSessionsFocus, m.focusPanel, "s gives the Sessions box the keyboard")
 	assert.Equal(t, toast.id, m.sessions.list.SelectedID(), "on the session the toast is about")
 	_, ok = m.visibleClaudeToast()
 	assert.False(t, ok, "and puts the toast away")
@@ -169,7 +169,7 @@ func TestInboxToastsEveryReplyYouHaventSeen(t *testing.T) {
 	require.True(t, m.claude.unread["hidden"])
 	view := ansi.Strip(m.View())
 	assert.Contains(t, view, "esc later")
-	assert.Contains(t, view, "! open", "! goes to a session that replied unread too")
+	assert.Contains(t, view, "s open", "s goes to a session that replied unread too")
 	m.claude.toast = nil
 
 	// Another reply while the first is still unread is news all the same.

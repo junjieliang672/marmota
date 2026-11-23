@@ -28,51 +28,51 @@ class NavCopyPathTest_Disabled(GenericTestImpl):
     
     # Override
     def test_execute(self) -> None:
-        self.start_spf()
+        self.start_marmota()
         time.sleep(tconst.OPERATION_DELAY)
         # > dir1 
         #   file1
         #   file2
 
-        self.env.spf_mgr.send_special_input(keys.KEY_CTRL_P)
+        self.env.marmota_mgr.send_special_input(keys.KEY_CTRL_P)
         time.sleep(tconst.KEY_DELAY)
         assert_that(get_sys_clipboard_text()).is_equal_to(str(self.env.fs_mgr.abspath(DIR1)))
 
-        self.env.spf_mgr.send_special_input(keys.KEY_DOWN)
+        self.env.marmota_mgr.send_special_input(keys.KEY_DOWN)
         time.sleep(tconst.KEY_DELAY)
         #   dir1 
         # > file1
         #   file2
-        self.env.spf_mgr.send_special_input(keys.KEY_CTRL_P)
+        self.env.marmota_mgr.send_special_input(keys.KEY_CTRL_P)
         time.sleep(tconst.KEY_DELAY)
         assert_that(get_sys_clipboard_text()).is_equal_to(str(self.env.fs_mgr.abspath(FILE1)))
 
-        self.env.spf_mgr.send_special_input(keys.KEY_DOWN)
+        self.env.marmota_mgr.send_special_input(keys.KEY_DOWN)
         time.sleep(tconst.KEY_DELAY)
         #   dir1 
         #   file1
         # > file2
-        self.env.spf_mgr.send_special_input(keys.KEY_CTRL_P)
+        self.env.marmota_mgr.send_special_input(keys.KEY_CTRL_P)
         time.sleep(tconst.KEY_DELAY)
         assert_that(get_sys_clipboard_text()).is_equal_to(str(self.env.fs_mgr.abspath(FILE2)))
 
-        self.env.spf_mgr.send_special_input(keys.KEY_UP)
+        self.env.marmota_mgr.send_special_input(keys.KEY_UP)
         time.sleep(tconst.KEY_DELAY)
         #   dir1 
         # > file1
         #   file2
-        self.env.spf_mgr.send_special_input(keys.KEY_CTRL_P)
+        self.env.marmota_mgr.send_special_input(keys.KEY_CTRL_P)
         time.sleep(tconst.KEY_DELAY)
         assert_that(get_sys_clipboard_text()).is_equal_to(str(self.env.fs_mgr.abspath(FILE1)))
 
-        self.env.spf_mgr.send_special_input(keys.KEY_DOWN)
+        self.env.marmota_mgr.send_special_input(keys.KEY_DOWN)
         time.sleep(tconst.KEY_DELAY)
-        self.env.spf_mgr.send_special_input(keys.KEY_DOWN)
+        self.env.marmota_mgr.send_special_input(keys.KEY_DOWN)
         time.sleep(tconst.KEY_DELAY)
         # > dir1 
         #   file1
         #   file2
-        self.env.spf_mgr.send_special_input(keys.KEY_CTRL_P)
+        self.env.marmota_mgr.send_special_input(keys.KEY_CTRL_P)
         time.sleep(tconst.KEY_DELAY)
         assert_that(get_sys_clipboard_text()).is_equal_to(str(self.env.fs_mgr.abspath(DIR1)))
         

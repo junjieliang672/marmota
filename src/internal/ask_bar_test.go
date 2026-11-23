@@ -135,12 +135,12 @@ func TestKOpensTheAskBoxInTheDock(t *testing.T) {
 }
 
 // The Ask bar starts its sessions in the background: the session beside
-// superfile, and the keyboard, stay where they are.
+// Marmota, and the keyboard, stay where they are.
 func TestANewSessionStartsInTheBackground(t *testing.T) {
 	ownAskHistory(t)
 	m := newClaudeTestModel(t)
 	beside := weztermPane{PaneID: 20, TabID: 1, WindowID: 1, Size: weztermPaneSize{Rows: 50, Cols: 99}}
-	wez := newFakeWezterm(t, superfileTab(), beside)
+	wez := newFakeWezterm(t, marmotaTab(), beside)
 	newAskID(t, "n-1")
 
 	ask(t, m, "group the logos")
@@ -153,7 +153,7 @@ func TestANewSessionStartsInTheBackground(t *testing.T) {
 	)
 	assert.Equal(t, managedAgentHiddenWorkspace, wez.panes[wez.nextPane].Workspace, "in the hidden workspace")
 	assert.Equal(t, 1, wez.panes[20].TabID, "the session beside Marmota stays")
-	assert.Equal(t, 10, wez.active, "the keyboard stays with superfile")
+	assert.Equal(t, 10, wez.active, "the keyboard stays with Marmota")
 	assert.Equal(t, sessionsFocusAsk, m.sessions.focus, "in the Ask bar")
 	assert.Equal(t, "Started a background session in "+filepath.Base(m.getFocusedFilePanel().location),
 		m.claude.flash)
@@ -166,11 +166,11 @@ func TestANewSessionStartsInTheBackground(t *testing.T) {
 func TestASessionStartsInTheChosenPermissionMode(t *testing.T) {
 	ownAskHistory(t)
 	m := newClaudeTestModel(t)
-	wez := newFakeWezterm(t, superfileTab())
+	wez := newFakeWezterm(t, marmotaTab())
 	press(m, common.Hotkeys.OpenAskBar[0])
 	press(m, common.Hotkeys.AskClear[0])
 	typeInto(m, "group the logos")
-	assert.Contains(t, viewText(m), "⏵⏵ bypass", "bypass, superfile's default")
+	assert.Contains(t, viewText(m), "⏵⏵ bypass", "bypass, Marmota's default")
 	press(m, common.Hotkeys.AskChoosePermissionMode[0])
 	assert.Contains(t, viewText(m), "⏵⏵ accept edits")
 
@@ -192,7 +192,7 @@ func TestKStartsANewSessionWhenTheFoldersSessionEnded(t *testing.T) {
 	m.claude.snapshot.Past = []claudesession.Session{{ID: "s-7", Title: "an earlier talk", Cwd: dir}}
 	m.ask.loaded = true
 	m.ask.folderSessions = map[string]string{dir: "s-7"}
-	wez := newFakeWezterm(t, superfileTab())
+	wez := newFakeWezterm(t, marmotaTab())
 	newAskID(t, "n-1")
 
 	press(m, common.Hotkeys.OpenAskBar[0])
@@ -212,7 +212,7 @@ func TestKStartsANewSessionWhenTheFoldersSessionEnded(t *testing.T) {
 func TestTheAskBoxWritesToANewSessionWhenItsSessionLeaves(t *testing.T) {
 	ownAskHistory(t)
 	m := dockTestModel(t)
-	bang(m)
+	toSessions(m)
 	require.True(t, m.sessions.list.Select("s20"))
 	press(m, common.Hotkeys.OpenAskBar[0]) // writes to it
 	press(m, common.Hotkeys.AskClear[0])
@@ -237,7 +237,7 @@ func TestKWritesToTheSessionItStarted(t *testing.T) {
 	ownAskHistory(t)
 	m := newClaudeTestModel(t)
 	dir := m.getFocusedFilePanel().location
-	newFakeWezterm(t, superfileTab())
+	newFakeWezterm(t, marmotaTab())
 	newAskID(t, "n-1")
 	ask(t, m, "first")
 
@@ -267,12 +267,12 @@ func TestASendThatCantStartKeepsYourText(t *testing.T) {
 	assert.Empty(t, m.ask.folderSessions)
 }
 
-// The question and what was sent are kept for the next superfile; the
+// The question and what was sent are kept for the next Marmota; the
 // model, effort and agent aren't: a new session starts from the defaults.
 func TestTheQuestionIsKeptAndTheChoicesStartFromTheDefaults(t *testing.T) {
 	ownAskHistory(t)
 	m := newClaudeTestModel(t)
-	newFakeWezterm(t, superfileTab())
+	newFakeWezterm(t, marmotaTab())
 	ask(t, m, "remember me")
 	press(m, common.Hotkeys.AskChooseModel[0])
 	typeInto(m, "half written")
@@ -307,7 +307,7 @@ func TestSendingToARunningSessionTypesIntoItsPane(t *testing.T) {
 	pane := newFakeClaudePane(t)
 	pane.set("half typed", nil)
 
-	bang(m)
+	toSessions(m)
 	require.True(t, m.sessions.list.Select("s20"))
 	press(m, common.Hotkeys.OpenAskBar[0])
 	assert.Contains(t, m.askSending().Text, "typed into its pane")
@@ -389,7 +389,7 @@ func startCommand(t *testing.T, wez *fakeWezterm) string {
 func TestTheAskBarWatchesItsNewSessionUntilItIsListed(t *testing.T) {
 	ownAskHistory(t)
 	m := newClaudeTestModel(t)
-	wez := newFakeWezterm(t, superfileTab())
+	wez := newFakeWezterm(t, marmotaTab())
 	newAskID(t, "n-1")
 	ask(t, m, "group the logos")
 	paneID := m.ask.starts["n-1"].paneID
@@ -415,7 +415,7 @@ func TestARequestSentWhileTheNewSessionStartsWaitsForItsReply(t *testing.T) {
 	ownAskHistory(t)
 	m := newClaudeTestModel(t)
 	dir := m.getFocusedFilePanel().location
-	wez := newFakeWezterm(t, superfileTab())
+	wez := newFakeWezterm(t, marmotaTab())
 	pane := newFakeClaudePane(t)
 	newAskID(t, "n-1")
 	ask(t, m, "group the logos")
@@ -472,7 +472,7 @@ func TestARequestSentWhileTheNewSessionStartsWaitsForItsReply(t *testing.T) {
 func TestARequestForANewSessionThatEndsComesBack(t *testing.T) {
 	ownAskHistory(t)
 	m := newClaudeTestModel(t)
-	newFakeWezterm(t, superfileTab())
+	newFakeWezterm(t, marmotaTab())
 	newAskID(t, "n-1")
 	ask(t, m, "group the logos")
 	typeInto(m, "and the icons")
@@ -493,7 +493,7 @@ func TestARequestForANewSessionThatEndsComesBack(t *testing.T) {
 func TestARequestForANewSessionThatClosesComesBack(t *testing.T) {
 	ownAskHistory(t)
 	m := newClaudeTestModel(t)
-	newFakeWezterm(t, superfileTab())
+	newFakeWezterm(t, marmotaTab())
 	newAskID(t, "n-1")
 	ask(t, m, "group the logos")
 	typeInto(m, "and the icons")
@@ -512,7 +512,7 @@ func TestARequestForANewSessionThatClosesComesBack(t *testing.T) {
 func TestAltKWritesToTheFoldersSessionWhileItStarts(t *testing.T) {
 	ownAskHistory(t)
 	m := newClaudeTestModel(t)
-	newFakeWezterm(t, superfileTab())
+	newFakeWezterm(t, marmotaTab())
 	newAskID(t, "n-1")
 	ask(t, m, "group the logos")
 	press(m, "esc")
@@ -530,7 +530,7 @@ func TestTheListKeepsTheRowYouChoseWhileANewSessionStarts(t *testing.T) {
 	m := dockTestModel(t)
 	newFakeWezterm(t, tabPanes()...)
 	newAskID(t, "n-1")
-	bang(m)
+	toSessions(m)
 	press(m, common.Hotkeys.SessionNew[0])
 	typeInto(m, "group the logos")
 	press(m, "enter")
@@ -553,9 +553,9 @@ func TestTheListKeepsTheRowYouChoseWhileANewSessionStarts(t *testing.T) {
 	assert.NotContains(t, m.claude.flash, "left the list")
 }
 
-// A process on superfile's own terminal is no session pane. Were it taken
-// for one, @ and the Ask bar would type into superfile itself.
-func TestAProcessOnSuperfilesTerminalHasNoSessionPane(t *testing.T) {
+// A process on Marmota's own terminal is no session pane. Were it taken
+// for one, @ and the Ask bar would type into Marmota itself.
+func TestAProcessOnMarmotasTerminalHasNoSessionPane(t *testing.T) {
 	m := newClaudeTestModel(t)
 	m.claude.panes = []weztermPane{
 		{PaneID: 10, TabID: 1, TTYName: "/dev/ttys010", Size: weztermPaneSize{Cols: 100}},
@@ -583,7 +583,7 @@ func TestTheBarReadsGitStatusAgain(t *testing.T) {
 	}
 	m.sidebarModel.SetGitStatus(sidebar.FetchGitStatus(dir))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "README.md"), []byte("changed by a session\n"), 0o600))
-	assert.Equal(t, 0, m.askContext().GitChanged, "what superfile knew before")
+	assert.Equal(t, 0, m.askContext().GitChanged, "what Marmota knew before")
 
 	for _, msg := range batchMsgs(t, press(m, common.Hotkeys.OpenAskBar[0])) {
 		TeaUpdate(m, msg)

@@ -21,7 +21,7 @@ import (
 	"github.com/junjieliang672/marmota/src/internal/common"
 )
 
-// initialConfig load and handle all configuration files (spf config,Hotkeys
+// initialConfig load and handle all configuration files (Marmota config,Hotkeys
 // themes) setted up. Processes input directories and returns toggle states.
 
 // This is the only usecase of named returns, distinguish between multiple return values
@@ -34,7 +34,7 @@ func initialConfig(firstPanelPaths []string) (toggleDotFile bool, //nolint: nona
 	// Open log stream
 	file, err := os.OpenFile(variable.LogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, utils.LogFilePerm)
 
-	// TODO : This could be improved if we want to make superfile more resilient to errors
+	// TODO : This could be improved if we want to make Marmota more resilient to errors
 	// For example if the log file directories have access issues.
 	// we could pass a dummy object to log.SetOutput() and the app would still function.
 	if err != nil {

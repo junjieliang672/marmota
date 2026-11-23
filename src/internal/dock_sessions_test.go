@@ -30,9 +30,9 @@ func dockTestModel(t *testing.T) *model {
 	return m
 }
 
-func bang(m *model) { pressKey(m, common.Hotkeys.JumpToUnreadSession[0]) }
+func toSessions(m *model) { pressKey(m, common.Hotkeys.JumpToUnreadSession[0]) }
 
-// ! goes to a session that needs you, and again to the next one, round at
+// s goes to a session that needs you, and again to the next one, round at
 // the end; it never takes you back to the files.
 func TestBangGoesToEachSessionThatNeedsYou(t *testing.T) {
 	m := dockTestModel(t)
@@ -42,37 +42,37 @@ func TestBangGoesToEachSessionThatNeedsYou(t *testing.T) {
 	m.refreshSessionsList()
 	ids := m.dockSessions()
 
-	bang(m)
+	toSessions(m)
 	assert.Equal(t, dockSessionsFocus, m.focusPanel)
 	assert.Equal(t, ids[0].ID, m.sessions.list.SelectedID(), "the first that needs you")
-	bang(m)
+	toSessions(m)
 	assert.Equal(t, ids[1].ID, m.sessions.list.SelectedID(), "again: the next")
-	bang(m)
+	toSessions(m)
 	assert.Equal(t, ids[0].ID, m.sessions.list.SelectedID(), "round at the end")
 	assert.Equal(t, dockSessionsFocus, m.focusPanel, "still in the Sessions box")
 
 	pressKey(m, "esc")
 	assert.Equal(t, nonePanelFocus, m.focusPanel, "esc goes back to the files")
-	bang(m)
+	toSessions(m)
 	assert.Equal(t, ids[0].ID, m.sessions.list.SelectedID(), "from the files, the first that needs you again")
 }
 
-// With nothing that needs you, ! goes to the first session, wherever the
+// With nothing that needs you, s goes to the first session, wherever the
 // box was.
 func TestBangElseTheFirstSession(t *testing.T) {
 	m := dockTestModel(t)
 	first := m.dockSessions()[0].ID
 
-	bang(m)
+	toSessions(m)
 	assert.Equal(t, first, m.sessions.list.SelectedID())
 	pressKey(m, common.Hotkeys.ListDown[0])
 	require.NotEqual(t, first, m.sessions.list.SelectedID())
 
-	bang(m)
+	toSessions(m)
 	assert.Equal(t, first, m.sessions.list.SelectedID(), "in the box too")
 	assert.Equal(t, dockSessionsFocus, m.focusPanel)
 
-	// One needs you: ! goes there, and stays there.
+	// One needs you: s goes there, and stays there.
 	waiting := m.dockSessions()[1].ID
 	for i := range m.claude.snapshot.Live {
 		if m.claude.snapshot.Live[i].ID == waiting {
@@ -80,15 +80,15 @@ func TestBangElseTheFirstSession(t *testing.T) {
 		}
 	}
 	m.refreshSessionsList()
-	bang(m)
+	toSessions(m)
 	assert.Equal(t, waiting, m.sessions.list.SelectedID())
-	bang(m)
+	toSessions(m)
 	assert.Equal(t, waiting, m.sessions.list.SelectedID())
 }
 
 func TestDockJumpsByNumber(t *testing.T) {
 	m := dockTestModel(t)
-	bang(m)
+	toSessions(m)
 	ids := m.dockSessions()
 
 	pressKey(m, "2")
@@ -115,7 +115,7 @@ func TestDockShowsSessionsAndThePreviewTheSelectedOne(t *testing.T) {
 	assert.Contains(t, screen, "provider registry")
 	assert.Contains(t, screen, "ime hold tests")
 
-	bang(m)
+	toSessions(m)
 	sel, ok := m.selectedSession()
 	require.True(t, ok)
 	preview := ansi.Strip(m.dockSessionPreview(m.fileModel.filePreview.GetWidth(),
@@ -131,7 +131,7 @@ func TestBangWithNoSessions(t *testing.T) {
 	m := dockTestModel(t)
 	m.claude.snapshot.Live = nil
 
-	bang(m)
+	toSessions(m)
 
 	assert.Equal(t, nonePanelFocus, m.focusPanel)
 	assert.Contains(t, m.claude.flash, "No live sessions")
@@ -169,7 +169,7 @@ func TestTheIdleAskBoxSaysWhereYourNextMessageGoes(t *testing.T) {
 func TestKFromTheSessionsBoxWritesToTheSelectedSession(t *testing.T) {
 	ownAskHistory(t)
 	m := dockTestModel(t)
-	bang(m)
+	toSessions(m)
 	pressKey(m, common.Hotkeys.ListDown[0])
 	second := m.sessions.list.SelectedID()
 
@@ -236,7 +236,7 @@ func TestKWritesInTheAskBoxWhereItIs(t *testing.T) {
 func TestTheSessionsBoxTakesTheKeysThatChangeTheScreen(t *testing.T) {
 	m := dockTestModel(t)
 	m.fileModel.filePreview.SetOpen(true)
-	bang(m)
+	toSessions(m)
 	require.Equal(t, dockSessionsFocus, m.focusPanel)
 	selected := m.sessions.list.SelectedID()
 
@@ -271,17 +271,17 @@ func TestTheSessionsBoxLetsGoForTheKeysThatGoElsewhere(t *testing.T) {
 	require.NoError(t, m.createNewFilePanel(t.TempDir()))
 	require.Equal(t, 1, m.filePanelFocusIndex)
 
-	bang(m)
+	toSessions(m)
 	pressKey(m, common.Hotkeys.FocusOnMetaData[0])
 	assert.Equal(t, metadataFocus, m.focusPanel, "M: Details")
 
-	bang(m)
+	toSessions(m)
 	pressKey(m, common.Hotkeys.NextFilePanel[0])
 	assert.Equal(t, nonePanelFocus, m.focusPanel, "tab: the files")
 	assert.Equal(t, 0, m.filePanelFocusIndex, "the next panel")
 	assert.True(t, m.getFocusedFilePanel().isFocused)
 
-	bang(m)
+	toSessions(m)
 	pressKey(m, common.Hotkeys.PreviousFilePanel[0])
 	assert.Equal(t, nonePanelFocus, m.focusPanel)
 	assert.Equal(t, 1, m.filePanelFocusIndex, "the one before")
@@ -306,7 +306,7 @@ func TestTheSessionsBoxLeavesTheFilesAlone(t *testing.T) {
 	}
 	before := names()
 	require.NotEmpty(t, before)
-	bang(m)
+	toSessions(m)
 	selected := m.sessions.list.SelectedID()
 
 	for _, keys := range [][]string{common.Hotkeys.DeleteItems, common.Hotkeys.PermanentlyDeleteItems,
@@ -367,7 +367,7 @@ func TestTheAskBoxSaysWhenSendingIsntTheUsual(t *testing.T) {
 	ownAskHistory(t)
 	m := dockTestModel(t)
 	m.fileModel.filePreview.SetOpen(true)
-	bang(m)
+	toSessions(m)
 	selected, ok := m.selectedSession()
 	require.True(t, ok)
 	pressKey(m, common.Hotkeys.OpenAskBar[0])
@@ -395,12 +395,12 @@ func TestEscFromTheAskBoxGoesBackToTheFiles(t *testing.T) {
 	assert.Equal(t, nonePanelFocus, m.focusPanel, "opened from the files, esc goes back to them")
 }
 
-// s opens its list from the Sessions box too; it goes to folders, so the
+// z opens its list from the Sessions box too; it goes to folders, so the
 // files have the keyboard behind it. Closed without going anywhere, it gives
 // the keyboard back to the Sessions box, on the same session.
 func TestSOpensItsPopupFromTheSessionsBox(t *testing.T) {
 	m := dockTestModel(t)
-	bang(m)
+	toSessions(m)
 	require.Equal(t, dockSessionsFocus, m.focusPanel)
 	on := m.sessions.list.SelectedID()
 
@@ -429,7 +429,7 @@ func TestTheSessionPreviewClearsTheFilesImage(t *testing.T) {
 	m.setFilePreviewPanelSize()
 	clear := "\x1b_Ga=d\x1b\\"
 
-	bang(m)
+	toSessions(m)
 	require.True(t, m.previewShowsASession())
 	assert.Contains(t, m.View(), clear)
 
@@ -504,7 +504,7 @@ func TestTheSessionsBoxMarksRemoteControl(t *testing.T) {
 
 func TestQuestionMarkOpensTheHelpFromTheSessionsBox(t *testing.T) {
 	m := dockTestModel(t)
-	bang(m)
+	toSessions(m)
 	on := m.sessions.list.SelectedID()
 
 	pressKey(m, common.Hotkeys.OpenHelpMenu[0])
@@ -522,7 +522,7 @@ func TestQuestionMarkOpensTheHelpFromTheSessionsBox(t *testing.T) {
 
 func TestThePromptOpensFromTheSessionsBox(t *testing.T) {
 	m := dockTestModel(t)
-	bang(m)
+	toSessions(m)
 
 	pressKey(m, common.Hotkeys.OpenAgentPrompt[0])
 
@@ -536,7 +536,7 @@ func TestPCopiesTheSessionsFolder(t *testing.T) {
 		copied = text
 		return nil
 	})
-	bang(m)
+	toSessions(m)
 	s, ok := m.selectedSession()
 	require.True(t, ok)
 
@@ -577,7 +577,7 @@ func TestTheStatusLineEndsWithTheTime(t *testing.T) {
 	line := strings.TrimRight(ansi.Strip(m.statusLineRender()), " ")
 	assert.True(t, strings.HasSuffix(line, "✳ 1 working   Tue 15:04 PST"), line)
 
-	bang(m)
+	toSessions(m)
 	line = strings.TrimRight(ansi.Strip(m.statusLineRender()), " ")
 	assert.True(t, strings.HasSuffix(line, "Tue 15:04 PST"), "in the Sessions box too: %s", line)
 	assert.LessOrEqual(t, ansi.StringWidth(m.statusLineRender()), m.fullWidth)

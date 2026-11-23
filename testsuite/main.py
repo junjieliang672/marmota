@@ -30,13 +30,13 @@ def configure_logging(debug : bool = False) -> None:
 
 def main():
     # Setup argument parser
-    parser = argparse.ArgumentParser(description='superfile testsuite')
+    parser = argparse.ArgumentParser(description='Marmota testsuite')
     parser.add_argument('-d', '--debug',action='store_true',
                         help='Enable debug logging')
     parser.add_argument('--close-wait-time', type=float,
-                        help='Override default wait time after closing spf')
-    parser.add_argument('--spf-path', type=str,
-                        help='Override the default spf executable path(../bin/y) under test')
+                        help='Override default wait time after closing marmota')
+    parser.add_argument('--marmota-path', type=str,
+                        help='Override the default Marmota executable path(../bin/y) under test')
     parser.add_argument('-t', '--tests', nargs='+',
                         help='Specify one or more than one space separated testcases to be run')
     # Parse arguments
@@ -48,14 +48,14 @@ def main():
         
     # Default path
     # We maybe should run this only in main.py file.
-    spf_path = Path(__file__).parent.parent / "bin" / "y"
+    marmota_path = Path(__file__).parent.parent / "bin" / "y"
 
-    if args.spf_path is not None:
-        spf_path = Path(args.spf_path)
+    if args.marmota_path is not None:
+        marmota_path = Path(args.marmota_path)
     # Resolve any symlinks, and make it absolute
-    spf_path = spf_path.resolve()
+    marmota_path = marmota_path.resolve()
 
-    success = run_tests(spf_path, only_run_tests=args.tests)
+    success = run_tests(marmota_path, only_run_tests=args.tests)
     if success:
         sys.exit(0)
     else:

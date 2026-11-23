@@ -23,11 +23,11 @@ class ChooserFileTest(GenericTestImpl):
             test_dirs=[DIR1, DIR2],
             test_files=[(FILE1, tconst.FILE_TEXT1)],
             key_inputs=['e'],
-            validate_spf_closed=True,
+            validate_marmota_closed=True,
             close_wait_time=3
         )
 
-        self.spf_opts += ["--chooser-file", str(self.env.fs_mgr.abspath(CHOOSER_FILE))]
+        self.marmota_opts += ["--chooser-file", str(self.env.fs_mgr.abspath(CHOOSER_FILE))]
 
     # Override
     def end_execution(self) -> None:

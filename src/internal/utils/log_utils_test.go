@@ -12,7 +12,7 @@ import (
 func TestRotateLogFileIfNeeded(t *testing.T) {
 	t.Run("does nothing below threshold", func(t *testing.T) {
 		dir := t.TempDir()
-		logPath := filepath.Join(dir, "superfile.log")
+		logPath := filepath.Join(dir, "marmota.log")
 		require.NoError(t, os.WriteFile(logPath, []byte("small log"), LogFilePerm))
 
 		require.NoError(t, RotateLogFileIfNeeded(logPath, 1024))
@@ -27,7 +27,7 @@ func TestRotateLogFileIfNeeded(t *testing.T) {
 
 	t.Run("rotates when threshold reached", func(t *testing.T) {
 		dir := t.TempDir()
-		logPath := filepath.Join(dir, "superfile.log")
+		logPath := filepath.Join(dir, "marmota.log")
 		content := []byte("1234567890")
 		require.NoError(t, os.WriteFile(logPath, content, LogFilePerm))
 		require.NoError(t, os.WriteFile(logPath+".1", []byte("stale backup"), LogFilePerm))

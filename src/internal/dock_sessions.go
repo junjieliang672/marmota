@@ -24,17 +24,17 @@ import (
 // The Sessions box is under the preview, as wide as it: the live sessions,
 // a row each, in two columns when the box is wide enough for both to say
 // everything. It is as tall as its sessions, up to a share of the screen
-// (layout.go). ! gives it the keyboard, on the session that most recently
-// started needing you, else the one you were last on, else the first; ! or
-// esc gives the keyboard back. While it has the keyboard, the preview shows
+// (layout.go). s gives it the keyboard, on the session that most recently
+// started needing you, else the one you were last on, else the first; s
+// again goes on to the next one, esc gives the keyboard back. While it has the keyboard, the preview shows
 // the selected session, and its question when it asks one. It moves
 // m.sessions.list.
 
 // dockState is what the Sessions box keeps between visits.
 type dockState struct {
-	// lastID is the session the box was last on, for the next !.
+	// lastID is the session the box was last on, for the next s.
 	lastID string
-	// prevFocus is what had the keyboard before !, to give it back to.
+	// prevFocus is what had the keyboard before s, to give it back to.
 	prevFocus focusPanelType
 	// jumpCount is a count typed before g or G.
 	jumpCount string
@@ -82,8 +82,8 @@ func (m *model) dockSessions() []claudesession.Session {
 	return append(out, m.appSessions()...)
 }
 
-// dockPick is where ! lands: the first session below from that needs you
-// or replied unread, round at the end, so ! again goes on to the next one;
+// dockPick is where s lands: the first session below from that needs you
+// or replied unread, round at the end, so s again goes on to the next one;
 // with from "" the first of those. With none, the first session.
 func (m *model) dockPick(sessions []claudesession.Session, from string) string {
 	if len(sessions) == 0 {
@@ -105,7 +105,7 @@ func (m *model) focusDockSessions() tea.Cmd {
 }
 
 // focusDockSessionsOn gives the Sessions box the keyboard on session id, or
-// with id "", on the one ! picks.
+// with id "", on the one s picks.
 func (m *model) focusDockSessionsOn(id string) tea.Cmd {
 	var cmds []tea.Cmd
 	m.refreshSessionsList()
@@ -159,7 +159,7 @@ func (m *model) stepDockSession(step int) tea.Cmd {
 	return m.focusDockSessionsOn(sessions[at].ID)
 }
 
-// leaveDockSessions gives the keyboard back to what had it before !.
+// leaveDockSessions gives the keyboard back to what had it before s.
 func (m *model) leaveDockSessions() {
 	if m.sessions.list.IsRenaming() {
 		m.sessions.list.CancelRename()
@@ -277,7 +277,7 @@ func (m *model) dockSessionsKey(msg tea.KeyMsg) tea.Cmd {
 	case slices.Contains(common.Hotkeys.SendToShelf, key):
 		return m.sendSessionFilesToShelf()
 	case slices.Contains(common.Hotkeys.GoTo, key):
-		// The s list goes to folders, which acts on the files. Closed with
+		// The go to list goes to folders, which acts on the files. Closed with
 		// esc, it gives the keyboard back here.
 		m.leaveDockSessions()
 		m.dock.popupFrom = true
@@ -562,7 +562,7 @@ func (m *model) remoteSectionLines(width int) []string {
 		dim.Render(ansi.Truncate(" "+note, max(0, width-4), "…")), width, base)}
 }
 
-// claudeColor is the ✳ orange superfile uses for Claude.
+// claudeColor is the ✳ orange Marmota uses for Claude.
 const claudeColor = "#D97757"
 
 // dockRow is a session's row: number, state, agent (cc, co), title, what it

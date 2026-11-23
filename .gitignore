@@ -19,6 +19,9 @@ pnpm-debug.log*
 coverage.out
 coverage.html
 
+# Compiled test binaries (go test -c)
+*.test
+
 # environment variables
 .env
 .env.production
@@ -41,5 +44,5 @@ testsuite/.venv/
 .codex/
 .auto-claude/
 
-# Git worktrees created by sessions forked from superfile
+# Git worktrees created by sessions forked from Marmota
 .worktrees/

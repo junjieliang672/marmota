@@ -18,9 +18,9 @@ import (
 
 // The Inbox (deck item 8) is what needs you: a session that asks you
 // something, fails, or finishes a reply you haven't read. When that happens
-// to a session you can't see, a toast shows in superfile's top right corner,
-// and while superfile isn't focused WezTerm posts a notification too. Focus
-// never moves: ! opens the toast's session, or else the one that has waited
+// to a session you can't see, a toast shows in Marmota's top right corner,
+// and while Marmota isn't focused WezTerm posts a notification too. Focus
+// never moves: s opens the toast's session, or else the one that has waited
 // longest, and esc puts the toast away.
 
 const (
@@ -30,7 +30,7 @@ const (
 	claudeToastDuration = 10 * time.Second
 	claudeToastMaxWidth = 56
 	claudeToastMinWidth = 34
-	// The toast covers at most this share of superfile's width.
+	// The toast covers at most this share of Marmota's width.
 	claudeToastWidthShare = 2
 	claudeNoticeMaxRunes  = 200
 )
@@ -71,9 +71,9 @@ var (
 )
 
 // updateClaudeInbox looks at what changed since the last refresh. A session
-// you can't see (neither beside superfile nor shown in the preview) that
+// you can't see (neither beside Marmota nor shown in the preview) that
 // now needs you, failed, or finished a reply gets a toast, and a
-// notification while superfile isn't focused.
+// notification while Marmota isn't focused.
 func (m *model) updateClaudeInbox() tea.Cmd {
 	now := time.Now()
 	first := m.claude.inbox == nil
@@ -162,7 +162,7 @@ func (m *model) visibleClaudeToast() (claudeToast, bool) {
 }
 
 // dismissClaudeToast puts the toast away ("esc later"); what it was about
-// stays in the Inbox for !.
+// stays in the Inbox for s.
 func (m *model) dismissClaudeToast() bool {
 	if _, ok := m.visibleClaudeToast(); !ok {
 		return false
@@ -263,7 +263,7 @@ func (m *model) renderClaudeToast(t claudeToast) string {
 	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(common.Theme.Hint)).Background(bg).Bold(true)
 	dim := lipgloss.NewStyle().Foreground(lipgloss.Color(common.GitUntrackedColor)).Background(bg)
 	keys := keyStyle.Render("esc") + dim.Render(" later")
-	if m.dockPick(m.dockSessions(), "") == t.id { // where ! goes: one that needs you or replied unread
+	if m.dockPick(m.dockSessions(), "") == t.id { // where s goes: one that needs you or replied unread
 		keys = keyStyle.Render(firstKey(common.Hotkeys.JumpToUnreadSession)) + dim.Render(" open  ") + keys
 	}
 

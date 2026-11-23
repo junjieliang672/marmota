@@ -12,7 +12,7 @@ DIR1 = TESTROOT / "dir1"
 
 class EmptyPanelTest(GenericTestImpl):
     """
-    Validate that spf doesn't crashes when we try to 
+    Validate that Marmota doesn't crashes when we try to 
     perform operations on empty file panel
     """
     def __init__(self, test_env : Environment):
@@ -40,17 +40,17 @@ class EmptyPanelTest(GenericTestImpl):
                 'v',
                 '.',                # Try toggle dotfiles                 
                 ],
-            # Makes sure spf doesn't crashes
-            validate_spf_running=True
+            # Makes sure Marmota doesn't crashes
+            validate_marmota_running=True
         )
 
     # Override
     def test_execute(self) -> None:
-        self.start_spf()
+        self.start_marmota()
         self.send_input()    
         time.sleep(tconst.OPERATION_DELAY)
-        # Intentionally not closing spf to ensure it remains running,
-        # which is verified by the validate_spf_running flag which is set 
+        # Intentionally not closing Marmota to ensure it remains running,
+        # which is verified by the validate_marmota_running flag which is set 
         # to true for this testcase
     
     

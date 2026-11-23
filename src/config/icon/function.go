@@ -25,7 +25,7 @@ func InitIcon(nerdfont bool, directoryIconColor string) {
 		// for ASCII characters, unlike nerd fonts which often need proper spacing
 		// to display correctly
 		Space = ""
-		SuperfileIcon = ""
+		MarmotaIcon = ""
 
 		Home = ""
 		Download = ""

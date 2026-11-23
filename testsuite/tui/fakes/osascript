@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fake `osascript`: logs argv and fails, so a test can never drive the real Finder.
 
-spf falls back to ``tell application "Finder" to delete`` when a trash rename
+Marmota falls back to ``tell application "Finder" to delete`` when a trash rename
 fails; with this fake that path reports an error instead of touching the
 user's real Trash. Exit code: $FAKE_OSASCRIPT_EXIT (default 1).
 """

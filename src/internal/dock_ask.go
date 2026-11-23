@@ -94,7 +94,7 @@ func (m *model) openDockAsk(target string) tea.Cmd {
 func (m *model) closeDockAsk() {
 	m.ask.resume = nil
 	m.sessions.composer.Blur()
-	m.saveAskHistory() // the draft, for the next superfile too
+	m.saveAskHistory() // the draft, for the next Marmota too
 	m.sessions.composer.SetEscText("")
 	m.sessions.focus = sessionsFocusList
 	if id := m.sessions.list.SelectedID(); id != "" && !m.sessions.list.NewSelected() {
@@ -174,7 +174,7 @@ func (m *model) dockAskKey(msg tea.KeyMsg) tea.Cmd {
 }
 
 // askRecall is what up and down step through in the Ask box: the prompts of
-// the session it writes to, typed there or sent from superfile, oldest
+// the session it writes to, typed there or sent from Marmota, oldest
 // first; nil for a new session, which steps through what the box sent.
 func (m *model) askRecall() []string {
 	s, ok := m.selectedSession()

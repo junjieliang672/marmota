@@ -109,7 +109,7 @@ type Session struct {
 	// LastError is the API error its last reply was.
 	LastError string
 	// PrintOnly reports a session only `claude -p` ever ran, such as a
-	// question superfile's Ask sent.
+	// question Marmota's Ask sent.
 	PrintOnly bool
 }
 

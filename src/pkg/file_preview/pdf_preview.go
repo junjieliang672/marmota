@@ -27,7 +27,7 @@ type PDFPreviewer struct {
 // NewPDFPreviewer creates a new PDF previewer
 func NewPDFPreviewer(imagePreviewer *ImagePreviewer) *PDFPreviewer {
 	// Create temp directory for PDF page images
-	tempDir := filepath.Join(os.TempDir(), "superfile-pdf-preview")
+	tempDir := filepath.Join(os.TempDir(), "marmota-pdf-preview")
 	if err := os.MkdirAll(tempDir, 0o750); err != nil {
 		slog.Error("Failed to create PDF preview temp directory", "error", err)
 	}

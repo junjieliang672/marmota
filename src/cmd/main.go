@@ -19,7 +19,7 @@ import (
 	internal "github.com/junjieliang672/marmota/src/internal"
 )
 
-// Run superfile app
+// Run Marmota app
 func Run(content embed.FS) {
 	// Enable custom colored help output
 	cli.HelpPrinter = CustomHelpPrinter //nolint:reassign // Intentionally reassigning to customize help output
@@ -29,7 +29,7 @@ func Run(content embed.FS) {
 
 	// Settings and state from before the program was Marmota come along
 	for _, m := range variable.MoveOldDirs() {
-		slog.Debug("Moved a folder from superfile", "move", m)
+		slog.Debug("Moved a folder from before the program was Marmota", "move", m)
 	}
 
 	common.LoadInitialPrerenderedVariables()
@@ -70,9 +70,9 @@ func Run(content embed.FS) {
 					fmt.Printf("%-*s %s\n", common.HelpKeyColumnWidth,
 						logStyle.Render("[Log file path]"), variable.LogFile)
 					fmt.Printf("%-*s %s\n", common.HelpKeyColumnWidth,
-						configStyle.Render("[Configuration directory path]"), variable.SuperFileMainDir)
+						configStyle.Render("[Configuration directory path]"), variable.MarmotaMainDir)
 					fmt.Printf("%-*s %s\n", common.HelpKeyColumnWidth,
-						dataStyle.Render("[Data directory path]"), variable.SuperFileDataDir)
+						dataStyle.Render("[Data directory path]"), variable.MarmotaDataDir)
 					return nil
 				},
 				Flags: []cli.Flag{
@@ -129,7 +129,7 @@ func Run(content embed.FS) {
 				Value:   "", // Default to the blank string indicating non-usage of flag
 			},
 		},
-		Action: spfAppAction,
+		Action: marmotaAppAction,
 	}
 
 	err := app.Run(context.Background(), os.Args)
@@ -138,7 +138,7 @@ func Run(content embed.FS) {
 	}
 }
 
-func spfAppAction(_ context.Context, c *cli.Command) error {
+func marmotaAppAction(_ context.Context, c *cli.Command) error {
 	// If no args are called along with y, use current dir
 	firstPanelPaths := []string{""}
 	if c.Args().Present() {
@@ -149,7 +149,7 @@ func spfAppAction(_ context.Context, c *cli.Command) error {
 
 	InitConfigFile()
 
-	// Scripts like build.sh fix the config this way; without it, superfile
+	// Scripts like build.sh fix the config this way; without it, Marmota
 	// would open its interface after fixing and wait for keys forever.
 	if c.Bool("fix-only") {
 		common.LoadConfigFile()
@@ -159,8 +159,8 @@ func spfAppAction(_ context.Context, c *cli.Command) error {
 
 	firstUse := checkFirstUse()
 
-	// WithReportFocus drives the IME ascii-hold: superfile releases its
-	// pass-through request when the terminal loses focus, so a superfile left
+	// WithReportFocus drives the IME ascii-hold: Marmota releases its
+	// pass-through request when the terminal loses focus, so a Marmota left
 	// in hotkey mode in a background tab cannot force ASCII input elsewhere.
 	p := tea.NewProgram(internal.InitialModel(firstPanelPaths, firstUse),
 		tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithReportFocus())
@@ -189,9 +189,9 @@ func spfAppAction(_ context.Context, c *cli.Command) error {
 func InitConfigFile() {
 	// Create directories
 	if err := utils.CreateDirectories(
-		variable.SuperFileMainDir,
-		variable.SuperFileDataDir,
-		variable.SuperFileStateDir,
+		variable.MarmotaMainDir,
+		variable.MarmotaDataDir,
+		variable.MarmotaStateDir,
 		variable.ThemeFolder,
 	); err != nil {
 		utils.PrintlnAndExit("Error creating directories:", err)

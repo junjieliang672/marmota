@@ -1,16 +1,16 @@
-"""Drive a real spf binary in a pseudo-terminal, without tmux.
+"""Drive a real Marmota binary in a pseudo-terminal, without tmux.
 
 Example::
 
-    with Session("bin/y", cols=150, rows=40, cwd=workdir) as spf:
-        spf.wait_for("alpha.txt")
-        spf.send("?")
-        spf.wait_for("Open help menu")
-        spf.screenshot("help.png")
-        spf.send("esc", "q")
-        assert spf.wait_exit() == 0
+    with Session("bin/y", cols=150, rows=40, cwd=workdir) as marmota:
+        marmota.wait_for("alpha.txt")
+        marmota.send("?")
+        marmota.wait_for("Open help menu")
+        marmota.screenshot("help.png")
+        marmota.send("esc", "q")
+        assert marmota.wait_exit() == 0
 
-A background thread drains the pty continuously (spf blocks on a full pty
+A background thread drains the pty continuously (marmota blocks on a full pty
 buffer otherwise), feeds the output to a pyte screen and answers terminal
 queries (CSI 6n, OSC 10/11, DA1/DA2, ...) at the position they appear in the
 stream, so cursor position reports are exact.
@@ -57,7 +57,7 @@ ESC_DELAY: float = 0.1
 _RAW_OUTPUT_LIMIT: int = 16 * 1024 * 1024
 
 # Runs in the child after setsid(): make the pty the controlling terminal
-# (needed for /dev/tty, SIGWINCH and job control) and exec spf. This avoids
+# (needed for /dev/tty, SIGWINCH and job control) and exec Marmota. This avoids
 # Popen(preexec_fn=...), which is unsafe once reader threads are running.
 _EXEC_WRAPPER: str = (
     "import fcntl, os, sys, termios\n"
@@ -77,7 +77,7 @@ class WaitTimeout(TimeoutError):
 
 
 class SessionExited(RuntimeError):
-    """spf is no longer running, so input cannot be delivered."""
+    """marmota is no longer running, so input cannot be delivered."""
 
 
 class _QuietScreen(pyte.Screen):
@@ -88,19 +88,19 @@ class _QuietScreen(pyte.Screen):
 
 
 class Session:
-    """spf running in a pty with an emulated screen. Use as a context manager.
+    """marmota running in a pty with an emulated screen. Use as a context manager.
 
     Args:
-        binary: path to the spf binary.
+        binary: path to the Marmota binary.
         cols, rows: terminal size.
-        cwd: working directory; spf opens it. Default: an empty dir in the sandbox.
+        cwd: working directory; Marmota opens it. Default: an empty dir in the sandbox.
         env: extra environment variables (None removes one), applied on top of
             the sandbox environment. HOME/XDG_* may only point inside the sandbox.
-        args: extra command line arguments for spf.
+        args: extra command line arguments for Marmota.
         sandbox: a Sandbox to run in. When omitted the session creates its own
             and deletes it on close; a passed sandbox is left for the caller.
         palette: default colors of the fake terminal.
-        cell_size: (width, height) in pixels reported to spf.
+        cell_size: (width, height) in pixels reported to Marmota.
         key_delay: pause between keys in one send() call, so that every key
             arrives as its own read (Bubble Tea merges runes read together).
     """
@@ -154,12 +154,12 @@ class Session:
         self.close()
 
     def start(self) -> "Session":
-        """Launch spf. Called by ``with``; returns self."""
+        """Launch Marmota. Called by ``with``; returns self."""
         if self._proc is not None:
             return self
         binary = self.binary.resolve()
         if not binary.is_file() or not os.access(binary, os.X_OK):
-            raise FileNotFoundError(f"spf binary not found or not executable: {binary}")
+            raise FileNotFoundError(f"marmota binary not found or not executable: {binary}")
         sandbox = self._ensure_sandbox()
         cwd = self.cwd.resolve() if self.cwd is not None else sandbox.workdir()
         env = sandbox.env(self.extra_env)
@@ -187,7 +187,7 @@ class Session:
         return self
 
     def close(self) -> None:
-        """Stop spf (SIGTERM, then SIGKILL) and release the pty and sandbox."""
+        """Stop Marmota (SIGTERM, then SIGKILL) and release the pty and sandbox."""
         if self._closed:
             return
         self._closed = True
@@ -240,7 +240,7 @@ class Session:
         fcntl.ioctl(fd, termios.TIOCSWINSZ, packed)
 
     def resize(self, cols: int, rows: int) -> None:
-        """Change the terminal size; spf gets SIGWINCH and redraws."""
+        """Change the terminal size; Marmota gets SIGWINCH and redraws."""
         with self._cond:
             self.cols, self.rows = cols, rows
             self._term.cols, self._term.rows = cols, rows
@@ -268,7 +268,7 @@ class Session:
             except BlockingIOError:
                 continue
             except OSError:
-                break  # EIO: every slave fd is closed, spf has exited
+                break  # EIO: every slave fd is closed, Marmota has exited
             if not data:
                 break
             self._handle_output(data)
@@ -325,11 +325,11 @@ class Session:
                 except BlockingIOError:
                     remaining = deadline - time.monotonic()
                     if remaining <= 0:
-                        raise TimeoutError("spf is not reading its input") from None
+                        raise TimeoutError("marmota is not reading its input") from None
                     select.select([], [self._fd], [], min(remaining, 0.05))
                 except OSError as exc:
                     if exc.errno in (errno.EIO, errno.EBADF):
-                        raise SessionExited("spf has exited") from exc
+                        raise SessionExited("marmota has exited") from exc
                     raise
 
     def _pace(self, gap: float) -> None:
@@ -339,7 +339,7 @@ class Session:
 
     def _deliver(self, payload: bytes, delay: float) -> None:
         if not self.alive:
-            raise SessionExited(f"spf has exited (code {self.returncode})")
+            raise SessionExited(f"marmota has exited (code {self.returncode})")
         self._pace(max(delay, ESC_DELAY) if self._last_was_esc else delay)
         self._write(payload)
         self._last_write = time.monotonic()
@@ -378,13 +378,13 @@ class Session:
         return self
 
     def paste(self, text: str) -> "Session":
-        """Paste text, bracketed if spf enabled bracketed paste (mode 2004)."""
+        """Paste text, bracketed if Marmota enabled bracketed paste (mode 2004)."""
         if 2004 in self.modes:
             text = f"\x1b[200~{text}\x1b[201~"
         return self.send_raw(text.encode("utf-8"))
 
     def focus(self, focused: bool = True) -> "Session":
-        """Report terminal focus in/out (spf enables focus reporting)."""
+        """Report terminal focus in/out (marmota enables focus reporting)."""
         return self.send_raw(b"\x1b[I" if focused else b"\x1b[O")
 
     def click(self, row: int, col: int, button: int = 0) -> "Session":
@@ -473,7 +473,7 @@ class Session:
 
     @property
     def modes(self) -> Set[int]:
-        """DEC private modes spf has enabled (1049 alt screen, 2004 paste...)."""
+        """DEC private modes Marmota has enabled (1049 alt screen, 2004 paste...)."""
         with self._cond:
             return set(self._term.private_modes)
 
@@ -482,7 +482,7 @@ class Session:
             return snapshot_from_pyte(self._screen, self.palette, self._title)
 
     def raw_output(self) -> bytes:
-        """Everything spf wrote (first 16 MiB), for debugging rendering issues."""
+        """Everything Marmota wrote (first 16 MiB), for debugging rendering issues."""
         with self._cond:
             return bytes(self._raw)
 
@@ -506,7 +506,7 @@ class Session:
                 if remaining <= 0 or (self._eof and not self.alive):
                     break
                 self._cond.wait(min(remaining, 0.1))
-        state = "spf exited" if not self.alive else f"timed out after {timeout:g}s"
+        state = "marmota exited" if not self.alive else f"timed out after {timeout:g}s"
         raise WaitTimeout(f"{state} waiting for {needle!r}", self.dump())
 
     def wait_gone(self, needle: Needle, timeout: float = 5.0) -> None:
@@ -544,13 +544,13 @@ class Session:
                 self._cond.wait(min(quiet / 3, max(deadline - now, 0.01)))
 
     def wait_exit(self, timeout: float = 5.0) -> int:
-        """Wait for spf to exit and return its exit code."""
+        """Wait for Marmota to exit and return its exit code."""
         if self._proc is None:
             raise RuntimeError("session was never started")
         try:
             code = self._proc.wait(timeout)
         except subprocess.TimeoutExpired:
-            raise WaitTimeout(f"spf still running after {timeout:g}s", self.dump()) from None
+            raise WaitTimeout(f"marmota still running after {timeout:g}s", self.dump()) from None
         if self._reader is not None:
             self._reader.join(1.0)  # pick up the final frames
         return code
@@ -565,7 +565,7 @@ def wait_until(predicate: Callable[[], bool], timeout: float = 5.0,
     """Poll predicate until it is true or timeout passes; return its last value.
 
     For side effects that are not on screen: fake tool logs, the sandbox
-    clipboard, files spf writes.
+    clipboard, files Marmota writes.
     """
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -576,7 +576,7 @@ def wait_until(predicate: Callable[[], bool], timeout: float = 5.0,
 
 
 def _signal_group(proc: subprocess.Popen, sig: int) -> None:
-    """Signal spf's process group; spf is its leader (start_new_session)."""
+    """Signal Marmota's process group; marmota is its leader (start_new_session)."""
     try:
         os.killpg(proc.pid, sig)
     except ProcessLookupError:

@@ -59,7 +59,7 @@ func TestParsePS(t *testing.T) {
 }
 
 func TestProjectSlug(t *testing.T) {
-	assert.Equal(t, "-Users-kingjj-Developer-superfile-custom", ProjectSlug("/Users/kingjj/Developer/superfile-custom"))
+	assert.Equal(t, "-Users-kingjj-Developer-marmota-custom", ProjectSlug("/Users/kingjj/Developer/marmota-custom"))
 	assert.Equal(t, "-a-b-c-d-e", ProjectSlug("/a.b_c d/e"))
 }
 
@@ -355,9 +355,9 @@ func TestTrackerKeepsTheLatestTodoList(t *testing.T) {
 	assert.Len(t, s.Todos, 2)
 }
 
-// superfile sends requests with a context block after them; the prompt
-// superfile shows, and a title made from it, are what you typed.
-func TestPromptsLeaveOutSuperfilesContext(t *testing.T) {
+// Marmota sends requests with a context block after them; the prompt
+// Marmota shows, and a title made from it, are what you typed.
+func TestPromptsLeaveOutMarmotasContext(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "s.jsonl")
 	prompt := "group the logos into logos/\n\n" + ContextOpenTag + "\ncwd:      ~/repo\ncursor:   a.png\n" +
 		ContextCloseTag
@@ -379,7 +379,7 @@ func TestPromptsLeaveOutSuperfilesContext(t *testing.T) {
 		"blocks from before the rename are left out too")
 }
 
-// Claude Code lists a `claude -p` run, such as superfile's Ask bar starts, as
+// Claude Code lists a `claude -p` run, such as Marmota's Ask bar starts, as
 // an interactive session while it works. There is nothing to switch to.
 func TestCollectLeavesOutPrintRuns(t *testing.T) {
 	run := func(_ context.Context, name string, _ ...string) ([]byte, error) {
@@ -509,7 +509,7 @@ func TestConversationReadsTheLastTurns(t *testing.T) {
 	assert.Equal(t, "move the launchers", turns[0].Prompt)
 	assert.Equal(t, "Moved them.", turns[0].Reply)
 	assert.Equal(t, []string{"Edit(providers.go)"}, turns[0].Tools)
-	assert.Equal(t, "add a test", turns[1].Prompt, "superfile's context block is left out")
+	assert.Equal(t, "add a test", turns[1].Prompt, "Marmota's context block is left out")
 	assert.Equal(t, "Added one.", turns[1].Reply, "subagents' text is not the reply")
 
 	last, err := Conversation(path, 1)
@@ -551,7 +551,7 @@ func TestATurnCutByTheTailKeepsItsPrompt(t *testing.T) {
 	assert.Equal(t, "and the totals", turns[0].Prompt)
 }
 
-// Claude Code records text pasted into its prompt, as superfile types it,
+// Claude Code records text pasted into its prompt, as Marmota types it,
 // between pasted_content tags.
 func TestAPastedPromptIsAPrompt(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "s.jsonl")

@@ -19,7 +19,7 @@ import (
 // session all day. A session that starts during the day joins the end of
 // its folder's group, a new folder the end of the list. The first refresh
 // of a new day sorts again by last activity. The order is saved, so
-// restarting superfile doesn't sort it either. Finished sessions are listed
+// restarting Marmota doesn't sort it either. Finished sessions are listed
 // for the day they were active, except the folder's Ask session.
 
 const (

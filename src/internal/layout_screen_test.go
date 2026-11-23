@@ -200,7 +200,7 @@ func TestAFilePanelSaysHowManyOfItsItemsShow(t *testing.T) {
 
 // Whichever box has the keyboard, its frame is the one focus color, and no
 // other box's is: a file panel, the Sessions box, the Ask box, Details, the
-// s list.
+// go to list.
 func TestTheBoxWithTheKeyboardHasTheFocusColor(t *testing.T) {
 	ownAskHistory(t)
 	withTheme(t, func(th *common.ThemeType) {
@@ -229,7 +229,7 @@ func TestTheBoxWithTheKeyboardHasTheFocusColor(t *testing.T) {
 	folder := filepath.Base(m.getFocusedFilePanel().location)
 
 	assert.Equal(t, []string{folder}, lit(), "the files: the file panel")
-	bang(m)
+	toSessions(m)
 	assert.Equal(t, []string{"✳"}, lit(), "!: the Sessions box alone")
 	pressKey(m, common.Hotkeys.OpenAskBar[0])
 	assert.Equal(t, []string{"Ask"}, lit(), "K: the Ask box alone")
@@ -338,7 +338,7 @@ func TestFPutsDetailsAndTheAskBoxAway(t *testing.T) {
 	pressKey(m, "esc")
 	assert.Equal(t, l, m.lay, "and away again")
 
-	bang(m)
+	toSessions(m)
 	assert.False(t, m.toggleFooter, "the Sessions box doesn't need them back")
 	assert.Equal(t, dockSessionsFocus, m.focusPanel)
 }

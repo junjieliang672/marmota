@@ -58,7 +58,7 @@ func TestMain(m *testing.M) {
 	// deferred cleanup never executed
 
 	// Create testDir
-	testDir = filepath.Join(os.TempDir(), "spf_testdir")
+	testDir = filepath.Join(os.TempDir(), "marmota_testdir")
 	cleanupTestDir()
 	if err := os.Mkdir(testDir, 0o755); err != nil {
 		fmt.Printf("error while creating test directory, err : %v", err)

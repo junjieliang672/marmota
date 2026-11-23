@@ -71,7 +71,7 @@ func waitForScreen(t *testing.T, paneID int, want string) {
 func TestASessionStartsInTmuxAndIsReadAndTypedInto(t *testing.T) {
 	ownTmux(t)
 	m := newClaudeTestModel(t)
-	wez := newFakeWezterm(t, superfileTab())
+	wez := newFakeWezterm(t, marmotaTab())
 	restoreSeams(t)
 
 	paneID, err := m.launchParkedAgent(t.TempDir(), fakeAgent, managedAgentProviderClaude, "abc")
@@ -123,7 +123,7 @@ func restoreSeams(t *testing.T) {
 func TestShowingSessionsUsesOnePaneBesideMarmota(t *testing.T) {
 	socket := ownTmux(t)
 	m := newClaudeTestModel(t)
-	wez := newFakeWezterm(t, superfileTab())
+	wez := newFakeWezterm(t, marmotaTab())
 
 	first, err := m.launchParkedAgent(t.TempDir(), "sleep 60", managedAgentProviderClaude, "one")
 	require.NoError(t, err)
@@ -167,7 +167,7 @@ func TestShowingSessionsUsesOnePaneBesideMarmota(t *testing.T) {
 func TestARestartedMarmotaFindsTheSessionsInTmux(t *testing.T) {
 	ownTmux(t)
 	m := newClaudeTestModel(t)
-	newFakeWezterm(t, superfileTab())
+	newFakeWezterm(t, marmotaTab())
 	_, err := m.launchParkedAgent(t.TempDir(), fakeAgent, managedAgentProviderClaude, "kept")
 	require.NoError(t, err)
 	before, err := listTmuxPanes()
@@ -250,10 +250,11 @@ func TestASessionResumedIntoAWindowIsFoundThereByItsName(t *testing.T) {
 
 func TestARestartedMarmotaTakesBackThePaneBesideIt(t *testing.T) {
 	m := newClaudeTestModel(t)
-	wez := newFakeWezterm(t, superfileTab(),
-		weztermPane{PaneID: 31, TabID: 1, WindowID: 1, TTYName: "/dev/ttysA", Size: weztermPaneSize{Rows: 50, Cols: 99}},
-		weztermPane{PaneID: 32, TabID: 1, WindowID: 1, TTYName: "/dev/ttysB", Size: weztermPaneSize{Rows: 50, Cols: 99}},
-		weztermPane{PaneID: 33, TabID: 1, WindowID: 1, TTYName: "/dev/ttysC", Size: weztermPaneSize{Rows: 50, Cols: 99}})
+	size := weztermPaneSize{Rows: 50, Cols: 99}
+	wez := newFakeWezterm(t, marmotaTab(),
+		weztermPane{PaneID: 31, TabID: 1, WindowID: 1, TTYName: "/dev/ttysA", Size: size},
+		weztermPane{PaneID: 32, TabID: 1, WindowID: 1, TTYName: "/dev/ttysB", Size: size},
+		weztermPane{PaneID: 33, TabID: 1, WindowID: 1, TTYName: "/dev/ttysC", Size: size})
 	panes, err := listWeztermTabPanes(m.getFocusedFilePanel().location, 10)
 	require.NoError(t, err)
 	// ttysA and ttysB are the clients of its view: a restarted Marmota

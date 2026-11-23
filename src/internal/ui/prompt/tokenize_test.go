@@ -12,16 +12,16 @@ import (
 )
 
 const (
-	spfTestEnvVar1 = "SPF_TEST_ENV_VAR1"
-	spfTestEnvVar2 = "SPF_TEST_ENV_VAR2"
-	spfTestEnvVar3 = "SPF_TEST_ENV_VAR3"
-	spfTestEnvVar4 = "SPF_TEST_ENV_VAR4"
+	marmotaTestEnvVar1 = "MARMOTA_TEST_ENV_VAR1"
+	marmotaTestEnvVar2 = "MARMOTA_TEST_ENV_VAR2"
+	marmotaTestEnvVar3 = "MARMOTA_TEST_ENV_VAR3"
+	marmotaTestEnvVar4 = "MARMOTA_TEST_ENV_VAR4"
 )
 
 var testEnvValues = map[string]string{ //nolint:gochecknoglobals // This is more like a const.
-	spfTestEnvVar1: "1",
-	spfTestEnvVar2: "hello",
-	spfTestEnvVar3: "",
+	marmotaTestEnvVar1: "1",
+	marmotaTestEnvVar2: "hello",
+	marmotaTestEnvVar3: "",
 }
 
 func Test_tokenizePromptCommand(t *testing.T) {
@@ -152,17 +152,17 @@ func Test_resolveShellSubstitution(t *testing.T) {
 		},
 		{
 			name:            "Multiple substitution",
-			command:         fmt.Sprintf("$(echo $(echo hi)) ${%s}", spfTestEnvVar2),
-			expectedResult:  fmt.Sprintf("hi%s %s", newLineSuffix, testEnvValues[spfTestEnvVar2]),
+			command:         fmt.Sprintf("$(echo $(echo hi)) ${%s}", marmotaTestEnvVar2),
+			expectedResult:  fmt.Sprintf("hi%s %s", newLineSuffix, testEnvValues[marmotaTestEnvVar2]),
 			isErrorExpected: false,
 			errorToMatch:    nil,
 		},
 		{
 			name:            "Non Existing env var",
-			command:         fmt.Sprintf("${%s}", spfTestEnvVar4),
+			command:         fmt.Sprintf("${%s}", marmotaTestEnvVar4),
 			expectedResult:  "",
 			isErrorExpected: true,
-			errorToMatch:    envVarNotFoundError{varName: spfTestEnvVar4},
+			errorToMatch:    envVarNotFoundError{varName: marmotaTestEnvVar4},
 		},
 		{
 			name:            "Shell substitution inside env var substitution",

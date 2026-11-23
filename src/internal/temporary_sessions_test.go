@@ -221,7 +221,7 @@ func TestATemporarySessionThatNeedsYouSaysHowToOpenIt(t *testing.T) {
 func TestShowOpensASessionsWindowUnderThePane(t *testing.T) {
 	ownTmux(t)
 	m := newClaudeTestModel(t) // WEZTERM_PANE is 10
-	wez := newFakeWezterm(t, superfileTab())
+	wez := newFakeWezterm(t, marmotaTab())
 	paneID, err := m.launchParkedAgent(t.TempDir(), "echo claude; sleep 60", managedAgentProviderClaude, "abcd1234-ef")
 	require.NoError(t, err)
 	ref, _ := tmuxPanes.ref(paneID)

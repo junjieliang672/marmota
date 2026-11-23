@@ -25,7 +25,7 @@ ESC: str = "\x1b"
 ST: str = ESC + "\\"
 BEL: str = "\x07"
 
-# Catppuccin Mocha, matching superfile's default theme, so areas that use the
+# Catppuccin Mocha, matching Marmota's default theme, so areas that use the
 # terminal default colors blend in. OSC 10/11 queries are answered with these.
 _DEFAULT_ANSI: Tuple[str, ...] = (
     "#45475a", "#f38ba8", "#a6e3a1", "#f9e2af",
@@ -410,7 +410,7 @@ class TerminalState:
         if kind == "da2":
             return f"{ESC}[>1;10;0c"
         if kind == "xtversion":
-            return f"{ESC}P>|spf-tui-harness{ST}"
+            return f"{ESC}P>|marmota-tui-harness{ST}"
         if kind == "winops":
             if event.arg == "14":
                 return f"{ESC}[4;{self.rows * self.cell_height};{self.cols * self.cell_width}t"

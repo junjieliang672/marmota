@@ -199,11 +199,11 @@ func TestModel_HandleResults(t *testing.T) {
 		assert.True(t, m.IsOpen())
 	})
 
-	t.Run("Verify SPF results update", func(t *testing.T) {
+	t.Run("Verify Marmota results update", func(t *testing.T) {
 		m := GenerateModel(agentPromptChar, shellPromptChar, false, defaultTestMaxHeight, defaultTestWidth)
 		m.Open(true)
 		msg := "Test message"
-		m.HandleSPFActionResults(true, msg)
+		m.HandleMarmotaActionResults(true, msg)
 
 		assert.True(t, m.LastActionSucceeded())
 		assert.Equal(t, msg, m.resultMsg)
@@ -211,7 +211,7 @@ func TestModel_HandleResults(t *testing.T) {
 
 		m.closeOnSuccess = true
 		// Validate close happens when closeOnSuccess is true
-		m.HandleSPFActionResults(true, "")
+		m.HandleMarmotaActionResults(true, "")
 		assert.False(t, m.IsOpen())
 	})
 }

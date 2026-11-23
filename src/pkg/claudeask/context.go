@@ -1,5 +1,5 @@
-// Package claudeask asks Claude Code about the files superfile shows. It
-// writes the context block that goes with every request superfile sends
+// Package claudeask asks Claude Code about the files Marmota shows. It
+// writes the context block that goes with every request Marmota sends
 // ("these files" means the ones you selected), the arguments of a read-only
 // `claude -p` run, and reads that run's streamed output.
 package claudeask
@@ -12,7 +12,7 @@ import (
 	"github.com/junjieliang672/marmota/src/pkg/claudesession"
 )
 
-// Context is what you are looking at in superfile when you ask.
+// Context is what you are looking at in Marmota when you ask.
 type Context struct {
 	// Folder is the file panel's folder.
 	Folder string
@@ -40,7 +40,7 @@ type Context struct {
 const maxSelectedNames = 20
 
 // Block is the context as Claude reads it, wrapped in claudesession's
-// context tags so superfile can leave it out when it shows the prompt.
+// context tags so Marmota can leave it out when it shows the prompt.
 func (c Context) Block(home string) string {
 	var b strings.Builder
 	b.WriteString(claudesession.ContextOpenTag + "\n")

@@ -370,7 +370,7 @@ func (m *model) getDeleteTriggerCmd(deletePermanent bool) tea.Cmd {
 	}
 }
 
-// Copy directory or file's path to superfile's clipboard
+// Copy directory or file's path to Marmota's clipboard
 // set cut to true/false accordingly
 func (m *model) copySingleItem(cut bool) {
 	panel := &m.fileModel.filePanels[m.filePanelFocusIndex]

@@ -27,7 +27,7 @@ import (
 
 // The Ask bar sends what you write to the session the list selects, typed
 // into its pane; after n, or when the folder has none, to a new session it
-// starts in the background. The session beside superfile, and the
+// starts in the background. The session beside Marmota, and the
 // keyboard, stay where they are. Sessions it starts run in the permission
 // mode the bar shows (bypass unless you change it). The session it sends to
 // becomes the folder's: where alt+k writes next time. What you send a new
@@ -121,7 +121,7 @@ type askStartTickMsg struct {
 }
 
 const (
-	// askStartPoll is how often superfile looks at a session the Ask bar
+	// askStartPoll is how often Marmota looks at a session the Ask bar
 	// started; after askStartGiveUp looks it stops.
 	askStartPoll   = time.Second
 	askStartGiveUp = 600
@@ -138,7 +138,7 @@ type askDelegatedMsg struct {
 }
 
 // freshGitStatusCmd reads the folder's git status again. Files change
-// outside superfile, by a session for one, and the status superfile keeps
+// outside Marmota, by a session for one, and the status Marmota keeps
 // would tell Claude they hadn't.
 func (m *model) freshGitStatusCmd() tea.Cmd {
 	dir := m.getFocusedFilePanel().location
@@ -466,17 +466,17 @@ func (m *model) endAskStart(st *askStart) {
 	m.refreshSessionsList()
 }
 
-// showStartingSession brings a session the bar started in beside superfile,
+// showStartingSession brings a session the bar started in beside Marmota,
 // with the keyboard: enter on its row, to see all it shows.
 func (m *model) showStartingSession(started *askStart) {
 	var err error
 	if isTmuxPane(started.paneID) {
 		_, err = m.showTmuxPane(started.paneID, "", true)
 	} else {
-		var superfilePaneID int
-		superfilePaneID, err = currentWeztermPaneID()
+		var marmotaPaneID int
+		marmotaPaneID, err = currentWeztermPaneID()
 		if err == nil {
-			err = m.foregroundManagedPane(superfilePaneID, started.paneID)
+			err = m.foregroundManagedPane(marmotaPaneID, started.paneID)
 		}
 		if err == nil {
 			err = activateWeztermPane(started.folder, started.paneID)
@@ -604,7 +604,7 @@ func nearestClaudeNotes(dir string) string {
 	}
 }
 
-// askHistoryFile is what is kept between runs of superfile: what was sent,
+// askHistoryFile is what is kept between runs of Marmota: what was sent,
 // the question being written, and the bar's choices.
 // The model, effort and agent a new session gets aren't kept: each starts
 // from the defaults (Claude Code, its default model, medium effort).

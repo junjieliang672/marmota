@@ -1,5 +1,5 @@
-// Managed agent panes: the WezTerm panes superfile opened for agents, with one
-// shown beside superfile and the rest parked in hidden tabs.
+// Managed agent panes: the WezTerm panes Marmota opened for agents, with one
+// shown beside Marmota and the rest parked in hidden tabs.
 package internal
 
 import (

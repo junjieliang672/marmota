@@ -1,4 +1,4 @@
-"""``python -m tui``: run the pty-driven spf tests (run from testsuite/). See README.md."""
+"""``python -m tui``: run the pty-driven Marmota tests (run from testsuite/). See README.md."""
 from __future__ import annotations
 
 import argparse
@@ -23,15 +23,15 @@ def configure_logging(debug: bool = False) -> None:
 
 
 def default_binary() -> Path:
-    return Path(os.environ.get("SPF_BINARY") or REPO_ROOT / "bin" / "y")
+    return Path(os.environ.get("MARMOTA_BINARY") or REPO_ROOT / "bin" / "y")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(prog="python -m tui",
-                                     description="superfile pty test suite (no tmux)")
+                                     description="Marmota pty test suite (no tmux)")
     parser.add_argument("-d", "--debug", action="store_true", help="Enable debug logging")
-    parser.add_argument("--spf-path", type=Path, default=None,
-                        help="spf binary under test (default: $SPF_BINARY, else ../bin/y)")
+    parser.add_argument("--marmota-path", type=Path, default=None,
+                        help="marmota binary under test (default: $MARMOTA_BINARY, else ../bin/y)")
     parser.add_argument("-t", "--tests", nargs="+",
                         help="Only run these testcases (class names)")
     parser.add_argument("--artifacts", type=Path, default=DEFAULT_ARTIFACTS_DIR,
@@ -39,7 +39,7 @@ def main() -> int:
     parser.add_argument("--shots", action="store_true",
                         help="Also save a final screenshot of every session for passing tests")
     parser.add_argument("--config-source", choices=("repo", "binary"), default="repo",
-                        help="Seed config from src/superfile_config (repo) or from the "
+                        help="Seed config from src/marmota_config (repo) or from the "
                              "defaults embedded in the binary (binary)")
     parser.add_argument("-x", "--exitfirst", action="store_true",
                         help="Stop after the first failing test")
@@ -48,11 +48,11 @@ def main() -> int:
     args = parser.parse_args()
     configure_logging(args.debug)
 
-    binary = (args.spf_path or default_binary()).expanduser().resolve()
+    binary = (args.marmota_path or default_binary()).expanduser().resolve()
     if not binary.is_file():
-        logging.error("spf binary not found: %s (use --spf-path or $SPF_BINARY)", binary)
+        logging.error("marmota binary not found: %s (use --marmota-path or $MARMOTA_BINARY)", binary)
         return 2
-    logging.info("spf under test: %s", binary)
+    logging.info("marmota under test: %s", binary)
     options = RunOptions(binary=binary, artifacts=args.artifacts.resolve(),
                          config_source=args.config_source, shots=args.shots,
                          keep_sandboxes=args.keep_sandboxes)

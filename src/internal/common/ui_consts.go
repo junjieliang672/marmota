@@ -7,7 +7,7 @@ import "time"
 const ClaudeAgentColor = "#f0a07a"
 
 // CodexAgentColor marks a Codex session, as ClaudeAgentColor marks Claude
-// Code's: its cc or co tag, and its name in the s list.
+// Code's: its cc or co tag, and its name in the go to list.
 const CodexAgentColor = "#7aa2f7"
 
 // ClaudeNeedsYouColor marks a session that needs you (the ⚑ glyph); git's
@@ -30,8 +30,8 @@ const (
 	DefaultFilePanelWidth    = 10 // default width for file panels
 	FilePanelMax             = 10 // max number of file panels supported
 	MinWidthForRename        = 18 // minimal width for rename input to render
-	SuperfileInitialWidthPct = 50 // percentage of total tab width reserved for superfile after the first agent split
-	SuperfileManagedMinCols  = 62 // minimum width reserved for superfile when opening the first managed agent pane
+	MarmotaInitialWidthPct   = 50 // percentage of total tab width reserved for Marmota after the first agent split
+	MarmotaManagedMinCols    = 62 // minimum width reserved for Marmota when opening the first managed agent pane
 	ManagedAgentPaneCols     = 1  // fixed number of columns in the managed agent area
 	ManagedAgentPaneRows     = 2  // fixed number of rows in the managed agent area
 	ManagedAgentPaneCapacity = ManagedAgentPaneCols * ManagedAgentPaneRows

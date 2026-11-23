@@ -11,7 +11,7 @@ import (
 )
 
 // fakeWezterm stands in for `wezterm cli`: it keeps a table of panes and
-// answers the commands superfile sends the way WezTerm does, so layout tests
+// answers the commands Marmota sends the way WezTerm does, so layout tests
 // can check where panes end up instead of an exact sequence of commands.
 type fakeWezterm struct {
 	panes    map[int]*weztermPane
@@ -174,7 +174,7 @@ func (f *fakeWezterm) closePane(id int) {
 	}
 }
 
-// paneList is what superfile's last refresh would have listed.
+// paneList is what Marmota's last refresh would have listed.
 func (f *fakeWezterm) paneList() []weztermPane {
 	list := make([]weztermPane, 0, len(f.panes))
 	for _, p := range f.panes {

@@ -30,7 +30,7 @@ func TestTheSessionsBoxMentionsARunningSession(t *testing.T) {
 		return nil
 	}
 	t.Cleanup(func() { writeClipboard = original })
-	bang(m)
+	toSessions(m)
 	require.True(t, m.sessions.list.Select("s20"))
 
 	pressKey(m, common.Hotkeys.SessionMention[0])
@@ -45,7 +45,7 @@ func TestTheSessionsBoxMentionsARunningSession(t *testing.T) {
 func TestNInTheSessionsBoxStartsANewSessionInTheAskBox(t *testing.T) {
 	ownAskHistory(t)
 	m := dockTestModel(t)
-	bang(m)
+	toSessions(m)
 
 	pressKey(m, common.Hotkeys.SessionNew[0])
 
@@ -82,7 +82,7 @@ func TestUpAndDownInTheAskBoxRecallTheSessionsOwnPrompts(t *testing.T) {
 	m.setFilePreviewPanelSize()
 	m.claude.snapshot.Live[0].TranscriptPath = longTranscript(t)
 	m.sessions.composer.Sent("wow, to another session")
-	bang(m)
+	toSessions(m)
 	require.True(t, m.sessions.list.Select("s20"))
 	pressKey(m, common.Hotkeys.OpenAskBar[0]) // writes to it
 	require.Equal(t, sessionsFocusAsk, m.sessions.focus)
@@ -123,7 +123,7 @@ func TestUpAndDownInTheAskBoxRecallTheSessionsOwnPrompts(t *testing.T) {
 func TestTheSessionsBoxMovesTheSelectedSessionHere(t *testing.T) {
 	m := dockTestModel(t)
 	pane := newFakeClaudePane(t)
-	bang(m)
+	toSessions(m)
 	require.True(t, m.sessions.list.Select("s20"))
 
 	cmd := press(m, common.Hotkeys.MoveSessionHere[0])
@@ -138,7 +138,7 @@ func TestSessionsWithNoFolderAreListedLast(t *testing.T) {
 	m := dockTestModel(t)
 	m.claude.snapshot.Live = append(m.claude.snapshot.Live, claudesession.Session{ID: "nowhere", Title: "lost",
 		Live: true, TTY: "/dev/ttys030"})
-	bang(m)
+	toSessions(m)
 	pressKey(m, common.Hotkeys.ListBottom[0])
 	assert.Equal(t, "nowhere", m.sessions.list.SelectedID())
 }
@@ -161,7 +161,7 @@ func TestThePreviewLoadsOlderTurnsAsYouScrollUp(t *testing.T) {
 	}
 	require.NoError(t, os.WriteFile(transcript, []byte(strings.Join(lines, "\n")+"\n"), 0o600))
 	m.claude.snapshot.Live[0].TranscriptPath = transcript
-	bang(m)
+	toSessions(m)
 	require.True(t, m.sessions.list.Select("s20"))
 	m.loadSessionsConversation()
 
@@ -206,7 +206,7 @@ func TestTheSelectedSessionIsReadInTheBackground(t *testing.T) {
 	m.fileModel.filePreview.SetOpen(true)
 	m.setFilePreviewPanelSize()
 	m.claude.snapshot.Live[0].TranscriptPath = longTranscript(t)
-	bang(m)
+	toSessions(m)
 	require.True(t, m.sessions.list.Select("s50"))
 	assert.Nil(t, m.loadSessionsConversation(), "no transcript: nothing to read")
 

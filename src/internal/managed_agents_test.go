@@ -12,9 +12,9 @@ func TestRefreshManagedWeztermState_AutoPromotesBackgroundSessionWhenForegroundP
 	t.Setenv("WEZTERM_PANE", "10")
 
 	state := weztermPaneLayoutState{
-		ManagedPaneIDs:     []int{20},
-		ForegroundPaneID:   20,
-		FixedSuperfileCols: 74,
+		ManagedPaneIDs:   []int{20},
+		ForegroundPaneID: 20,
+		FixedMarmotaCols: 74,
 		Sessions: []managedAgentSession{
 			{PaneID: 20, Provider: managedAgentProviderClaude, Cwd: "/tmp/api", VisibleSlot: managedAgentSlotOne},
 			{PaneID: 30, Provider: managedAgentProviderCodex, Cwd: "/tmp/tests", VisibleSlot: managedAgentHiddenSlot},
@@ -97,5 +97,5 @@ func TestRefreshManagedWeztermState_AutoPromotesBackgroundSessionWhenForegroundP
 	assert.Equal(t, 30, m.managedWeztermState.Sessions[0].PaneID)
 	assert.Equal(t, managedAgentSlotOne, m.managedWeztermState.Sessions[0].VisibleSlot)
 	assert.Equal(t, []int{30}, m.managedWeztermState.ManagedPaneIDs)
-	assert.Equal(t, 74, m.managedWeztermState.FixedSuperfileCols)
+	assert.Equal(t, 74, m.managedWeztermState.FixedMarmotaCols)
 }

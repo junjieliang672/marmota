@@ -124,7 +124,7 @@ func modalBorderStyleWithAlign(height int, width int, horizontalAlignment lipglo
 		Foreground(ModalFGColor)
 }
 
-// Generate first use modal style (This modal pop up when user first use superfile)
+// Generate first use modal style (This modal pop up when user first use Marmota)
 func FirstUseModal(height int, width int) lipgloss.Style {
 	border := GenerateBorder()
 	return lipgloss.NewStyle().Height(height).
@@ -170,7 +170,7 @@ func FilePanelDividerStyle(filePanelFocussed bool) lipgloss.Style {
 }
 
 // FocusBorderColor is the color of the frame and title of the box that has
-// the keyboard, whichever box it is: a file panel, the s list, the Sessions
+// the keyboard, whichever box it is: a file panel, the go to list, the Sessions
 // box, the Ask box, Details. It is the theme's footer_border_active, which
 // the Sessions box had first; file_panel_border_active stays the accent of
 // headings and marks.

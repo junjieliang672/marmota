@@ -281,7 +281,7 @@ func outputJSON(_ value: Any) {
 
 func printUsage() {
     let usage = """
-    icloud-helper - iCloud status and operations helper for superfile
+    icloud-helper - iCloud status and operations helper for Marmota
 
     Usage:
       icloud-helper status <path>              Get iCloud status for a file

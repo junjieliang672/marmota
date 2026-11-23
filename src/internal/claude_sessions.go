@@ -110,10 +110,10 @@ type claudeSessionsState struct {
 	folder string
 	// pendingStop is the session the stop confirmation is about.
 	pendingStop string
-	// stopped holds the sessions superfile stopped. A refresh can still list
+	// stopped holds the sessions Marmota stopped. A refresh can still list
 	// one as running while it exits; it is shown as finished all the same.
 	stopped map[string]stoppedClaudeSession
-	// layoutGen counts pane moves superfile made itself. A refresh that
+	// layoutGen counts pane moves Marmota made itself. A refresh that
 	// started before a move carries an outdated pane list and is ignored.
 	layoutGen int
 	// tickGen names the refresh that is due; one asked for sooner makes
@@ -316,7 +316,7 @@ func (m *model) applyClaudeSessionsSnapshot(msg claudeSessionsSnapshotMsg) tea.C
 }
 
 // sessionsChanged brings what follows the list up to date once sessions
-// were listed: their order, unread marks, the Sessions box and the s list,
+// were listed: their order, unread marks, the Sessions box and the go to list,
 // whom the Ask box writes to (askBarTarget, as before), and the session in
 // the preview.
 func (m *model) sessionsChanged(askBarTarget string) []tea.Cmd {
@@ -357,7 +357,7 @@ func (m *model) claudeSeenStore() *claudesession.SeenStore {
 }
 
 // recomputeClaudeUnread decides which sessions have a finished turn you
-// haven't looked at. A session shown beside superfile counts as looked at.
+// haven't looked at. A session shown beside Marmota counts as looked at.
 func (m *model) recomputeClaudeUnread() {
 	seen := m.claudeSeenStore()
 	unread := make(map[string]bool)
@@ -420,8 +420,8 @@ func (m *model) weztermPaneForSession(s claudesession.Session) (weztermPane, boo
 			continue
 		}
 		if selfErr == nil && p.PaneID == self {
-			// A process on superfile's own terminal, such as an Ask run, is
-			// no session pane: nothing may be typed into superfile for it.
+			// A process on Marmota's own terminal, such as an Ask run, is
+			// no session pane: nothing may be typed into Marmota for it.
 			return weztermPane{}, false
 		}
 		return p, true
@@ -431,8 +431,8 @@ func (m *model) weztermPaneForSession(s claudesession.Session) (weztermPane, boo
 	return m.tmuxPaneShowingSession(s)
 }
 
-// superfileTabID returns the WezTerm tab superfile runs in, or -1.
-func (m *model) superfileTabID() int {
+// marmotaTabID returns the WezTerm tab Marmota runs in, or -1.
+func (m *model) marmotaTabID() int {
 	paneID, err := currentWeztermPaneID()
 	if err != nil {
 		return -1
@@ -446,18 +446,18 @@ func (m *model) superfileTabID() int {
 }
 
 // isClaudeSessionVisible reports whether the session's pane is on screen next
-// to superfile, in the same WezTerm tab.
+// to Marmota, in the same WezTerm tab.
 func (m *model) isClaudeSessionVisible(s claudesession.Session) bool {
 	pane, ok := m.weztermPaneForSession(s)
 	if !ok {
 		return false
 	}
-	tab := m.superfileTabID()
+	tab := m.marmotaTabID()
 	return tab >= 0 && pane.TabID == tab
 }
 
 // isClaudeSessionOnScreen reports whether you see what the session says:
-// its pane is beside superfile, or the preview shows it.
+// its pane is beside Marmota, or the preview shows it.
 func (m *model) isClaudeSessionOnScreen(s claudesession.Session) bool {
 	return m.isClaudeSessionVisible(s) || m.previewShowsSession(s.ID)
 }
@@ -476,8 +476,8 @@ func (m *model) flashClaude(text string) {
 }
 
 // openClaudeSession shows or resumes a session:
-//   - a session running in one of superfile's agent panes is shown beside
-//     superfile; opening it again focuses it
+//   - a session running in one of Marmota's agent panes is shown beside
+//     Marmota; opening it again focuses it
 //   - a session running in another WezTerm pane is switched to
 //   - a background session is attached in a new agent pane
 //   - a past session is resumed in a new agent pane, in bypass mode
@@ -497,7 +497,7 @@ func (m *model) openClaudeSession(id string) {
 	m.flashClaude(message)
 }
 
-// jumpToClaudeSession shows a session beside superfile: its own pane when
+// jumpToClaudeSession shows a session beside Marmota: its own pane when
 // it runs in one, a new pane attached to it when it runs in the background,
 // or a new pane resuming it, in bypass mode, when it has ended. With focus
 // the keyboard moves into it as well.
@@ -535,20 +535,20 @@ func (m *model) claudeSessionDir(s claudesession.Session) string {
 	return m.getFocusedFilePanel().location
 }
 
-// showWeztermPaneForSession brings a session's pane beside superfile, taking
+// showWeztermPaneForSession brings a session's pane beside Marmota, taking
 // it from wherever it is: the hidden workspace, or another tab, beside
 // another Marmota or on its own. With focus, or when it is already beside
-// superfile, the keyboard moves into it.
+// Marmota, the keyboard moves into it.
 func (m *model) showWeztermPaneForSession(pane weztermPane, title string, focus bool) (string, error) {
 	if isTmuxPane(pane.PaneID) {
 		return m.showTmuxPane(pane.PaneID, title, focus)
 	}
 	cwd := m.getFocusedFilePanel().location
-	superfilePaneID, err := currentWeztermPaneID()
+	marmotaPaneID, err := currentWeztermPaneID()
 	if err != nil {
 		return "", err
 	}
-	if pane.TabID == m.superfileTabID() {
+	if pane.TabID == m.marmotaTabID() {
 		// Already on screen: opening it again means "let me type in it".
 		if err := activateWeztermPane(cwd, pane.PaneID); err != nil {
 			return "", err
@@ -558,31 +558,31 @@ func (m *model) showWeztermPaneForSession(pane weztermPane, title string, focus 
 
 	m.refreshManagedWeztermState()
 	if !m.isManagedAgentPane(pane.PaneID) {
-		// Parked by an earlier superfile, lost track of, or in another tab:
+		// Parked by an earlier Marmota, lost track of, or in another tab:
 		// take it over. Focusing it where it is would show nothing, or
 		// switch WezTerm away to that tab. Another Marmota that had it lets
 		// go, or it would park it again. Reconciling again records where
 		// the panes really are before the swap.
-		releasePaneFromOtherMarmotas(superfilePaneID, pane.PaneID)
-		m.adoptAgentPane(superfilePaneID, pane)
+		releasePaneFromOtherMarmotas(marmotaPaneID, pane.PaneID)
+		m.adoptAgentPane(marmotaPaneID, pane)
 		m.refreshManagedWeztermState()
 	}
 	for _, managed := range m.managedWeztermState.Sessions {
 		if managed.PaneID != pane.PaneID {
 			continue
 		}
-		state, err := m.foregroundManagedAgentSessionByPaneID(superfilePaneID, m.managedWeztermState, pane.PaneID)
+		state, err := m.foregroundManagedAgentSessionByPaneID(marmotaPaneID, m.managedWeztermState, pane.PaneID)
 		if err != nil {
 			return "", err
 		}
-		persistWeztermPaneLayoutState(superfilePaneID, state)
+		persistWeztermPaneLayoutState(marmotaPaneID, state)
 		state.loaded = true
-		m.setManagedWeztermState(superfilePaneID, state)
+		m.setManagedWeztermState(marmotaPaneID, state)
 		m.markPaneTabLocally(pane.PaneID)
 		if !focus {
 			// Moving a pane in makes it the active one; give the keyboard
-			// back so the next key still reaches superfile.
-			if err := activateWeztermPane(cwd, superfilePaneID); err != nil {
+			// back so the next key still reaches Marmota.
+			if err := activateWeztermPane(cwd, marmotaPaneID); err != nil {
 				slog.Warn("Could not give the keyboard back to Marmota", "error", err)
 			}
 			return "Showing " + title, nil
@@ -593,7 +593,7 @@ func (m *model) showWeztermPaneForSession(pane weztermPane, title string, focus 
 		return "Switched to " + title, nil
 	}
 
-	// Not one of superfile's agent panes: switch WezTerm to it.
+	// Not one of Marmota's agent panes: switch WezTerm to it.
 	if err := activateWeztermPane(cwd, pane.PaneID); err != nil {
 		return "", err
 	}
@@ -609,9 +609,9 @@ func (m *model) isManagedAgentPane(paneID int) bool {
 	return false
 }
 
-// adoptAgentPane adds a pane to the agent panes superfile manages, as a
-// hidden one: it is moved beside superfile when it is shown.
-func (m *model) adoptAgentPane(superfilePaneID int, pane weztermPane) {
+// adoptAgentPane adds a pane to the agent panes Marmota manages, as a
+// hidden one: it is moved beside Marmota when it is shown.
+func (m *model) adoptAgentPane(marmotaPaneID int, pane weztermPane) {
 	state := m.managedWeztermState
 	cwd := weztermPaneCwdPath(pane.Cwd)
 	provider := inferManagedAgentProvider(cwd, pane, managedAgentProviderUnknown)
@@ -626,34 +626,34 @@ func (m *model) adoptAgentPane(superfilePaneID int, pane weztermPane) {
 		VisibleSlot: managedAgentHiddenSlot,
 	})
 	state = normalizeWeztermPaneLayoutState(state)
-	persistWeztermPaneLayoutState(superfilePaneID, state)
+	persistWeztermPaneLayoutState(marmotaPaneID, state)
 	state.loaded = true
-	m.setManagedWeztermState(superfilePaneID, state)
+	m.setManagedWeztermState(marmotaPaneID, state)
 }
 
-// markPaneTabLocally records that a pane now sits beside superfile and that
-// the agent pane shown there before has been parked, so ! and @ act on the
+// markPaneTabLocally records that a pane now sits beside Marmota and that
+// the agent pane shown there before has been parked, so s and @ act on the
 // real layout before the next refresh lists panes again.
 func (m *model) markPaneTabLocally(paneID int) {
 	m.claude.layoutGen++
-	tab := m.superfileTabID()
-	superfilePaneID, _ := currentWeztermPaneID()
+	tab := m.marmotaTabID()
+	marmotaPaneID, _ := currentWeztermPaneID()
 	for i := range m.claude.panes {
 		p := &m.claude.panes[i]
 		switch {
 		case p.PaneID == paneID:
 			p.TabID = tab
 			p.Workspace = ""
-		case p.TabID == tab && p.PaneID != superfilePaneID:
+		case p.TabID == tab && p.PaneID != marmotaPaneID:
 			p.TabID = -1
 			p.Workspace = managedAgentHiddenWorkspace
 		}
 	}
 }
 
-// visibleClaudeSessionPane returns the live session shown next to superfile.
+// visibleClaudeSessionPane returns the live session shown next to Marmota.
 func (m *model) visibleClaudeSessionPane() (claudesession.Session, weztermPane, bool) {
-	tab := m.superfileTabID()
+	tab := m.marmotaTabID()
 	if tab < 0 {
 		return claudesession.Session{}, weztermPane{}, false
 	}
@@ -666,7 +666,7 @@ func (m *model) visibleClaudeSessionPane() (claudesession.Session, weztermPane, 
 }
 
 // sendSelectionToAgent types the selected files and folders (or the one under
-// the cursor) into the session shown next to superfile, Claude Code's or
+// the cursor) into the session shown next to Marmota, Claude Code's or
 // Codex's, as @mentions, then focuses that pane so you can say what to do
 // with them.
 func (m *model) sendSelectionToAgent() {
@@ -722,7 +722,7 @@ type claudeMovedMsg struct {
 	err     error
 }
 
-// moveClaudeSessionHere moves the session beside superfile to the folder the
+// moveClaudeSessionHere moves the session beside Marmota to the folder the
 // file panel shows.
 func (m *model) moveClaudeSessionHere() tea.Cmd {
 	s, _, ok := m.visibleClaudeSessionPane()
@@ -936,7 +936,7 @@ func (m *model) claudeStatusSummary() string {
 	}
 	if unread > 0 {
 		parts = append(parts, style.Foreground(lipgloss.Color(common.Theme.Hint)).Bold(true).
-			Render(fmt.Sprintf("● %d unread (!)", unread)))
+			Render(fmt.Sprintf("● %d unread (%s)", unread, firstKey(common.Hotkeys.JumpToUnreadSession))))
 	}
 	return strings.Join(parts, style.Foreground(lipgloss.Color(statusSepFG)).Render(" · "))
 }

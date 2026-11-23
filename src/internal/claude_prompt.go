@@ -16,7 +16,7 @@ import (
 	"github.com/junjieliang672/marmota/src/pkg/sessionhost"
 )
 
-// Typing into a running Claude Code session as if at its prompt. superfile
+// Typing into a running Claude Code session as if at its prompt. Marmota
 // reads the prompt box off the session's pane first, sets a half-typed
 // message aside with Claude Code's stash, and presses enter only once the box
 // holds exactly what it typed. Claude Code puts the stashed message back as
@@ -77,7 +77,7 @@ var (
 			strconv.Itoa(paneID), "--no-paste", "--", keys).Run()
 	}
 	// claudePromptPoll and claudePromptWait pace reading a pane back while
-	// it takes in what superfile typed.
+	// it takes in what Marmota typed.
 	claudePromptPoll = 30 * time.Millisecond //nolint:gochecknoglobals // test seam
 	claudePromptWait = 2 * time.Second       //nolint:gochecknoglobals // test seam
 )
@@ -190,7 +190,7 @@ func settleClaudePrompt(paneID int, sent string, before claudeprompt.Box, stashe
 	switch {
 	case stashed:
 		// Claude Code puts the message back as it sends; if it didn't,
-		// superfile does.
+		// Marmota does.
 		after, err = waitForClaudePrompt(paneID, func(b claudeprompt.Box) bool { return !b.Shown || !b.Stashed })
 		if err != nil && after.Shown && after.Text == "" && after.Stashed {
 			_ = weztermSendKeys(paneID, claudeKeyStash)
@@ -208,7 +208,7 @@ func settleClaudePrompt(paneID int, sent string, before claudeprompt.Box, stashe
 }
 
 // takeBackClaudePaste undoes a paste that didn't show as typed, and gives back
-// the message superfile stashed.
+// the message Marmota stashed.
 func takeBackClaudePaste(paneID int, pasted string, stashed bool) {
 	box, err := readClaudePrompt(paneID)
 	if err != nil || !box.Shown {

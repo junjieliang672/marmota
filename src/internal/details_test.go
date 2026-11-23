@@ -115,8 +115,8 @@ func TestShortPath(t *testing.T) {
 		require.NoError(t, os.MkdirAll(filepath.Join(home, d), 0o755))
 	}
 	for path, want := range map[string]string{
-		home + "/Developer/superfile/": "~/Developer/superfile/",
-		home:                           "~",
+		home + "/Developer/marmota/": "~/Developer/marmota/",
+		home:                         "~",
 		home + "/Library/Mobile Documents/com~apple~CloudDocs/MyMarmot/important docs": "iCloud/MyMarmot/important docs",
 		home + "/Library/Mobile Documents/iCloud~md~obsidian/Documents/vault":          "obsidian (iCloud)/Documents/vault",
 		home + "/Library/Mobile Documents/57T9237FN3~net~whatsapp~WhatsApp":            "WhatsApp (iCloud)",

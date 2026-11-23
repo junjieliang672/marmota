@@ -1,1 +1,1 @@
-"""pty-driven spf tests, discovered by tui/runner.py."""
+"""pty-driven Marmota tests, discovered by tui/runner.py."""

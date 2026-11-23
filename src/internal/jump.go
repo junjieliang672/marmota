@@ -21,7 +21,7 @@ import (
 	"github.com/junjieliang672/marmota/src/pkg/codexsession"
 )
 
-// The s list (src/internal/ui/jump) goes to a pinned folder or file, a
+// The go to list (src/internal/ui/jump) goes to a pinned folder or file, a
 // session (running, or ended to resume), a folder zoxide knows or a file
 // edited lately. It is drawn in the focused file panel's place, and the
 // preview beside it shows the item enter goes to: a folder's contents, a
@@ -29,7 +29,7 @@ import (
 // them (enter, and the keys an item takes elsewhere: t pins, r renames, a
 // session's keys are the Sessions box's) and keeps the preview on them.
 
-// jumpState is the s list's side of the model.
+// jumpState is the go to list's side of the model.
 type jumpState struct {
 	// zoxide is zoxide's answer for zoxideFor, what was typed when it was
 	// asked.
@@ -59,13 +59,13 @@ func (m *model) setJumpSize() {
 	m.jumpUI.SetSize(m.lay.sidebar.w, m.lay.sidebar.h)
 }
 
-// openJump opens the s list on every section, nothing typed.
+// openJump opens the go to list on every section, nothing typed.
 func (m *model) openJump() tea.Cmd {
 	m.jump.forResume = false
 	return m.startJump()
 }
 
-// openJumpForResume opens the s list on the Resume section alone, for the
+// openJumpForResume opens the go to list on the Resume section alone, for the
 // Ask box to pick the session it resumes.
 func (m *model) openJumpForResume() tea.Cmd {
 	m.jump.forResume = true

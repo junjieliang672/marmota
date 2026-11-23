@@ -19,14 +19,14 @@ const (
 
 	// defaultHoldSubPath is relative to the user's home directory. MarmotIM
 	// owns this directory; it is named after the reader rather than after
-	// superfile because the reader is what has to find it.
+	// Marmota because the reader is what has to find it.
 	defaultHoldSubPath = "Library/Application Support/MarmotIM/ascii-hold"
 )
 
 // terminalBundleIDs maps $TERM_PROGRAM to the bundle identifier the input
 // method sees as its client.
 //
-// The hold is scoped to this app so that a superfile sitting in a background
+// The hold is scoped to this app so that a Marmota sitting in a background
 // tab cannot disable Chinese input in whatever the user switched to. When the
 // terminal is not recognised we write no scope at all, which the reader treats
 // as "any app" — worse behaviour, but still better than a hold that never
@@ -97,7 +97,7 @@ func newPlatformHold(dir string) Hold {
 		done: make(chan struct{}),
 	}
 
-	// A previous superfile that was SIGKILLed cannot have cleaned up after
+	// A previous Marmota that was SIGKILLed cannot have cleaned up after
 	// itself. The reader prunes dead holders too, but it may not be running,
 	// and a stale file would then hold the input method in ASCII mode
 	// indefinitely with no visible cause.

@@ -1,6 +1,6 @@
-# tui: drive the real spf in a pseudo-terminal
+# tui: drive the real Marmota in a pseudo-terminal
 
-`tui` runs the real `spf` binary in a pty (no tmux), emulates the screen with
+`tui` runs the real `Marmota` binary in a pty (no tmux), emulates the screen with
 [pyte](https://github.com/selectel/pyte), answers terminal queries, and can
 render the screen to a PNG. Every session runs in a throwaway HOME, so tests
 never read or write your real Marmota config, state, zoxide database,
@@ -19,14 +19,14 @@ python3 -m venv .venv
 
 ```
 cd testsuite
-.venv/bin/python -m tui --spf-path ../bin/y          # all tests in tui/tests
-.venv/bin/python -m tui --spf-path ../bin/y -t QuitTest --shots -d
+.venv/bin/python -m tui --marmota-path ../bin/y          # all tests in tui/tests
+.venv/bin/python -m tui --marmota-path ../bin/y -t QuitTest --shots -d
 ```
 
-* `--spf-path` (or `$SPF_BINARY`, default `../bin/y`): binary under test.
+* `--marmota-path` (or `$MARMOTA_BINARY`, default `../bin/y`): binary under test.
 * `--shots`: also save a final screenshot of every session when tests pass.
 * `--config-source binary`: seed the config the binary itself embeds instead
-  of `src/superfile_config` (use this when testing an older build while the
+  of `src/marmota_config` (use this when testing an older build while the
   working tree has moved on).
 * `-x` stop at the first failure, `--keep-sandboxes` keep the temp HOMEs.
 
@@ -45,7 +45,7 @@ Quick screenshot:
 The tmux suite has no isolation of its own; run it inside a sandbox with:
 
 ```
-.venv/bin/python -m tui.run_in_sandbox -- .venv/bin/python main.py --spf-path ../bin/y
+.venv/bin/python -m tui.run_in_sandbox -- .venv/bin/python main.py --marmota-path ../bin/y
 ```
 
 ## Writing tests
@@ -60,11 +60,11 @@ class RenameTest(TuiTest):
     def run(self) -> None:
         sandbox = self.ctx.sandbox()                      # fresh HOME, seeded config
         work = sandbox.workdir(files={"a.txt": "hi"})
-        spf = self.ctx.session(cols=120, rows=40, cwd=work, sandbox=sandbox)
-        spf.wait_for("a.txt")
-        spf.send("r", "ctrl+u")                           # one key per write
-        spf.type_text("b").send("enter")                  # rename keeps ".txt"
-        spf.wait_for("b.txt")
+        Marmota = self.ctx.session(cols=120, rows=40, cwd=work, sandbox=sandbox)
+        Marmota.wait_for("a.txt")
+        Marmota.send("r", "ctrl+u")                           # one key per write
+        Marmota.type_text("b").send("enter")                  # rename keeps ".txt"
+        Marmota.wait_for("b.txt")
         assert (work / "b.txt").exists()
         self.ctx.snap("renamed")                          # tui/artifacts/RenameTest/renamed.png
 ```
@@ -91,14 +91,14 @@ context manager. Main API:
 ## Isolation
 
 `Sandbox` builds the environment from scratch: `HOME` and
-`XDG_{CONFIG,DATA,STATE,CACHE}_HOME` point into a temp dir (spf uses
+`XDG_{CONFIG,DATA,STATE,CACHE}_HOME` point into a temp dir (Marmota uses
 `$HOME/.config/marmota` on macOS and the XDG dirs for data, state and
 cache), plus `TMPDIR`, `_ZO_DATA_DIR`, `CLAUDE_CONFIG_DIR`. Nothing else is
 inherited from your shell except `PATH`, `USER` and `LOGNAME`, so
 `WEZTERM_PANE`, `TERM_PROGRAM` and `CLAUDE*` are unset unless a test passes
 them in `env`. `HOME`/`XDG_*` overrides that point outside the sandbox are
 refused. Each sandbox gets `config.toml`, `hotkeys.toml` and `theme/` from
-`src/superfile_config`, `firstUseCheck` (no intro modal;
+`src/marmota_config`, `firstUseCheck` (no intro modal;
 `Sandbox(first_use=True)` for it) and `~/.Trash`.
 
 `tui/fakes` comes first on `PATH`. Each fake appends its argv as a JSON array
@@ -113,7 +113,7 @@ per line to a log (`sandbox.fake_calls("wezterm")`):
 | `osascript`, `sudo` | log and fail, so Finder or a password prompt is never reached |
 
 Fixture variables hold a file path (re-read on every call, so a test can
-change them while spf runs) or literal content. For transcripts use
+change them while Marmota runs) or literal content. For transcripts use
 `Sandbox(claude_home=True)` and
 `sandbox.add_claude_transcript(project_dir, session_id, records)`, which
 writes `~/.claude/projects/<slug>/<id>.jsonl` inside the sandbox. To use
@@ -121,11 +121,11 @@ WezTerm code paths, pass `env={"WEZTERM_PANE": "1"}` and a pane list.
 
 ## Limitations
 
-* Kitty/iTerm/sixel images are not drawn (pyte has no graphics). spf only
+* Kitty/iTerm/sixel images are not drawn (pyte has no graphics). Marmota only
   uses them when `TERM_PROGRAM`/`KITTY_WINDOW_ID` say so; by default it falls
   back to half blocks, which render correctly. With `TERM_PROGRAM=WezTerm`
   the image commands are recorded in `session.graphics` instead.
-* pyte has no alternate screen: after spf exits, the last frame stays on
+* pyte has no alternate screen: after Marmota exits, the last frame stays on
   screen, which is handy for failure screenshots.
 * Only legacy key encoding is sent; `ctrl+shift+<letter>` cannot be expressed
   and raises `KeySpecError`.
@@ -133,7 +133,7 @@ WezTerm code paths, pass `env={"WEZTERM_PANE": "1"}` and a pane list.
   merges input that arrives in one read (`JJ` instead of `J`, `esc q` becomes
   `alt+q`). Prefer `wait_for` over sleeps; `wait_stable` ignores attribute
   changes (blinking cursors) but not spinners.
-* Width tables: pyte uses `wcwidth`, spf uses go-runewidth (we set
+* Width tables: pyte uses `wcwidth`, Marmota uses go-runewidth (we set
   `RUNEWIDTH_EASTASIAN=0`); they agree for box drawing, Nerd Font icons and
   CJK, but an exotic emoji sequence could still disagree.
 * `e`/`E` start the configured editors (`nvim`, `neovide`) for real; override

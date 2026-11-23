@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fake `wezterm` CLI for spf TUI tests. Every call is appended to $FAKE_WEZTERM_LOG.
+"""Fake `wezterm` CLI for Marmota TUI tests. Every call is appended to $FAKE_WEZTERM_LOG.
 
 * ``wezterm cli list [--format json]``: prints $FAKE_WEZTERM_LIST (default ``[]``).
 * ``wezterm cli split-pane ...`` / ``wezterm cli spawn ...``: prints a new pane

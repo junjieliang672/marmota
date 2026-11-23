@@ -27,20 +27,20 @@ func TestPruneDeadManagedPanesForgetsClosedPanes(t *testing.T) {
 	assert.Zero(t, state.ForegroundPaneID)
 }
 
-// superfileTab is superfile's pane (10) in tab 1 of a 200-column window.
-func superfileTab() weztermPane {
+// marmotaTab is Marmota's pane (10) in tab 1 of a 200-column window.
+func marmotaTab() weztermPane {
 	return weztermPane{PaneID: 10, TabID: 1, WindowID: 1, Size: weztermPaneSize{Rows: 50, Cols: 200}}
 }
 
-func TestResumeAfterTheShownSessionExitedComesInBesideSuperfile(t *testing.T) {
+func TestResumeAfterTheShownSessionExitedComesInBesideMarmota(t *testing.T) {
 	m := newClaudeTestModel(t) // sets up the state folder, so save after it
 	require.NoError(t, saveWeztermPaneLayoutState(10, weztermPaneLayoutState{
-		ManagedPaneIDs:     []int{152},
-		ForegroundPaneID:   152,
-		FixedSuperfileCols: 62,
-		Sessions:           []managedAgentSession{{PaneID: 152, Provider: managedAgentProviderClaude, VisibleSlot: 1}},
+		ManagedPaneIDs:   []int{152},
+		ForegroundPaneID: 152,
+		FixedMarmotaCols: 62,
+		Sessions:         []managedAgentSession{{PaneID: 152, Provider: managedAgentProviderClaude, VisibleSlot: 1}},
 	}))
-	wez := newFakeWezterm(t, superfileTab())
+	wez := newFakeWezterm(t, marmotaTab())
 	m.claude.panes = wez.paneList()
 	past := claudesession.Session{ID: "past1", Title: "old work", Cwd: t.TempDir()}
 
@@ -56,10 +56,10 @@ func TestResumeAfterTheShownSessionExitedComesInBesideSuperfile(t *testing.T) {
 func TestResumeWithAParkedSessionKeepsItReachable(t *testing.T) {
 	m := newClaudeTestModel(t)
 	require.NoError(t, saveWeztermPaneLayoutState(10, weztermPaneLayoutState{
-		FixedSuperfileCols: 62,
-		Sessions:           []managedAgentSession{{PaneID: 30, Provider: managedAgentProviderClaude}},
+		FixedMarmotaCols: 62,
+		Sessions:         []managedAgentSession{{PaneID: 30, Provider: managedAgentProviderClaude}},
 	}))
-	wez := newFakeWezterm(t, superfileTab(), weztermPane{PaneID: 30, TabID: 30, WindowID: 30,
+	wez := newFakeWezterm(t, marmotaTab(), weztermPane{PaneID: 30, TabID: 30, WindowID: 30,
 		Workspace: managedAgentHiddenWorkspace, TTYName: "/dev/ttys030", Size: weztermPaneSize{Rows: 24, Cols: 80}})
 	m.claude.panes = wez.paneList()
 
@@ -78,28 +78,28 @@ func TestResumeWithAParkedSessionKeepsItReachable(t *testing.T) {
 
 func TestManagedAgentSplitWidthNeverLeavesASideEmpty(t *testing.T) {
 	cases := []struct {
-		total, superfile, want int
+		total, marmota, want int
 	}{
 		{200, 100, 99}, // the recorded width
 		{80, 0, 17},    // nothing recorded: the first split's widths
-		{80, 80, 17},   // superfile had the whole tab
+		{80, 80, 17},   // Marmota had the whole tab
 		{80, 79, 17},
 	}
 	for _, c := range cases {
-		got, err := managedAgentSplitWidth(c.total, c.superfile)
+		got, err := managedAgentSplitWidth(c.total, c.marmota)
 		require.NoError(t, err)
-		assert.Equal(t, c.want, got, "total %d, superfile %d", c.total, c.superfile)
+		assert.Equal(t, c.want, got, "total %d, Marmota %d", c.total, c.marmota)
 	}
 	_, err := managedAgentSplitWidth(40, 0)
 	assert.Error(t, err, "too narrow to split at all")
 }
 
-// After superfile restarts, sessions the old one parked are unknown to the
+// After Marmota restarts, sessions the old one parked are unknown to the
 // new one. Showing one takes it over and brings it in, instead of focusing
 // a pane in a workspace nobody looks at.
-func TestShowingAPaneParkedByAnEarlierSuperfileTakesItOver(t *testing.T) {
+func TestShowingAPaneParkedByAnEarlierMarmotaTakesItOver(t *testing.T) {
 	m := newClaudeTestModel(t)
-	wez := newFakeWezterm(t, superfileTab(), weztermPane{PaneID: 70, TabID: 70, WindowID: 70,
+	wez := newFakeWezterm(t, marmotaTab(), weztermPane{PaneID: 70, TabID: 70, WindowID: 70,
 		Workspace: managedAgentHiddenWorkspace, TTYName: "/dev/ttys070", Size: weztermPaneSize{Rows: 24, Cols: 80}})
 	m.claude.panes = wez.paneList()
 	parked := claudesession.Session{ID: "s70", Title: "parked earlier", Live: true, TTY: "/dev/ttys070"}
@@ -119,11 +119,11 @@ func TestShowingAPaneParkedByAnEarlierSuperfileTakesItOver(t *testing.T) {
 func TestShowingASessionBesideAnotherMarmotaTakesItOver(t *testing.T) {
 	m := newClaudeTestModel(t)
 	require.NoError(t, saveWeztermPaneLayoutState(10, weztermPaneLayoutState{
-		FixedSuperfileCols: 100,
-		Sessions:           []managedAgentSession{{PaneID: 8, Provider: managedAgentProviderClaude, VisibleSlot: 1}},
+		FixedMarmotaCols: 100,
+		Sessions:         []managedAgentSession{{PaneID: 8, Provider: managedAgentProviderClaude, VisibleSlot: 1}},
 	}))
 	otherState := weztermPaneLayoutState{
-		FixedSuperfileCols: 100,
+		FixedMarmotaCols: 100,
 		Sessions: []managedAgentSession{
 			{PaneID: 4, Provider: managedAgentProviderClaude, VisibleSlot: 1},
 			{PaneID: 6, Provider: managedAgentProviderClaude},
@@ -164,14 +164,14 @@ func TestShowingASessionBesideAnotherMarmotaTakesItOver(t *testing.T) {
 
 // Starting Claude from the prompt while another session is beside Marmota
 // shows the new one there, with the keyboard, and parks the other.
-func TestClaudeFromThePromptComesInBesideSuperfile(t *testing.T) {
+func TestClaudeFromThePromptComesInBesideMarmota(t *testing.T) {
 	m := newClaudeTestModel(t)
-	wez := newFakeWezterm(t, superfileTab())
+	wez := newFakeWezterm(t, marmotaTab())
 
 	_, err := m.launchClaudeInWezterm(false)
 	require.NoError(t, err)
 	first := wez.nextPane
-	require.Equal(t, 1, wez.tabOf(first), "the first one splits superfile's tab: %v", wez.commands)
+	require.Equal(t, 1, wez.tabOf(first), "the first one splits Marmota's tab: %v", wez.commands)
 
 	msg, err := m.launchClaudeInWezterm(false)
 	require.NoError(t, err)
@@ -184,10 +184,10 @@ func TestClaudeFromThePromptComesInBesideSuperfile(t *testing.T) {
 }
 
 // Stopping the session beside Marmota brings a parked one in its place,
-// and the keyboard stays in superfile, where the sheet is.
-func TestStoppingTheShownSessionKeepsTheKeyboardInSuperfile(t *testing.T) {
+// and the keyboard stays in Marmota, where the sheet is.
+func TestStoppingTheShownSessionKeepsTheKeyboardInMarmota(t *testing.T) {
 	m := newClaudeTestModel(t)
-	wez := newFakeWezterm(t, superfileTab())
+	wez := newFakeWezterm(t, marmotaTab())
 	_, err := m.launchClaudeInWezterm(false)
 	require.NoError(t, err)
 	parked := wez.nextPane
@@ -203,6 +203,6 @@ func TestStoppingTheShownSessionKeepsTheKeyboardInSuperfile(t *testing.T) {
 
 	assert.Nil(t, wez.panes[shown], "its pane is closed")
 	assert.Equal(t, 1, wez.tabOf(parked), "the parked session takes its place: %v", wez.commands)
-	assert.Equal(t, 10, wez.active, "the keyboard is back in superfile")
+	assert.Equal(t, 10, wez.active, "the keyboard is back in Marmota")
 	assert.Equal(t, "Stopped shown", m.claude.flash)
 }

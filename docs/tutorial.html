@@ -184,7 +184,7 @@ y</pre>
   <div class="legend">
     <div><span class="chip">A</span><p><strong>File panels.</strong> Your folders. <kbd>tab</kbd> moves to the next panel, <kbd>n</kbd> opens another. A <span class="tag cc">✳</span> marks a file a running session changed.</p></div>
     <div><span class="chip">B</span><p><strong>Preview.</strong> The file under the cursor; while you are in the Sessions box, the selected session's conversation.</p></div>
-    <div><span class="chip">C</span><p><strong>Sessions box.</strong> Every running session, <span class="tag cc">cc</span> for Claude Code and <span class="tag co">co</span> for Codex. <kbd>!</kbd> goes to a session that needs you or replied since you looked, and again to the next; with none, to the first. <kbd>esc</kbd> goes back. Under them, with a cloud, your sessions on other computers.</p></div>
+    <div><span class="chip">C</span><p><strong>Sessions box.</strong> Every running session, <span class="tag cc">cc</span> for Claude Code and <span class="tag co">co</span> for Codex. <kbd>s</kbd> goes to a session that needs you or replied since you looked, and again to the next; with none, to the first. <kbd>esc</kbd> goes back. Under them, with a cloud, your sessions on other computers.</p></div>
     <div><span class="chip">D</span><p><strong>Details.</strong> The file, your Mac's cpu, memory and disk, and file operations under way. <kbd>M</kbd> focuses it.</p></div>
     <div><span class="chip">E</span><p><strong>Ask box.</strong> Where you write to a session, or start a new one. <kbd>K</kbd> opens it.</p></div>
     <div><span class="chip">F</span><p><strong>Status line.</strong> The keys you can press now, how many sessions are working, need you or have unread replies, and the time. <kbd>F</kbd> hides the boxes at the foot.</p></div>
@@ -240,7 +240,7 @@ y</pre>
     <div class="case">
       <h3>Jump to a project and open a file</h3>
       <ol class="steps">
-        <li><kbd>s</kbd>, type part of the folder's name, <kbd>enter</kbd>: the first match, the row with the cursor. (<kbd>ctrl+n</kbd> opens it in a new panel instead.)</li>
+        <li><kbd>z</kbd>, type part of the folder's name, <kbd>enter</kbd>: the first match, the row with the cursor. (<kbd>ctrl+n</kbd> opens it in a new panel instead.)</li>
         <li><kbd>/</kbd> and a few letters filter the folder; <kbd>esc</kbd> clears it.</li>
         <li><kbd>e</kbd> opens the file in the editor, in Marmota's place until you close it (<a href="#editor">more on it below</a>); <kbd>E</kbd> opens it in a new tab.</li>
       </ol>
@@ -280,7 +280,7 @@ y</pre>
     <div class="case">
       <h3>Keep your places, and leave from one</h3>
       <ol class="steps">
-        <li><kbd>t</kbd> pins the folder under the cursor. <kbd>s</kbd> lists your pins, sessions, the folders you visit most and the files you edited lately, in the panel's place; the preview shows the one <kbd>enter</kbd> would go to. <kbd>↓</kbd> picks one, and <kbd>t</kbd>, <kbd>r</kbd>, <kbd>p</kbd> act on it as they do in a panel.</li>
+        <li><kbd>t</kbd> pins the folder under the cursor. <kbd>z</kbd> lists your pins, sessions, the folders you visit most and the files you edited lately, in the panel's place; the preview shows the one <kbd>enter</kbd> would go to. <kbd>↓</kbd> picks one, and <kbd>t</kbd>, <kbd>r</kbd>, <kbd>p</kbd> act on it as they do in a panel.</li>
         <li><kbd>Q</kbd> quits and leaves your shell in the folder you were in.</li>
       </ol>
     </div>
@@ -338,7 +338,7 @@ y</pre>
       <h3>Answer when it asks permission</h3>
       <ol class="steps">
         <li>The status line shows <span style="color: var(--accent)">⚑ 1 needs you</span>.</li>
-        <li><kbd>!</kbd> lands on it; the preview shows its question with the options.</li>
+        <li><kbd>s</kbd> lands on it; the preview shows its question with the options.</li>
         <li><kbd>K</kbd> hands your keys to the question (<kbd>y</kbd>, <kbd>enter</kbd>, arrows, <kbd>esc</kbd>); <kbd>ctrl+k</kbd> gives them back.</li>
       </ol>
     </div>
@@ -352,7 +352,7 @@ y</pre>
   </div>
   <figure class="shot wide">
     <button type="button" aria-label="Show full size"><img src="shots/agent-answer.webp" width="1368" height="839" alt="The preview shows a hidden session's permission question: a shell command, then Do you want to proceed, with its options, from Yes to No." loading="lazy"></button>
-    <figcaption>A session out of sight wants to run a shell command. After <kbd>!</kbd> and <kbd>K</kbd>, your keys go to its question: <kbd>1</kbd> answers Yes.</figcaption>
+    <figcaption>A session out of sight wants to run a shell command. After <kbd>s</kbd> and <kbd>K</kbd>, your keys go to its question: <kbd>1</kbd> answers Yes.</figcaption>
   </figure>
 </section>
 
@@ -370,7 +370,7 @@ y</pre>
     <div class="case">
       <h3>Start one in the background</h3>
       <ol class="steps">
-        <li><kbd>!</kbd> then <kbd>n</kbd>: the Ask box writes to a new session in this folder. (With no session running yet, <kbd>K</kbd> opens it that way.)</li>
+        <li><kbd>s</kbd> then <kbd>n</kbd>: the Ask box writes to a new session in this folder. (With no session running yet, <kbd>K</kbd> opens it that way.)</li>
         <li><kbd>tab</kbd> picks Claude Code or Codex; <kbd>ctrl+o</kbd> the model, <kbd>ctrl+t</kbd> the effort (medium unless you change it), <kbd>shift+tab</kbd> the permission mode.</li>
         <li>Write the task, <kbd>enter</kbd>. It starts out of sight and your keyboard stays in Marmota. Its row shows at once; in a folder it hasn't seen, it first asks whether you trust it, and the preview shows that question: <kbd>K</kbd> answers it there.</li>
       </ol>
@@ -378,7 +378,7 @@ y</pre>
     <div class="case">
       <h3>See how each one is doing</h3>
       <ol class="steps">
-        <li><kbd>!</kbd> opens the Sessions box. Each row: its state, <span class="tag cc">cc</span> or <span class="tag co">co</span>, its name, its age, and what it is doing now. A phone beside the age means Remote Control is on: you can follow and answer that session from the Claude app (Claude Code) or the ChatGPT app (Codex).</li>
+        <li><kbd>s</kbd> opens the Sessions box. Each row: its state, <span class="tag cc">cc</span> or <span class="tag co">co</span>, its name, its age, and what it is doing now. A phone beside the age means Remote Control is on: you can follow and answer that session from the Claude app (Claude Code) or the ChatGPT app (Codex).</li>
         <li>The preview shows the selected session's conversation; <kbd>pgup</kbd> <kbd>pgdown</kbd> scroll it.</li>
       </ol>
       <div class="states">
@@ -391,7 +391,7 @@ y</pre>
   </div>
   <figure class="shot wide">
     <button type="button" aria-label="Show full size"><img src="shots/many-new-wide.webp" width="1368" height="839" alt="The Ask box at full width: a new Codex session in tidepool, auto permissions, model codex default, effort medium, with a task typed in." loading="lazy"></button>
-    <figcaption><kbd>!</kbd> <kbd>n</kbd>, then <kbd>tab</kbd> for Codex: the Ask box will start a Codex session in <code>tidepool</code>, in auto mode, at medium effort.</figcaption>
+    <figcaption><kbd>s</kbd> <kbd>n</kbd>, then <kbd>tab</kbd> for Codex: the Ask box will start a Codex session in <code>tidepool</code>, in auto mode, at medium effort.</figcaption>
   </figure>
   <div class="cases">
     <div class="case">
@@ -399,7 +399,7 @@ y</pre>
       <ol class="steps">
         <li>In the Sessions box, <kbd>j</kbd> <kbd>k</kbd> to a session (or <kbd>3</kbd><kbd>g</kbd> for the third). From your files, <kbd>]</kbd> and <kbd>[</kbd> go straight to the next and the previous one.</li>
         <li><kbd>enter</kbd> brings it beside Marmota with the keyboard; the one that was there goes on out of sight. Scrolling up in that pane shows that session's own history.</li>
-        <li>In the <kbd>s</kbd> list, <kbd>enter</kbd> on a session only puts the Sessions box on it: the pane beside Marmota stays as it is until you press <kbd>enter</kbd> there.</li>
+        <li>In the <kbd>z</kbd> list, <kbd>enter</kbd> on a session only puts the Sessions box on it: the pane beside Marmota stays as it is until you press <kbd>enter</kbd> there.</li>
       </ol>
     </div>
     <div class="case">
@@ -445,7 +445,7 @@ y</pre>
   </figure>
   <div class="case">
     <ol class="steps">
-      <li><kbd>!</kbd>, select the session, <kbd>W</kbd>: the panel lists the files it changed.</li>
+      <li><kbd>s</kbd>, select the session, <kbd>W</kbd>: the panel lists the files it changed.</li>
       <li>Move through them; the preview shows each file's diff. <kbd>]</kbd> and <kbd>[</kbd> jump to the next and previous change.</li>
       <li><kbd>e</kbd> opens the file in the editor to fix something yourself, or to ask the session about it from there (<kbd>cmd+L</kbd>); <kbd>K</kbd> writes to the session from here.</li>
       <li><kbd>W</kbd> or <kbd>esc</kbd> goes back to the folder.</li>
@@ -532,13 +532,13 @@ y</pre>
   </div>
   <figure class="shot wide">
     <button type="button" aria-label="Show full size"><img src="shots/away.webp" width="1368" height="839" alt="Marmota showing a trip report, with a note in the top right corner: Tides daylight saving duplicate events needs you, permission prompt." loading="lazy"></button>
-    <figcaption>A hidden session stopped to ask permission. The note in the top right says which one and why; <kbd>!</kbd> opens it, <kbd>esc</kbd> puts the note away.</figcaption>
+    <figcaption>A hidden session stopped to ask permission. The note in the top right says which one and why; <kbd>s</kbd> opens it, <kbd>esc</kbd> puts the note away.</figcaption>
   </figure>
   <div class="case">
     <ol class="steps">
       <li>When a session you can't see asks something, fails, or replies, a note appears in Marmota's top right corner; while Marmota isn't in front, WezTerm also posts a macOS notification.</li>
       <li>The status line keeps count: <span class="tag cc">✳ working</span>, <span style="color: var(--accent)">⚑ needs you</span>, <span class="tag co">● unread</span>.</li>
-      <li><kbd>!</kbd> opens the session the note is about; answer it with <kbd>K</kbd>, or <kbd>esc</kbd> to put the note away.</li>
+      <li><kbd>s</kbd> opens the session the note is about; answer it with <kbd>K</kbd>, or <kbd>esc</kbd> to put the note away.</li>
       <li>Away from your desk? Start the session with <code>&gt;claude rc</code>: Remote Control lets you follow and answer it from the Claude app.</li>
       <li>Quit WezTerm, or let it crash: the sessions keep running in tmux. Open WezTerm, run <code>y</code>, and every one of them is back in the Sessions box; <kbd>enter</kbd> shows one beside Marmota again.</li>
     </ol>
@@ -596,7 +596,7 @@ y</pre>
   <ul class="plain">
     <li><code>y path-list</code> prints where your settings live, usually <code>~/.config/marmota</code>.</li>
     <li><code>config.toml</code>: your editor (and <code>editor_beside</code>, which opens it in a pane on Marmota's right instead of in its place), theme, preview settings, <code>codex_command</code>, and <code>cd_on_quit</code> (your shell moves to the folder you quit in).</li>
-    <li><code>hotkeys.toml</code>: every key. If you prefer Vim keys, copy <code>src/superfile_config/vimHotkeys.toml</code> over it.</li>
+    <li><code>hotkeys.toml</code>: every key. If you prefer Vim keys, copy <code>src/marmota_config/vimHotkeys.toml</code> over it.</li>
     <li>Themes: set <code>theme</code> to the name of any file in the <code>theme</code> folder.</li>
   </ul>
 </section>

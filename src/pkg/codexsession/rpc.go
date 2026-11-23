@@ -1,4 +1,4 @@
-// Package codexsession reads Codex CLI sessions for superfile's sessions
+// Package codexsession reads Codex CLI sessions for Marmota's sessions
 // list, the way package claudesession reads Claude Code's.
 //
 // Codex keeps its sessions in a background server that every Codex window

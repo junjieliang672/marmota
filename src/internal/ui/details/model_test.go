@@ -16,7 +16,7 @@ import (
 var now = time.Date(2026, 11, 7, 12, 0, 0, 0, time.UTC)
 
 func folder() *File {
-	return &File{Path: "/Users/me/Developer/superfile/asset/", IsDir: true, Items: 21, Size: "3.4 MB",
+	return &File{Path: "/Users/me/Developer/marmota/asset/", IsDir: true, Items: 21, Size: "3.4 MB",
 		Modified: time.Date(2025, 12, 14, 12, 1, 0, 0, time.UTC), Permissions: "drwxr-xr-x"}
 }
 
@@ -51,7 +51,7 @@ func TestSectionsInOrder(t *testing.T) {
 	got := plain(m.Render(in, false, "M"))
 
 	want := []string{
-		" FILE  /Users/me/Developer/superfile/asset/",
+		" FILE  /Users/me/Developer/marmota/asset/",
 		"  ▎    folder · 21 items · 3.4 MB · " + icon.Calendar + " Dec 14, 2025 12:01",
 		"",
 		" MAC   cpu    ▓▓░░░░░░░░ 23%",

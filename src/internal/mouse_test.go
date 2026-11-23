@@ -88,7 +88,7 @@ func TestTheWheelScrollsTheSessionPreview(t *testing.T) {
 	m.fileModel.filePreview.SetOpen(true)
 	m.setFilePreviewPanelSize()
 	m.claude.snapshot.Live[0].TranscriptPath = longTranscript(t)
-	bang(m)
+	toSessions(m)
 	require.True(t, m.sessions.list.Select("s20"))
 	m.sessionsSelectionChanged()
 	x := m.fullWidth - m.fileModel.filePreview.GetWidth() + 5
@@ -158,7 +158,7 @@ func TestTheWheelScrollsTheFilePreview(t *testing.T) {
 
 // Sideways the wheel shows what the file preview cuts off of long lines,
 // with a trackpad's sideways scroll or with shift. A sideways scroll WezTerm
-// sends from outside superfile's screen does nothing.
+// sends from outside Marmota's screen does nothing.
 func TestTheWheelScrollsTheFilePreviewSideways(t *testing.T) {
 	dir := t.TempDir()
 	wide := "start " + strings.Repeat("-", 300) + " far end"

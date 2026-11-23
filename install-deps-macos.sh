@@ -107,7 +107,7 @@ Features:
     and the Mac keys WezTerm sends it (cmd+S, cmd+Z, cmd+arrows …)
   • Builds Marmota as y, and sets up your shell to run it (cd on quit too)
   • Initializes zoxide for smart directory navigation ('z' command)
-  • Moves an install from before y (spf, with y an alias) over to y
+  • Moves an install from before the program was Marmota over to y
   • Supports bash, zsh, and fish shells
 
 Examples:
@@ -799,7 +799,7 @@ install_dev_tools() {
     fi
 }
 
-build_superfile() {
+build_marmota() {
     if [[ $SKIP_BUILD == true ]]; then
         log_warning "Skipping Marmota build (--skip-build)"
         return
@@ -830,7 +830,7 @@ setup_shell_integration() {
         return
     fi
 
-    # build.sh, which build_superfile ran, has put the y block in your shell
+    # build.sh, which build_marmota ran, has put the y block in your shell
     # config: ./bin on PATH and the y function (cd on quit). Here: zoxide and
     # fzf in the same config.
     echo ""
@@ -1220,7 +1220,7 @@ main() {
     fi
 
     # Build Marmota
-    build_superfile
+    build_marmota
 
     # Setup shell integration for cd-on-quit
     setup_shell_integration

@@ -7,8 +7,8 @@ type Style struct {
 }
 
 var (
-	Space         = " "
-	SuperfileIcon = "\ue6ad" // Printable Rune : ""
+	Space       = " "
+	MarmotaIcon = "\ue6ad" // Printable Rune : ""
 
 	// Well Known Directories
 	Home        = "\U000f02dc" // Printable Rune : "󰋜"
@@ -434,5 +434,5 @@ var Folders = map[string]Style{
 	"node_modules": {Icon: "\ue5fa", Color: "#cb3837"}, // Node modules folder - Red // Printable Rune : ""
 	"link_folder":  {Icon: "\uf482", Color: "NONE"},    // link folder - None // Printable Rune : ""
 
-	"superfile": {Icon: "\U000f069d", Color: "#FF6F00"}, // Printable Rune : "󰚝"
+	"marmota": {Icon: "\U000f069d", Color: "#FF6F00"}, // Printable Rune : "󰚝"
 }

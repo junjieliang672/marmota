@@ -28,15 +28,15 @@ import (
 //
 // Run with:
 //
-//	SPF_ICLOUD_DIR="$HOME/Library/Mobile Documents/com~apple~CloudDocs" \
-//	SPF_ICLOUD_QUERY="bytedance offer" \
+//	MARMOTA_ICLOUD_DIR="$HOME/Library/Mobile Documents/com~apple~CloudDocs" \
+//	MARMOTA_ICLOUD_QUERY="bytedance offer" \
 //	go test -tags=manual_icloud -run TestICloudParityAfterShowHiddenFix -v -count=1 -timeout 300s ./src/internal/
 func TestICloudParityAfterShowHiddenFix(t *testing.T) {
-	dir := os.Getenv("SPF_ICLOUD_DIR")
+	dir := os.Getenv("MARMOTA_ICLOUD_DIR")
 	if dir == "" {
-		t.Skip("SPF_ICLOUD_DIR not set")
+		t.Skip("MARMOTA_ICLOUD_DIR not set")
 	}
-	query := os.Getenv("SPF_ICLOUD_QUERY")
+	query := os.Getenv("MARMOTA_ICLOUD_QUERY")
 	if query == "" {
 		query = "bytedance offer"
 	}

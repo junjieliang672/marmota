@@ -48,7 +48,7 @@ const (
 const (
 	nonePanelFocus focusPanelType = iota
 	metadataFocus
-	// dockSessionsFocus is the Sessions box under the preview (!).
+	// dockSessionsFocus is the Sessions box under the preview (s).
 	dockSessionsFocus
 	// dockAskFocus is the Ask box (K): it is written in while it has it.
 	dockAskFocus
@@ -90,7 +90,7 @@ type model struct {
 	typingModal typingModal
 	helpMenu    helpMenuModal
 	promptModal prompt.Model
-	// jumpUI is the s list; jump its side of the model.
+	// jumpUI is the go to list; jump its side of the model.
 	jumpUI jumpui.Model
 	jump   jumpState
 	resume resumeState
@@ -160,19 +160,19 @@ type model struct {
 	filePanelJumpCount string
 
 	// Asks the input method to pass keys through as plain ASCII while
-	// superfile is in hotkey mode. See src/pkg/ime and typing_state.go.
+	// Marmota is in hotkey mode. See src/pkg/ime and typing_state.go.
 	imeHold ime.Hold
 
 	// Whether the terminal reports us as focused. Starts true so terminals
 	// that do not support focus reporting behave as they always have.
 	//
-	// The ascii-hold must be released on blur: superfile stays in hotkey mode
+	// The ascii-hold must be released on blur: Marmota stays in hotkey mode
 	// while it is not frontmost, and a hold left in place from a background
 	// tab would disable Chinese input in whatever the user switched to.
 	terminalFocused bool
 
 	// Whether a child process currently owns the terminal (an editor, or the
-	// sudo password prompt). While it does, superfile has no business telling
+	// sudo password prompt). While it does, Marmota has no business telling
 	// the input method what mode to be in.
 	externalProcessRunning bool
 	// editorAway is the editor that was put away, nil with none
@@ -192,7 +192,7 @@ type model struct {
 	editorPane int
 
 	// Claude Code sessions: the status line, unread markers and the keys
-	// that show sessions beside superfile.
+	// that show sessions beside Marmota.
 	claude claudeSessionsState
 	codex  codexState
 

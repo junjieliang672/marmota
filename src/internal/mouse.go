@@ -107,7 +107,7 @@ func wheelScroll(msg tea.MouseMsg) (int, int, bool) {
 
 // previewUnder is the preview drawn at the screen cell x, y, from 0. WezTerm
 // sends a trackpad's sideways scroll to the focused pane, wherever the
-// pointer is: a cell outside superfile's screen is no preview.
+// pointer is: a cell outside Marmota's screen is no preview.
 func (m *model) previewUnder(x, y int) previewArea {
 	switch {
 	case m.fullHeight < common.MinimumHeight || m.fullWidth < common.MinimumWidth:

@@ -63,7 +63,7 @@ type shelfSentMsg struct {
 }
 
 // shelfCommand is open's arguments for handing paths to app without bringing
-// it to the front (-g), so superfile keeps the focus.
+// it to the front (-g), so Marmota keeps the focus.
 func shelfCommand(app string, paths []string) (string, []string) {
 	return "open", append([]string{"-g", "-a", app}, paths...)
 }

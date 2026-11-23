@@ -405,8 +405,8 @@ func (m *model) startTmuxAgent(cwd, command string, provider managedAgentProvide
 }
 
 // tmuxView names the view session of this Marmota's pane beside it.
-func tmuxView(superfilePaneID int) string {
-	return "view-" + strconv.Itoa(superfilePaneID)
+func tmuxView(marmotaPaneID int) string {
+	return "view-" + strconv.Itoa(marmotaPaneID)
 }
 
 // tmuxViewerPane is the WezTerm pane beside Marmota that shows a tmux window,
@@ -641,7 +641,7 @@ func (m *model) parkLegacyAgentPane(cwd string, self int) {
 // markTmuxShown records which window is beside Marmota on the panes the
 // rest of Marmota reads: it is in Marmota's tab, the others aren't.
 func (m *model) markTmuxShown(id int) {
-	tab := m.superfileTabID()
+	tab := m.marmotaTabID()
 	for i := range m.claude.panes {
 		if p := &m.claude.panes[i]; isTmuxPane(p.PaneID) {
 			p.TabID = -1

@@ -12,11 +12,11 @@ to it.
 
 ## What it does
 
-- **Files**: panels, previews, copy, move, rename, trash, archives, and `s` to go anywhere: pinned folders, sessions, folders zoxide knows, files edited lately.
+- **Files**: panels, previews, copy, move, rename, trash, archives, and `z` to go anywhere: pinned folders, sessions, folders zoxide knows, files edited lately.
 - **Sessions beside your files.** The Claude Code and Codex sessions Marmota starts run in tmux
   (a server of Marmota's own, out of sight), so they keep running when you close their pane, quit
   Marmota or quit WezTerm: run `y` again and they are all there. A pane beside Marmota shows the
-  one you pick. The Sessions box at the foot (`!`) lists the running ones; each row says `cc`
+  one you pick. The Sessions box at the foot (`s`) lists the running ones; each row says `cc`
   (Claude Code) or `co` (Codex), how it stands (working, needs you, replied) and what it is doing.
   The preview above shows the selected session's conversation.
 - **Sessions on other computers.** The Sessions box's Remote section lists your sessions on other
@@ -81,7 +81,7 @@ y
 
 | Key | What it does |
 | --- | --- |
-| `!` | Sessions box, on a session that needs you or replied unread (again: the next one), else the first; `esc` goes back |
+| `s` | Sessions box, on a session that needs you or replied unread (again: the next one), else the first; `esc` goes back |
 | `]` · `[` | Sessions box, on the next · previous session (after `W`: the diff's next · previous change) |
 | `K` | Ask box: write to the selected session (or `n` in the Sessions box for a new one) |
 | `tab` · `ctrl+o` · `ctrl+t` · `shift+tab` | In the Ask box: Claude Code or Codex · model · effort · permission mode |
@@ -101,7 +101,7 @@ y
 | `W` | The files the selected session changed |
 | `V` | Pin the preview to a session while you browse |
 | `w` · `r` · `x` · `m` | In the Sessions box: fork, rename, stop, mention a session |
-| `s` or `z` | Go to: pinned, sessions (running or ended, to resume), folders zoxide knows, recent files; `enter` on a running session puts the Sessions box on it and leaves the pane beside Marmota as it is |
+| `z` | Go to: pinned, sessions (running or ended, to resume), folders zoxide knows, recent files; `enter` on a running session puts the Sessions box on it and leaves the pane beside Marmota as it is |
 | `ctrl+r` | In the Ask box, writing to a new session: resume an ended one instead |
 | `M` · `F` | Focus the Details box · hide or show the boxes at the foot |
 | `?` | All keys |

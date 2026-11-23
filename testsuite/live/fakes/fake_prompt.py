@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The prompt box of the fake claude, drawn and driven as Claude Code's is.
 
-superfile reads a session's prompt box before it types into it, so the fake
+Marmota reads a session's prompt box before it types into it, so the fake
 session draws one: a rule, "❯" and a no-break space before what is typed (a
 dim placeholder when nothing is), a rule. It takes typing, a paste (a long one
 shows as "[Pasted text #1 +N lines]"), ctrl+s (stash, or bring the stash back

@@ -1,4 +1,4 @@
-"""Take a screenshot of spf after a few key presses, inside a throwaway sandbox.
+"""Take a screenshot of Marmota after a few key presses, inside a throwaway sandbox.
 
 Run from testsuite/::
 
@@ -60,10 +60,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m tui.shot", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--binary", type=Path, default=REPO_ROOT / "bin" / "y",
-                        help="spf binary (default: ../bin/y)")
+                        help="marmota binary (default: ../bin/y)")
     parser.add_argument("--size", type=parse_size, default=(150, 40), help="COLSxROWS")
     parser.add_argument("--cwd", type=Path, default=Path.cwd(),
-                        help="directory spf opens (default: current dir)")
+                        help="directory Marmota opens (default: current dir)")
     parser.add_argument("--keys", default="", help='e.g. "J J ctrl+k" or "? wait:Help"')
     parser.add_argument("--out", type=Path, default=Path("shot.png"), help="PNG to write")
     parser.add_argument("--wait", default=None,

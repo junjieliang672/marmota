@@ -56,7 +56,7 @@ func TestPromptLeavesOutTheContextWhenShown(t *testing.T) {
 }
 
 func TestPermissionModes(t *testing.T) {
-	assert.Equal(t, "bypassPermissions", PermissionModes[0], "superfile's default comes first")
+	assert.Equal(t, "bypassPermissions", PermissionModes[0], "Marmota's default comes first")
 	assert.Equal(t, []string{"--dangerously-skip-permissions"}, PermissionArgs(""))
 	assert.Equal(t, []string{"--dangerously-skip-permissions"}, PermissionArgs("bypassPermissions"))
 	assert.Equal(t, []string{"--permission-mode", "plan"}, PermissionArgs("plan"))

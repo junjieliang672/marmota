@@ -18,7 +18,7 @@ func resumeTestModel(t *testing.T) (*model, *fakeWezterm) {
 	t.Helper()
 	ownAskHistory(t)
 	m := newClaudeTestModel(t)
-	wez := newFakeWezterm(t, superfileTab())
+	wez := newFakeWezterm(t, marmotaTab())
 	here := m.getFocusedFilePanel().location
 	now := time.Now()
 	m.claude.snapshot.Past = []claudesession.Session{
@@ -38,7 +38,7 @@ func jumpIDs(m *model) []string {
 	return ids
 }
 
-// pickJumpRow picks row n of the open s list, as [n]g does.
+// pickJumpRow picks row n of the open go to list, as [n]g does.
 func pickJumpRow(m *model, n int) {
 	if !m.jumpUI.Picking() {
 		press(m, "down")

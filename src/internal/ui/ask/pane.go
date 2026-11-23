@@ -29,7 +29,7 @@ type Session struct {
 	// State says what it is doing and since when ("finished 1h ago");
 	// Place where it runs and Mode its permission mode, while it runs.
 	State, Place, Mode string
-	// Beside marks the session beside superfile: its place is drawn in the
+	// Beside marks the session beside Marmota: its place is drawn in the
 	// color the list marks it with.
 	Beside bool
 	// Folder is where it works, Branch the git branch there. Dir is the

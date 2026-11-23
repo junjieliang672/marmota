@@ -128,7 +128,7 @@ func TestCompressSelectedFiles(t *testing.T) {
 			// The focused panel re-reads its folder at most about once a second,
 			// so a single no-op update right after the zip appears can be too
 			// early. Keep nudging the panel until the new zip is listed.
-			// TODO - This should not be needed. Only operation finish SPF should refresh
+			// TODO - This should not be needed. Only operation finish Marmota should refresh
 			// on its own
 			require.Eventually(t, func() bool {
 				p.SendDirectly(nil)

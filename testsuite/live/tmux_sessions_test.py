@@ -2,7 +2,7 @@
 """Live WezTerm test for sessions in tmux, and for upgrading to them.
 
 Runs real Marmota binaries inside the WezTerm you're using, in a workspace of
-its own ("spf-tmux-test") that your window never shows, with a fake `claude`
+its own ("marmota-tmux-test") that your window never shows, with a fake `claude`
 on PATH and a tmux server of its own (MARMOTA_TMUX_SOCKET). Checks:
 
   1. The old Marmota (--old, built from before sessions ran in tmux) opens
@@ -46,10 +46,10 @@ from pathlib import Path
 from typing import Any
 
 from wezterm_sessions_test import (HERE, client_state, dock_rows, in_sessions_box, pane_by_id, panes, screen,
-                                   select_session, superfile_knows_sessions, type_keys, wait_for)
+                                   select_session, marmota_knows_sessions, type_keys, wait_for)
 
-TEST_WORKSPACE = "spf-tmux-test"
-HIDDEN_WORKSPACE = "superfile-agents"
+TEST_WORKSPACE = "marmota-tmux-test"
+HIDDEN_WORKSPACE = "marmota-agents"
 
 
 def row_of_host(text: str, host: str, title: str) -> str | None:
@@ -80,7 +80,7 @@ def main() -> int:
         return 0
 
     new, old = str(Path(args.binary).resolve()), str(Path(args.old).resolve())
-    work = Path(tempfile.mkdtemp(prefix="spf-tmux-", dir="/private/tmp"))
+    work = Path(tempfile.mkdtemp(prefix="marmota-tmux-", dir="/private/tmp"))
     project = work / "project"
     (project / "assets").mkdir(parents=True)
     (project / "notes.md").write_text("hello\n")
@@ -127,65 +127,65 @@ def main() -> int:
     def is_test_pane(p: dict[str, Any]) -> bool:
         return str(work) in p.get("cwd", "") or p.get("workspace") == TEST_WORKSPACE
 
-    def main_screen(spf: int) -> None:
-        wait_for("Marmota to start", lambda: "Thanks for using Marmota" in screen(spf) or "K:ask" in screen(spf))
-        if "Thanks for using Marmota" in screen(spf):
-            type_keys(spf, "\x1b")
-        wait_for("the main screen", lambda: "K:ask" in screen(spf))
+    def main_screen(marmota: int) -> None:
+        wait_for("Marmota to start", lambda: "Thanks for using Marmota" in screen(marmota) or "K:ask" in screen(marmota))
+        if "Thanks for using Marmota" in screen(marmota):
+            type_keys(marmota, "\x1b")
+        wait_for("the main screen", lambda: "K:ask" in screen(marmota))
 
-    def listed(spf: int) -> set[str]:
+    def listed(marmota: int) -> set[str]:
         """The titles in the Sessions box, read with the keyboard in it."""
-        if not in_sessions_box(spf):
-            type_keys(spf, "!")
+        if not in_sessions_box(marmota):
+            type_keys(marmota, "s")
             try:
-                wait_for("the Sessions box", lambda: in_sessions_box(spf), timeout=8)
+                wait_for("the Sessions box", lambda: in_sessions_box(marmota), timeout=8)
             except AssertionError:
                 # A Marmota that has just started may drop the first key; one
                 # that hangs fails this second time.
-                type_keys(spf, "!")
-                wait_for("the Sessions box", lambda: in_sessions_box(spf))
-        titles = {title.split()[0] for _, title, _ in dock_rows(spf)}
-        type_keys(spf, "\x1b")
-        wait_for("the files", lambda: not in_sessions_box(spf))
+                type_keys(marmota, "s")
+                wait_for("the Sessions box", lambda: in_sessions_box(marmota))
+        titles = {title.split()[0] for _, title, _ in dock_rows(marmota)}
+        type_keys(marmota, "\x1b")
+        wait_for("the files", lambda: not in_sessions_box(marmota))
         return titles
 
     before_workspace, before_focus = client_state()
-    spf = 0
+    marmota = 0
     try:
         # 1. the old Marmota, in a shell that starts the new one after it
         script = f"{shlex.quote(old)}; sleep 600"
-        spf = spawn("/bin/sh", "-c", script)
-        spf_tab = pane_by_id(spf)["tab_id"]
-        main_screen(spf)
-        type_keys(spf, "F")
+        marmota = spawn("/bin/sh", "-c", script)
+        marmota_tab = pane_by_id(marmota)["tab_id"]
+        main_screen(marmota)
+        type_keys(marmota, "F")
         for command in ("claude\r", "claude rc\r"):
-            type_keys(spf, ">")
+            type_keys(marmota, ">")
             time.sleep(0.5)
-            type_keys(spf, command)
+            type_keys(marmota, command)
             time.sleep(2)
-        wait_for("two sessions", lambda: superfile_knows_sessions(iso, registry, 2))
+        wait_for("two sessions", lambda: marmota_knows_sessions(iso, registry, 2))
         parked = wait_for("one parked in the hidden workspace", lambda: next(
             (p for p in panes() if p.get("workspace") == HIDDEN_WORKSPACE and is_test_pane(p)), None))
         beside = wait_for("one beside Marmota", lambda: next(
-            (p for p in panes() if p["tab_id"] == spf_tab and p["pane_id"] != spf and is_test_pane(p)), None))
+            (p for p in panes() if p["tab_id"] == marmota_tab and p["pane_id"] != marmota and is_test_pane(p)), None))
         by_hand = spawn("claude")
-        wait_for("the one started by hand", lambda: superfile_knows_sessions(iso, registry, 3))
-        old_titles = wait_for("the old Marmota to list three", lambda: (lambda t: t if len(t) == 3 else None)(listed(spf)))
+        wait_for("the one started by hand", lambda: marmota_knows_sessions(iso, registry, 3))
+        old_titles = wait_for("the old Marmota to list three", lambda: (lambda t: t if len(t) == 3 else None)(listed(marmota)))
         assert not windows(), "the old Marmota started nothing in tmux"
         print(f"ok   the old Marmota lists {sorted(old_titles)}: one beside it, one parked, one started by hand")
 
         # 2. quit; the new Marmota starts in a pane of its own
-        type_keys(spf, "q")
-        wait_for("the old Marmota to quit", lambda: "K:ask" not in screen(spf))
-        old_tab = spf_tab
-        spf = spawn(new)
-        spf_tab = pane_by_id(spf)["tab_id"]
-        main_screen(spf)
-        type_keys(spf, "F")
+        type_keys(marmota, "q")
+        wait_for("the old Marmota to quit", lambda: "K:ask" not in screen(marmota))
+        old_tab = marmota_tab
+        marmota = spawn(new)
+        marmota_tab = pane_by_id(marmota)["tab_id"]
+        main_screen(marmota)
+        type_keys(marmota, "F")
         moved = wait_for("the parked session to move into tmux", lambda: next(iter(windows().values()), None)
                          if pane_by_id(parked["pane_id"]) is None else None, timeout=30)
         new_titles = wait_for("the new Marmota to list the same three",
-                              lambda: (lambda t: t if t == old_titles else None)(listed(spf)), timeout=20)
+                              lambda: (lambda t: t if t == old_titles else None)(listed(marmota)), timeout=20)
         assert pane_by_id(beside["pane_id"])["tab_id"] == old_tab, "the session beside the old Marmota moved"
         assert pane_by_id(by_hand) is not None, "the session started by hand was touched"
         print(f"ok   the new Marmota lists the same sessions {sorted(new_titles)}; the parked one runs on in "
@@ -193,32 +193,32 @@ def main() -> int:
 
         # 3. enter on the moved one shows it beside Marmota
         moved_title = "local1"  # the fake names sessions in the order they start: >claude was the first
-        type_keys(spf, "!")
-        wait_for("the Sessions box", lambda: in_sessions_box(spf))
-        select_session(spf, moved_title)
-        type_keys(spf, "\r")
+        type_keys(marmota, "s")
+        wait_for("the Sessions box", lambda: in_sessions_box(marmota))
+        select_session(marmota, moved_title)
+        type_keys(marmota, "\r")
         viewer = wait_for("a pane beside Marmota that attaches to tmux", lambda: next(
-            (p for p in panes() if p["tab_id"] == spf_tab and p["pane_id"] != spf), None))
+            (p for p in panes() if p["tab_id"] == marmota_tab and p["pane_id"] != marmota), None))
         wait_for("it to draw the moved session", lambda: screen(viewer["pane_id"]).strip())
-        type_keys(spf, "\x1b")
+        type_keys(marmota, "\x1b")
         print(f"ok   enter showed the moved session beside Marmota in pane {viewer['pane_id']}, attached to tmux")
 
         # 4. the Ask box starts a new session in tmux
-        if in_sessions_box(spf):
-            type_keys(spf, "\x1b")
-        type_keys(spf, "!")
-        wait_for("the Sessions box", lambda: in_sessions_box(spf))
-        type_keys(spf, "n")
-        wait_for("the Ask box on a new session", lambda: "Ask → new Claude Code session" in screen(spf))
+        if in_sessions_box(marmota):
+            type_keys(marmota, "\x1b")
+        type_keys(marmota, "s")
+        wait_for("the Sessions box", lambda: in_sessions_box(marmota))
+        type_keys(marmota, "n")
+        wait_for("the Ask box on a new session", lambda: "Ask → new Claude Code session" in screen(marmota))
         known = set(windows())
         panes_before = {p["pane_id"] for p in panes() if is_test_pane(p)}
-        type_keys(spf, "what is in here?")
+        type_keys(marmota, "what is in here?")
         time.sleep(0.3)
-        type_keys(spf, "\r")
+        type_keys(marmota, "\r")
         time.sleep(0.3)
-        type_keys(spf, "and in src?")
+        type_keys(marmota, "and in src?")
         time.sleep(0.3)
-        type_keys(spf, "\r")
+        type_keys(marmota, "\r")
         new_window = wait_for("a new tmux window", lambda: next((n for n in windows() if n not in known), None))
         new_pane = windows()[new_window]
         wait_for("the follow-up typed into it", lambda: "and in src?" in tmux("capture-pane", "-p", "-t", new_pane),
@@ -229,40 +229,40 @@ def main() -> int:
               "and typed the follow-up into it")
 
         # 5. x stops it
-        type_keys(spf, "\x1b")
-        wait_for("the Ask box closed", lambda: "Ask → " not in screen(spf))
-        if not in_sessions_box(spf):
-            type_keys(spf, "!")
-            wait_for("the Sessions box", lambda: in_sessions_box(spf))
+        type_keys(marmota, "\x1b")
+        wait_for("the Ask box closed", lambda: "Ask → " not in screen(marmota))
+        if not in_sessions_box(marmota):
+            type_keys(marmota, "s")
+            wait_for("the Sessions box", lambda: in_sessions_box(marmota))
         new_title = wait_for("the new session listed", lambda: next(
-            (t.split()[0] for _, t, _ in dock_rows(spf) if t.split()[0] not in new_titles), None))
-        select_session(spf, new_title)
-        type_keys(spf, "x")
-        wait_for("the stop question", lambda: "Stop" in screen(spf))
-        type_keys(spf, "\r")
+            (t.split()[0] for _, t, _ in dock_rows(marmota) if t.split()[0] not in new_titles), None))
+        select_session(marmota, new_title)
+        type_keys(marmota, "x")
+        wait_for("the stop question", lambda: "Stop" in screen(marmota))
+        type_keys(marmota, "\r")
         wait_for("its window to close", lambda: new_window not in windows())
-        wait_for("it to leave the box", lambda: not any(new_title in t for _, t, _ in dock_rows(spf)))
-        type_keys(spf, "\x1b")
+        wait_for("it to leave the box", lambda: not any(new_title in t for _, t, _ in dock_rows(marmota)))
+        type_keys(marmota, "\x1b")
         print("ok   x stopped the new session: its tmux window closed and it left the Sessions box")
 
         # 6. WezTerm loses Marmota and the pane beside it
-        for pane in (viewer["pane_id"], spf):
+        for pane in (viewer["pane_id"], marmota):
             subprocess.run(["wezterm", "cli", "kill-pane", "--pane-id", str(pane)], capture_output=True)
         time.sleep(1)
         assert moved in windows().values(), "the session in tmux died with WezTerm's panes"
-        spf = spawn(new)
-        spf_tab = pane_by_id(spf)["tab_id"]
-        main_screen(spf)
-        type_keys(spf, "F")
+        marmota = spawn(new)
+        marmota_tab = pane_by_id(marmota)["tab_id"]
+        main_screen(marmota)
+        type_keys(marmota, "F")
         again = wait_for("the restarted Marmota to list them all",
-                         lambda: (lambda t: t if t == old_titles else None)(listed(spf)), timeout=20)
-        type_keys(spf, "!")
-        wait_for("the Sessions box", lambda: in_sessions_box(spf))
-        select_session(spf, moved_title)
-        type_keys(spf, "\r")
+                         lambda: (lambda t: t if t == old_titles else None)(listed(marmota)), timeout=20)
+        type_keys(marmota, "s")
+        wait_for("the Sessions box", lambda: in_sessions_box(marmota))
+        select_session(marmota, moved_title)
+        type_keys(marmota, "\r")
         wait_for("the moved session beside the new Marmota", lambda: next(
-            (p for p in panes() if p["tab_id"] == spf_tab and p["pane_id"] != spf), None))
-        type_keys(spf, "\x1b")
+            (p for p in panes() if p["tab_id"] == marmota_tab and p["pane_id"] != marmota), None))
+        type_keys(marmota, "\x1b")
         print(f"ok   after WezTerm lost Marmota and the pane beside it, a new Marmota listed {sorted(again)} "
               "and showed the tmux session beside it")
 
@@ -284,9 +284,9 @@ def main() -> int:
             ["tmux", "-L", remote_socket, "capture-pane", "-p", "-t", "cc-" + remote_id],
             capture_output=True, text=True).stdout)
         assert "from far away" in y("read", remote_id[:8])
-        type_keys(spf, "!")
-        wait_for("the Sessions box", lambda: in_sessions_box(spf))
-        row = wait_for("the remote session's row", lambda: row_of_host(screen(spf), host, ""))
+        type_keys(marmota, "s")
+        wait_for("the Sessions box", lambda: in_sessions_box(marmota))
+        row = wait_for("the remote session's row", lambda: row_of_host(screen(marmota), host, ""))
         remote_title = title_after(row, host)
 
         def pick_remote() -> None:
@@ -294,10 +294,10 @@ def main() -> int:
             says whom it writes to."""
             number = re.search(r"│\S?\s*(\d+) ", row_of(remote_title)).group(1)
             for key in number + "g":
-                type_keys(spf, key)
+                type_keys(marmota, key)
                 time.sleep(0.1)
             wait_for("the remote session picked",
-                     lambda: (row_of_host(screen(spf), host, remote_title) or "").startswith("│▌"))
+                     lambda: (row_of_host(screen(marmota), host, remote_title) or "").startswith("│▌"))
 
         def screen_of(pane_id: int) -> str:
             """A pane's screen, or nothing if it closed since it was listed:
@@ -308,26 +308,26 @@ def main() -> int:
                 return ""
 
         def row_of(title: str) -> str:
-            return wait_for(f"{title}'s row", lambda: row_of_host(screen(spf), host, title))
+            return wait_for(f"{title}'s row", lambda: row_of_host(screen(marmota), host, title))
 
         pick_remote()
-        type_keys(spf, "\r")
+        type_keys(marmota, "\r")
         remote_viewer = wait_for("it beside Marmota", lambda: next(
-            (p for p in panes() if p["tab_id"] == spf_tab and p["pane_id"] != spf
+            (p for p in panes() if p["tab_id"] == marmota_tab and p["pane_id"] != marmota
              and "and one more" in screen_of(p["pane_id"])), None))
-        type_keys(spf, "\x1b")
-        wait_for("the files", lambda: not in_sessions_box(spf))
-        type_keys(spf, "!")
-        wait_for("the Sessions box", lambda: in_sessions_box(spf))
+        type_keys(marmota, "\x1b")
+        wait_for("the files", lambda: not in_sessions_box(marmota))
+        type_keys(marmota, "s")
+        wait_for("the Sessions box", lambda: in_sessions_box(marmota))
         pick_remote()
-        type_keys(spf, "x")
-        wait_for("the stop question", lambda: "Stop" in screen(spf))
-        type_keys(spf, "\r")
+        type_keys(marmota, "x")
+        wait_for("the stop question", lambda: "Stop" in screen(marmota))
+        type_keys(marmota, "\r")
         wait_for("its window to close over there", lambda: "cc-" + remote_id not in subprocess.run(
             ["tmux", "-L", remote_socket, "list-windows", "-a", "-F", "#{window_name}"],
             capture_output=True, text=True).stdout)
         wait_for("the pane beside Marmota to close", lambda: pane_by_id(remote_viewer["pane_id"]) is None)
-        type_keys(spf, "\x1b")
+        type_keys(marmota, "\x1b")
         subprocess.run(["tmux", "-L", remote_socket, "kill-server"], capture_output=True)
         print(f"ok   y session start --on started a session on {host}; it showed in the Sessions box with its "
               "computer's name; send and read reached it; enter showed it beside Marmota; x stopped it")
@@ -348,12 +348,12 @@ def main() -> int:
             if h["name"] == host2:
                 h["login"] = ["touch", str(marker)]
         remotes_file.write_text(json.dumps(hosts))
-        row2 = wait_for("its row", lambda: row_of_host(screen(spf), host2, ""))
+        row2 = wait_for("its row", lambda: row_of_host(screen(marmota), host2, ""))
         title2 = title_after(row2, host2)
 
         def screen_after(title: str) -> str:
             """The line under a session's row: what it is doing."""
-            lines = screen(spf).splitlines()
+            lines = screen(marmota).splitlines()
             for i, line in enumerate(lines):
                 box = line.split("││", 1)[0]
                 if box.startswith("│") and " cc " in box and host2 + " · " in box and title[:3] in box \
@@ -370,17 +370,17 @@ def main() -> int:
             if control == "1":
                 subprocess.run(["tmux", "-L", remote_socket2, "detach-client", "-t", name], capture_output=True)
         wait_for("its row to say it needs a login", lambda: "needs login" in screen_after(title2), timeout=30)
-        type_keys(spf, "!")
-        wait_for("the Sessions box", lambda: in_sessions_box(spf))
-        number2 = re.search(r"│\S?\s*(\d+) ", row_of_host(screen(spf), host2, title2)).group(1)
+        type_keys(marmota, "s")
+        wait_for("the Sessions box", lambda: in_sessions_box(marmota))
+        number2 = re.search(r"│\S?\s*(\d+) ", row_of_host(screen(marmota), host2, title2)).group(1)
         for key in number2 + "g":
-            type_keys(spf, key)
+            type_keys(marmota, key)
             time.sleep(0.1)
-        wait_for("its row picked", lambda: (row_of_host(screen(spf), host2, title2) or "").startswith("│▌"))
-        type_keys(spf, "\r")
+        wait_for("its row picked", lambda: (row_of_host(screen(marmota), host2, title2) or "").startswith("│▌"))
+        type_keys(marmota, "\r")
         wait_for("the login to run", lambda: marker.exists())
         wait_for("it reached again", lambda: "waiting for your next" in screen_after(title2), timeout=40)
-        type_keys(spf, "\x1b")
+        type_keys(marmota, "\x1b")
         print(f"ok   {host2} needing a login kept its session in the list, marked; enter logged in in a pane, "
               "and it was reached again")
 
@@ -388,17 +388,17 @@ def main() -> int:
         # other computer's session is taken back, not opened twice
         # Between the two, a line the test waits for: the second Marmota can
         # draw before a look at the screen finds the first one gone.
-        spf3 = spawn("/bin/sh", "-c", f"{shlex.quote(new)}; echo marmota-quit; sleep 2; {shlex.quote(new)}; sleep 600")
-        tab3 = pane_by_id(spf3)["tab_id"]
-        main_screen(spf3)
-        type_keys(spf3, "F")
+        marmota3 = spawn("/bin/sh", "-c", f"{shlex.quote(new)}; echo marmota-quit; sleep 2; {shlex.quote(new)}; sleep 600")
+        tab3 = pane_by_id(marmota3)["tab_id"]
+        main_screen(marmota3)
+        type_keys(marmota3, "F")
 
         def open_remote(pane: int) -> None:
-            type_keys(pane, "!")
+            type_keys(pane, "s")
             try:
                 wait_for("the Sessions box", lambda: in_sessions_box(pane), timeout=8)
             except AssertionError:
-                type_keys(pane, "!")
+                type_keys(pane, "s")
                 wait_for("the Sessions box", lambda: in_sessions_box(pane))
             # Its computer has this one session: a narrow box cuts its title.
             line = wait_for("the remote row", lambda: row_of_host(screen(pane), host2, ""))
@@ -412,19 +412,19 @@ def main() -> int:
         def beside(pane: int) -> list[int]:
             return [p["pane_id"] for p in panes() if p["tab_id"] == tab3 and p["pane_id"] != pane]
 
-        open_remote(spf3)
-        first_viewer = wait_for("the remote session beside Marmota", lambda: beside(spf3))
-        type_keys(spf3, "\x1b")
-        wait_for("the files", lambda: not in_sessions_box(spf3))
-        type_keys(spf3, "q")
-        wait_for("Marmota to quit", lambda: "marmota-quit" in screen(spf3))
-        main_screen(spf3)
-        type_keys(spf3, "F")
+        open_remote(marmota3)
+        first_viewer = wait_for("the remote session beside Marmota", lambda: beside(marmota3))
+        type_keys(marmota3, "\x1b")
+        wait_for("the files", lambda: not in_sessions_box(marmota3))
+        type_keys(marmota3, "q")
+        wait_for("Marmota to quit", lambda: "marmota-quit" in screen(marmota3))
+        main_screen(marmota3)
+        type_keys(marmota3, "F")
         time.sleep(3)  # its first refresh reaches the other computer
-        open_remote(spf3)
+        open_remote(marmota3)
         time.sleep(3)
-        assert beside(spf3) == first_viewer, f"a second pane opened beside Marmota: {beside(spf3)} vs {first_viewer}"
-        type_keys(spf3, "\x1b")
+        assert beside(marmota3) == first_viewer, f"a second pane opened beside Marmota: {beside(marmota3)} vs {first_viewer}"
+        type_keys(marmota3, "\x1b")
         subprocess.run(["tmux", "-L", remote_socket2, "kill-server"], capture_output=True)
         print("ok   restarted in its pane, Marmota took back the pane beside it that shows the other computer's "
               "session; enter didn't open a second one")
@@ -461,9 +461,9 @@ def main() -> int:
         return 0
     except AssertionError as e:
         print(f"FAIL {e}")
-        if spf and pane_by_id(spf):
+        if marmota and pane_by_id(marmota):
             print("---- Marmota's screen ----")
-            print(screen(spf))
+            print(screen(marmota))
         return 1
     finally:
         if not args.keep:

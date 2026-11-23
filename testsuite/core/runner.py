@@ -1,4 +1,4 @@
-from core.spf_manager import BaseSPFManager
+from core.marmota_manager import BaseMarmotaManager
 from core.fs_manager import TestFSManager
 from core.environment import Environment
 from core.base_test import BaseTest
@@ -14,9 +14,9 @@ from typing import List
 if platform.system() == "Windows" :
     # Conditional import is needed to make it work on linux
     # importing pyautogui on linux can cause errors.
-    from core.pyautogui_manager import PyAutoGuiSPFManager
+    from core.pyautogui_manager import PyAutoGuiMarmotaManager
 else:
-    from core.tmux_manager import TmuxSPFManager
+    from core.tmux_manager import TmuxMarmotaManager
 
 logger = logging.getLogger()
 
@@ -37,11 +37,11 @@ def get_testcases(test_env : Environment, only_run_tests : List[str] = None) -> 
                 res.append(attr(test_env))
     return res
 
-def run_tests(spf_path : Path, stop_on_fail : bool = True, only_run_tests : List[str] = None) -> bool:
+def run_tests(marmota_path : Path, stop_on_fail : bool = True, only_run_tests : List[str] = None) -> bool:
     """Runs tests
 
     Args:
-        spf_path (Path): Path of spf binary under test
+        marmota_path (Path): Path of Marmota binary under test
         stop_on_fail (bool, optional): Whether to stop on failures. Defaults to True.
         only_run_tests (List[str], optional): Only specific test to run. Defaults to None.
 
@@ -50,15 +50,15 @@ def run_tests(spf_path : Path, stop_on_fail : bool = True, only_run_tests : List
     """    
     # is this str conversion needed ?
 
-    spf_manager : BaseSPFManager = None 
+    marmota_manager : BaseMarmotaManager = None 
     if platform.system() == "Windows" :
-        spf_manager = PyAutoGuiSPFManager(str(spf_path))
+        marmota_manager = PyAutoGuiMarmotaManager(str(marmota_path))
     else:
-        spf_manager = TmuxSPFManager(str(spf_path))
+        marmota_manager = TmuxMarmotaManager(str(marmota_path))
         
     fs_manager = TestFSManager()
 
-    test_env = Environment(spf_manager, fs_manager)
+    test_env = Environment(marmota_manager, fs_manager)
     cnt_passed : int = 0
     cnt_executed : int = 0
     try:    

@@ -127,18 +127,18 @@ func TestKeysThatActOnASessionSayRemoteOnesAreInTheApp(t *testing.T) {
 	assert.Contains(t, ansi.Strip(m.dockStatusLine()), "open in the Claude app")
 }
 
-// ! stops at sessions that need you and at those that replied unread, here
+// s stops at sessions that need you and at those that replied unread, here
 // and in the Remote section.
 func TestBangStopsAtUnreadAndRemoteSessionsToo(t *testing.T) {
 	m := appTestModel(t)
 	m.claude.unread = map[string]bool{"s50": true}
 	m.refreshSessionsList()
 
-	bang(m)
+	toSessions(m)
 	assert.Equal(t, "s50", m.sessions.list.SelectedID(), "replied, unread")
-	bang(m)
+	toSessions(m)
 	assert.Equal(t, "app:cse_01b1", m.sessions.list.SelectedID(), "b1 needs you, on another computer")
-	bang(m)
+	toSessions(m)
 	assert.Equal(t, "s50", m.sessions.list.SelectedID(), "round at the end")
 }
 
@@ -224,7 +224,7 @@ func TestARemoteSessionOpenedInTheAppIsReadAndAnsweredUntilItMovesOn(t *testing.
 	m.focusDockSessionsOn("app:cse_01b1")
 	cmd := m.dockSessionsKey(utils.TeaKeyMsg(common.Hotkeys.Confirm[0]))
 	row, _ = m.appSessionByID("app:cse_01b1")
-	assert.NotEqual(t, sessionsui.NeedsYou, m.sessionState(row), "answered in the app: ! goes on")
+	assert.NotEqual(t, sessionsui.NeedsYou, m.sessionState(row), "answered in the app: s goes on")
 	assert.False(t, row.App.Unread)
 	assert.NotContains(t, row.App.Doing, "needs you")
 	runCmds(m, cmd)

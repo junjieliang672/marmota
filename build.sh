@@ -4,8 +4,8 @@
 # in your shell config puts ./bin on PATH and defines the y function, which
 # moves your shell to the folder y quit in when cd_on_quit is on. On a Mac it
 # also keeps Marmota's look in ~/.wezterm.lua up to date. An install
-# from before the binary was called y (spf, with y an alias) is moved over:
-# its shell lines and its spf binaries go. On a Mac where Marmota was never
+# from before the program was Marmota and its binary y is moved over: its
+# shell lines and its binaries go (OLD_* below). On a Mac where Marmota was never
 # installed (no Go, or nothing in your shell config), it first installs
 # everything through install-deps-macos.sh, which calls back here to build.
 #
@@ -51,21 +51,28 @@ fi
 SHELL_CONFIGS=("$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.config/fish/config.fish")
 BLOCK_BEGIN="# >>> marmota >>>"
 BLOCK_END="# <<< marmota <<<"
-# The same block, as it was marked before the program was Marmota
+# What an install from before the program was Marmota left on a computer.
+# These lines are the only ones that say its old names, superfile and spf:
+# they are what is looked for, to take it out.
+#   the same block, as it was marked then
 LEGACY_BEGIN="# >>> y (superfile) >>>"
 LEGACY_END="# <<< y (superfile) <<<"
-# What an install from before y wrote: this block, which ended in alias y='spf'
+#   the block from before y, which ended in an alias of y to the old binary
 OLD_MARKER="Superfile cd-on-quit wrapper"
-# ... or an alias of y or spf to a superfile binary
-OLD_ALIAS='^alias (y|spf)[ =].*spf'
+#   an alias of y, or of the old binary's name, to the old binary
+OLD_NAME="spf"
+OLD_ALIAS="^alias (y|$OLD_NAME)[ =].*$OLD_NAME"
+#   the variable that block named the old binary with, and what it said of itself
+OLD_BINARY_VAR="SPF_BINARY"
+OLD_VERSION_LINE="^superfile version"
 
-# installed_before reports a shell config that runs superfile, old or new.
+# installed_before reports a shell config that runs Marmota, old or new.
 installed_before() {
     grep -qsF -e "$BLOCK_BEGIN" -e "$LEGACY_BEGIN" -e "$OLD_MARKER" "${SHELL_CONFIGS[@]}" ||
         grep -qsE "$OLD_ALIAS" "${SHELL_CONFIGS[@]}"
 }
 
-# Never installed: no Go, or no shell config that runs superfile
+# Never installed: no Go, or no shell config that runs Marmota
 if [[ $INSTALL == auto ]]; then
     INSTALL=no
     if [[ $(uname -s) == "Darwin" ]] && { ! command -v go &>/dev/null || ! installed_before; }; then
@@ -117,10 +124,11 @@ EOF
     echo "$BLOCK_END"
 }
 
-# without_superfile prints a shell config without what superfile put in it:
-# the y block, the old cd-on-quit block (from its marker to its alias y line,
-# or to the end of its function), and aliases of y or spf to superfile.
-without_superfile() {
+# without_marmota prints a shell config without what Marmota put in it, now
+# or under its old name: the y block, the old cd-on-quit block (from its
+# marker to its alias y line, or to the end of its function), and aliases of
+# y or of the old binary's name to the old binary.
+without_marmota() {
     # The old block is about 30 lines: an end further than 40 lines on isn't its.
     awk -v begin="$BLOCK_BEGIN" -v end="$BLOCK_END" -v lbegin="$LEGACY_BEGIN" -v lend="$LEGACY_END" \
         -v old="$OLD_MARKER" -v alias_re="$OLD_ALIAS" '
@@ -142,35 +150,36 @@ without_superfile() {
     ' "$1" "$1"
 }
 
-# old_binaries prints the spf binaries an older install used: the ones its
-# shell config named, and where it put them.
+# old_binaries prints the binaries an install under the old name used: the
+# ones its shell config named, and where it put them.
 old_binaries() {
     local f
     for f in "${SHELL_CONFIGS[@]}"; do
         [[ -f $f ]] || continue
-        grep -hoE 'SPF_BINARY[ =]"[^"]*"' "$f" | sed -E 's/^SPF_BINARY[ =]"//; s/"$//'
-        grep -hoE "$OLD_ALIAS" "$f" | grep -oE "[^'\" =]*spf['\"]?$" | tr -d "'\""
+        grep -hoE "$OLD_BINARY_VAR"'[ =]"[^"]*"' "$f" | sed -E "s/^$OLD_BINARY_VAR[ =]\"//; s/\"\$//"
+        grep -hoE "$OLD_ALIAS" "$f" | grep -oE "[^'\" =]*$OLD_NAME['\"]?$" | tr -d "'\""
     done | sed "s|^\\\$HOME|$HOME|; s|^~|$HOME|"
-    echo "$REPO/bin/spf"
-    echo "$HOME/.local/bin/spf"
-    echo "/usr/local/bin/spf"
+    echo "$REPO/bin/$OLD_NAME"
+    echo "$HOME/.local/bin/$OLD_NAME"
+    echo "/usr/local/bin/$OLD_NAME"
 }
 
-# remove_old_binaries deletes those that are superfile, saying what it did.
+# remove_old_binaries deletes those that say they are the old program, saying
+# what it did.
 remove_old_binaries() {
     local f
     while IFS= read -r f; do
         [[ -f $f ]] || continue
-        "$f" --version 2>/dev/null | grep -q '^superfile version' || continue
+        "$f" --version 2>/dev/null | grep -q "$OLD_VERSION_LINE" || continue
         if rm -f "$f" 2>/dev/null; then
-            echo "Removed the old superfile binary $f (it is y now)"
+            echo "Removed the old binary $f (it is y now)"
         else
-            echo "An old superfile binary is still at $f: remove it with  sudo rm '$f'"
+            echo "An old binary is still at $f: remove it with  sudo rm '$f'"
         fi
     done < <(old_binaries | awk '!seen[$0]++')
 }
 
-# setup_shell puts the y block in each shell config that ran superfile, or in
+# setup_shell puts the y block in each shell config that ran Marmota, or in
 # your shell's when none did, taking out what an older install put there. A
 # config it changes is backed up next to it first.
 setup_shell() {
@@ -196,7 +205,7 @@ setup_shell() {
         [[ $f == *.fish ]] && kind=fish
         local new
         new="$(mktemp)"
-        { without_superfile "$f"; echo; y_block "$kind"; } > "$new"
+        { without_marmota "$f"; echo; y_block "$kind"; } > "$new"
         if cmp -s "$new" "$f"; then
             rm -f "$new"
             continue
@@ -274,15 +283,20 @@ install_session_skill
 
 # Update user config with missing fields
 echo "Updating user config with missing fields..."
-"$TARGET" --fix-config-file --fix-hotkeys --fix-only >/dev/null 2>&1 || true
+"$TARGET" --fix-config-file --fix-only >/dev/null 2>&1 || true
 echo "User config updated"
 
-# On a Mac, micro as Marmota's editor (its tools, settings, keys and plugins,
-# and editor = "micro" in Marmota's config) and Marmota's block in
+# On a Mac, setup-macos-hotkeys.sh sets up every key: Marmota's own, brought
+# up to date in your hotkeys.toml (an old default gets today's, a key you
+# chose stays), micro as Marmota's editor (its tools, settings, keys and
+# plugins, and editor = "micro" in Marmota's config) and Marmota's block in
 # ~/.wezterm.lua: its look, and the Mac keys it sends micro. Brought up to
 # date on each build, so a computer is ready once Marmota is built on it.
+# Elsewhere there is only Marmota's own keys to bring up to date.
 if [[ $(uname -s) == "Darwin" ]]; then
     ./setup-macos-hotkeys.sh --micro --no-color 2>&1 | grep -i -E "micro|Marmota's|opens files" || true
+else
+    "$TARGET" --fix-hotkeys --fix-only >/dev/null 2>&1 || true
 fi
 
 if [[ -n "$SHELL_CHANGED" ]]; then

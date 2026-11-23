@@ -216,7 +216,7 @@ func TestSummaryReadsTheRollout(t *testing.T) {
 	assert.Equal(t, "/w/repo", sum.Cwd)
 	assert.Equal(t, "gpt-6.1-sol", sum.Model)
 	assert.Equal(t, "low", sum.Effort)
-	assert.Equal(t, "fix the login", sum.LastPrompt, "superfile's context block is left out")
+	assert.Equal(t, "fix the login", sum.LastPrompt, "Marmota's context block is left out")
 	assert.Equal(t, "2026-11-08T09:14:02.1Z", sum.LastTurnEnd.UTC().Format(time.RFC3339Nano),
 		"the record's time: completed_at, in whole seconds, may fall before the turn's own prompt")
 	assert.Equal(t, []string{"/w/repo/login.go", "/w/repo/new.go"}, sum.EditedFiles)

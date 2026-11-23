@@ -76,5 +76,5 @@ started=$(/usr/bin/python3 -c 'import time; print(int(time.time() * 1000))')
 printf '{"pid":"%s","cwd":"%s","kind":"interactive","startedAt":"%s","sessionId":"%s","name":"%s","status":"idle"}' \
 	"$$" "$cwd" "$started" "$id" "$title" >"$reg/$id.json"
 printf '%s\n' "$transcript" >"$reg/$id.transcript"
-# The prompt box superfile reads before it types into a session.
+# The prompt box Marmota reads before it types into a session.
 exec /usr/bin/python3 "$(dirname "$0")/fake_prompt.py" "$id"

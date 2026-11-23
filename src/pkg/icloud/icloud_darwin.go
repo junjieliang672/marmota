@@ -12,7 +12,7 @@ import (
 )
 
 // helperPath is the path to the icloud-helper binary, found the first time
-// it's needed. It should be compiled and placed alongside the superfile
+// it's needed. It should be compiled and placed alongside the Marmota
 // binary.
 var helperPath = sync.OnceValue(findHelper) //nolint:gochecknoglobals // found once, then fixed
 
@@ -25,7 +25,7 @@ func helperCommand(args ...string) *exec.Cmd {
 func findHelper() string {
 	// Try to find the helper in common locations
 	candidates := []string{
-		// Same directory as superfile binary
+		// Same directory as Marmota binary
 		filepath.Join(filepath.Dir(getExecutablePath()), "icloud-helper"),
 		// Development path
 		filepath.Join(getSourcePath(), "src/pkg/icloud/helper/icloud-helper"),
@@ -43,7 +43,7 @@ func findHelper() string {
 	return ""
 }
 
-// getExecutablePath is the running superfile binary's path, whatever it is
+// getExecutablePath is the running Marmota binary's path, whatever it is
 // called (y now).
 func getExecutablePath() string {
 	ex, err := os.Executable()
@@ -58,7 +58,6 @@ func getSourcePath() string {
 	homeDir := getHomeDir()
 	candidates := []string{
 		filepath.Join(homeDir, "Developer/marmota"),
-		filepath.Join(homeDir, "Developer/superfile"), // the folder's name before Marmota
 		filepath.Join(homeDir, "go/src/github.com/junjieliang672/marmota"),
 	}
 	for _, path := range candidates {

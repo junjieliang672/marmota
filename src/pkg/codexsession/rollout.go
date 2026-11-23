@@ -18,7 +18,7 @@ import (
 )
 
 // A rollout is a session's log: one JSON record a line, each
-// {timestamp, type, payload}. The records superfile reads:
+// {timestamp, type, payload}. The records Marmota reads:
 //
 //	session_meta                  the folder it started in; a fork's history_base
 //	turn_context                  the folder, model and effort of the turn
@@ -27,7 +27,7 @@ import (
 //	event_msg/task_complete       a turn ended (completed_at, unix seconds)
 //	event_msg/turn_aborted        a turn was stopped
 
-// Summary is what superfile needs from one rollout.
+// Summary is what Marmota needs from one rollout.
 type Summary struct {
 	Cwd          string
 	LastPrompt   string

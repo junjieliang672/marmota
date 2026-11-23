@@ -25,7 +25,7 @@ type fakeExecCall struct {
 	cmd string
 }
 
-func TestLaunchManagedSessionInWeztermForPane_FirstSplitStoresFixedSuperfileWidth(t *testing.T) {
+func TestLaunchManagedSessionInWeztermForPane_FirstSplitStoresFixedMarmotaWidth(t *testing.T) {
 	setupWeztermStateDirForTest(t)
 	m := defaultTestModel(testDir)
 	calls := installFakeExec(t,
@@ -50,7 +50,7 @@ func TestLaunchManagedSessionInWeztermForPane_FirstSplitStoresFixedSuperfileWidt
 	state, err := loadWeztermPaneLayoutState(10)
 	require.NoError(t, err)
 	assert.Equal(t, []int{20}, state.ManagedPaneIDs)
-	assert.Equal(t, 111, state.FixedSuperfileCols)
+	assert.Equal(t, 111, state.FixedMarmotaCols)
 }
 
 func TestLaunchClaudeInWezterm_RemoteControlAddsFlag(t *testing.T) {
@@ -80,7 +80,7 @@ func TestLaunchClaudeInWezterm_RemoteControlAddsFlag(t *testing.T) {
 	assert.Equal(t, managedAgentProviderClaude, state.Sessions[0].Provider)
 }
 
-func TestLaunchManagedSessionInWeztermForPane_FirstSplitEnforcesMinimumSuperfileWidth(t *testing.T) {
+func TestLaunchManagedSessionInWeztermForPane_FirstSplitEnforcesMinimumMarmotaWidth(t *testing.T) {
 	setupWeztermStateDirForTest(t)
 	m := defaultTestModel(testDir)
 	calls := installFakeExec(t,
@@ -105,14 +105,14 @@ func TestLaunchManagedSessionInWeztermForPane_FirstSplitEnforcesMinimumSuperfile
 	state, err := loadWeztermPaneLayoutState(10)
 	require.NoError(t, err)
 	assert.Equal(t, []int{20}, state.ManagedPaneIDs)
-	assert.Equal(t, 62, state.FixedSuperfileCols)
+	assert.Equal(t, 62, state.FixedMarmotaCols)
 }
 
 func TestLaunchManagedSessionInWeztermForPane_SecondSessionStaysBackgroundWhenForegroundExists(t *testing.T) {
 	setupWeztermStateDirForTest(t)
 	require.NoError(t, saveWeztermPaneLayoutState(10, weztermPaneLayoutState{
-		ManagedPaneIDs:     []int{20},
-		FixedSuperfileCols: 74,
+		ManagedPaneIDs:   []int{20},
+		FixedMarmotaCols: 74,
 	}))
 	m := defaultTestModel(testDir)
 
@@ -133,7 +133,7 @@ func TestLaunchManagedSessionInWeztermForPane_SecondSessionStaysBackgroundWhenFo
 	require.NoError(t, err)
 	assert.Equal(t, "Codex CLI launched in new pane", msg)
 	require.Len(t, *calls, 2)
-	assert.Contains(t, (*calls)[1].cmd, "wezterm cli spawn --new-window --workspace superfile-agents",
+	assert.Contains(t, (*calls)[1].cmd, "wezterm cli spawn --new-window --workspace marmota-agents",
 		"hidden sessions start in their own workspace, out of the tab bar")
 
 	state, err := loadWeztermPaneLayoutState(10)
@@ -144,14 +144,14 @@ func TestLaunchManagedSessionInWeztermForPane_SecondSessionStaysBackgroundWhenFo
 	assert.Equal(t, managedAgentSlotOne, state.Sessions[0].VisibleSlot)
 	assert.Equal(t, 30, state.Sessions[1].PaneID)
 	assert.Equal(t, managedAgentHiddenSlot, state.Sessions[1].VisibleSlot)
-	assert.Equal(t, 74, state.FixedSuperfileCols)
+	assert.Equal(t, 74, state.FixedMarmotaCols)
 }
 
 func TestLaunchManagedSessionInWeztermForPane_ThirdSessionIsQueuedInHiddenTab(t *testing.T) {
 	setupWeztermStateDirForTest(t)
 	require.NoError(t, saveWeztermPaneLayoutState(10, weztermPaneLayoutState{
-		ManagedPaneIDs:     []int{20},
-		FixedSuperfileCols: 74,
+		ManagedPaneIDs:   []int{20},
+		FixedMarmotaCols: 74,
 		Sessions: []managedAgentSession{
 			{PaneID: 20, Provider: managedAgentProviderClaude, Cwd: "/tmp/api", VisibleSlot: managedAgentSlotOne},
 			{PaneID: 30, Provider: managedAgentProviderCodex, Cwd: "/tmp/tests", VisibleSlot: managedAgentHiddenSlot},
@@ -198,7 +198,7 @@ func TestLaunchManagedSessionInWeztermForPane_ThirdSessionIsQueuedInHiddenTab(t 
 	require.NoError(t, err)
 	assert.Equal(t, "Claude Code launched in new pane", msg)
 	require.Len(t, *calls, 2)
-	assert.Contains(t, (*calls)[1].cmd, "wezterm cli spawn --new-window --workspace superfile-agents",
+	assert.Contains(t, (*calls)[1].cmd, "wezterm cli spawn --new-window --workspace marmota-agents",
 		"hidden sessions start in their own workspace, out of the tab bar")
 
 	state, err := loadWeztermPaneLayoutState(10)
@@ -213,8 +213,8 @@ func TestLaunchManagedSessionInWeztermForPane_ThirdSessionIsQueuedInHiddenTab(t 
 func TestLaunchManagedSessionInWeztermForPane_RejectsUnmanagedPanesInTab(t *testing.T) {
 	setupWeztermStateDirForTest(t)
 	require.NoError(t, saveWeztermPaneLayoutState(10, weztermPaneLayoutState{
-		ManagedPaneIDs:     []int{20},
-		FixedSuperfileCols: 74,
+		ManagedPaneIDs:   []int{20},
+		FixedMarmotaCols: 74,
 	}))
 	m := defaultTestModel(testDir)
 
@@ -239,8 +239,8 @@ func TestLaunchManagedSessionInWeztermForPane_RejectsUnmanagedPanesInTab(t *test
 
 func TestReconcileManagedAgentSessionsWithWezterm_RefreshesRunningTaskState(t *testing.T) {
 	state := weztermPaneLayoutState{
-		ManagedPaneIDs:     []int{20, 30},
-		FixedSuperfileCols: 75,
+		ManagedPaneIDs:   []int{20, 30},
+		FixedMarmotaCols: 75,
 		Sessions: []managedAgentSession{
 			{PaneID: 20, Provider: managedAgentProviderClaude, Cwd: "/tmp/api", VisibleSlot: managedAgentSlotOne},
 			{PaneID: 30, Provider: managedAgentProviderCodex, Cwd: "/tmp/tests", VisibleSlot: managedAgentSlotTwo},
@@ -270,7 +270,7 @@ func TestReconcileManagedAgentSessionsWithWezterm_RefreshesRunningTaskState(t *t
 				WindowID: 9,
 				TabID:    2,
 				PaneID:   30,
-				Title:    "superfile",
+				Title:    "marmota",
 				LeftCol:  0,
 				TopRow:   0,
 				Size:     weztermPaneSize{Rows: 53, Cols: 223},
@@ -294,8 +294,8 @@ func TestReconcileManagedAgentSessionsWithWezterm_RefreshesRunningTaskState(t *t
 
 func TestNormalizeWeztermPaneLayoutState_PreservesProviderCwdAndSingleForegroundSession(t *testing.T) {
 	state := weztermPaneLayoutState{
-		ManagedPaneIDs:     []int{20, 30},
-		FixedSuperfileCols: 75,
+		ManagedPaneIDs:   []int{20, 30},
+		FixedMarmotaCols: 75,
 		Sessions: []managedAgentSession{
 			{
 				PaneID:      20,
@@ -327,8 +327,8 @@ func TestNormalizeWeztermPaneLayoutState_PreservesProviderCwdAndSingleForeground
 func TestSpec007LaunchManagedSessionKeepsNewSessionInBackgroundWhenForegroundExists(t *testing.T) {
 	setupWeztermStateDirForTest(t)
 	require.NoError(t, saveWeztermPaneLayoutState(10, weztermPaneLayoutState{
-		ManagedPaneIDs:     []int{20},
-		FixedSuperfileCols: 74,
+		ManagedPaneIDs:   []int{20},
+		FixedMarmotaCols: 74,
 		Sessions: []managedAgentSession{
 			{PaneID: 20, Provider: managedAgentProviderClaude, Cwd: "/tmp/api", VisibleSlot: managedAgentSlotOne},
 		},
@@ -350,7 +350,7 @@ func TestSpec007LaunchManagedSessionKeepsNewSessionInBackgroundWhenForegroundExi
 	)
 	require.NoError(t, err)
 	require.Len(t, *calls, 2)
-	assert.Contains(t, (*calls)[1].cmd, "wezterm cli spawn --new-window --workspace superfile-agents")
+	assert.Contains(t, (*calls)[1].cmd, "wezterm cli spawn --new-window --workspace marmota-agents")
 
 	state, err := loadWeztermPaneLayoutState(10)
 	require.NoError(t, err)
@@ -361,8 +361,8 @@ func TestSpec007LaunchManagedSessionKeepsNewSessionInBackgroundWhenForegroundExi
 
 func TestSpec007NormalizeWeztermPaneLayoutState_CollapsesLegacyVisibleSessionsToOneForegroundSession(t *testing.T) {
 	state := weztermPaneLayoutState{
-		ManagedPaneIDs:     []int{20, 30},
-		FixedSuperfileCols: 75,
+		ManagedPaneIDs:   []int{20, 30},
+		FixedMarmotaCols: 75,
 		Sessions: []managedAgentSession{
 			{PaneID: 20, Provider: managedAgentProviderClaude, Cwd: "/tmp/api", VisibleSlot: managedAgentSlotOne},
 			{PaneID: 30, Provider: managedAgentProviderCodex, Cwd: "/tmp/tests", VisibleSlot: managedAgentSlotTwo},
@@ -383,7 +383,7 @@ func TestSpec007WeztermStateRoundTripsDisplayNameAndDefaultsFolderName(t *testin
 	t.Run("preserves a custom display name", func(t *testing.T) {
 		setupWeztermStateDirForTest(t)
 		statePath := weztermPaneStatePath(10)
-		raw := `{"managed_pane_ids":[20],"fixed_superfile_cols":75,"sessions":[{"pane_id":20,"provider":"claude","cwd":"/tmp/api","display_name":"API Chat","visible_slot":1}]}`
+		raw := `{"managed_pane_ids":[20],"fixed_marmota_cols":75,"sessions":[{"pane_id":20,"provider":"claude","cwd":"/tmp/api","display_name":"API Chat","visible_slot":1}]}`
 		require.NoError(t, os.WriteFile(statePath, []byte(raw), 0o644))
 
 		state, err := loadWeztermPaneLayoutState(10)
@@ -398,7 +398,7 @@ func TestSpec007WeztermStateRoundTripsDisplayNameAndDefaultsFolderName(t *testin
 	t.Run("defaults to the rooted folder name", func(t *testing.T) {
 		setupWeztermStateDirForTest(t)
 		statePath := weztermPaneStatePath(10)
-		raw := `{"managed_pane_ids":[20],"fixed_superfile_cols":75,"sessions":[{"pane_id":20,"provider":"claude","cwd":"/tmp/api","visible_slot":1}]}`
+		raw := `{"managed_pane_ids":[20],"fixed_marmota_cols":75,"sessions":[{"pane_id":20,"provider":"claude","cwd":"/tmp/api","visible_slot":1}]}`
 		require.NoError(t, os.WriteFile(statePath, []byte(raw), 0o644))
 
 		state, err := loadWeztermPaneLayoutState(10)
@@ -425,16 +425,16 @@ func TestPlanManagedWeztermLayout_UsesFixedOneByTwoCapacity(t *testing.T) {
 
 func TestInitialManagedWeztermSplitWidths(t *testing.T) {
 	t.Run("uses percentage when it exceeds minimum", func(t *testing.T) {
-		superfileCols, agentCols, err := initialManagedWeztermSplitWidths(223)
+		marmotaCols, agentCols, err := initialManagedWeztermSplitWidths(223)
 		require.NoError(t, err)
-		assert.Equal(t, 111, superfileCols)
+		assert.Equal(t, 111, marmotaCols)
 		assert.Equal(t, 111, agentCols)
 	})
 
 	t.Run("uses minimum width when percentage is smaller", func(t *testing.T) {
-		superfileCols, agentCols, err := initialManagedWeztermSplitWidths(100)
+		marmotaCols, agentCols, err := initialManagedWeztermSplitWidths(100)
 		require.NoError(t, err)
-		assert.Equal(t, 62, superfileCols)
+		assert.Equal(t, 62, marmotaCols)
 		assert.Equal(t, 37, agentCols)
 	})
 
@@ -445,23 +445,23 @@ func TestInitialManagedWeztermSplitWidths(t *testing.T) {
 	})
 }
 
-func TestAttachManagedPaneToSlot_DoesNotDriftFixedSuperfileColsAcrossSwaps(t *testing.T) {
-	// Each swap cycle through the agent manager hides the foreground agent pane (superfile
-	// expands to the full tab width) and then re-splits the superfile pane to surface the
+func TestAttachManagedPaneToSlot_DoesNotDriftFixedMarmotaColsAcrossSwaps(t *testing.T) {
+	// Each swap cycle through the agent manager hides the foreground agent pane (Marmota
+	// expands to the full tab width) and then re-splits the Marmota pane to surface the
 	// next agent. reconcileManagedAgentSessionsWithWezterm subsequently updates
-	// FixedSuperfileCols to whatever superfile is measured at after the split, so if the
-	// split math does not leave superfile at exactly FixedSuperfileCols, the value drifts
+	// FixedMarmotaCols to whatever Marmota is measured at after the split, so if the
+	// split math does not leave Marmota at exactly FixedMarmotaCols, the value drifts
 	// one column per swap and the agent pane keeps getting wider.
 	const totalWidth = 223
-	const startingFixedSuperfileCols = 74
+	const startingFixedMarmotaCols = 74
 	const swapIterations = 10
 
 	cellsRE := regexp.MustCompile(`--cells (\d+)`)
-	fixedSuperfileCols := startingFixedSuperfileCols
+	fixedMarmotaCols := startingFixedMarmotaCols
 
 	for i := range swapIterations {
 		state := weztermPaneLayoutState{
-			FixedSuperfileCols: fixedSuperfileCols,
+			FixedMarmotaCols: fixedMarmotaCols,
 			Sessions: []managedAgentSession{
 				{PaneID: 30, Provider: managedAgentProviderClaude, VisibleSlot: managedAgentHiddenSlot},
 			},
@@ -483,25 +483,25 @@ func TestAttachManagedPaneToSlot_DoesNotDriftFixedSuperfileColsAcrossSwaps(t *te
 		require.NoError(t, convErr, "iteration %d", i)
 
 		// WezTerm consumes the requested agent cells plus one divider column from the
-		// superfile pane, so superfile ends up at totalWidth - agentCells - divider. If
-		// the split forgets the divider (agentCells == totalWidth - FixedSuperfileCols),
-		// superfile lands one column short and reconcile saves the shrunken value, which
+		// Marmota pane, so Marmota ends up at totalWidth - agentCells - divider. If
+		// the split forgets the divider (agentCells == totalWidth - FixedMarmotaCols),
+		// Marmota lands one column short and reconcile saves the shrunken value, which
 		// is what compounds into visible drift across swaps.
-		newSuperfileCols := totalWidth - agentCells - weztermSplitDividerCols
-		require.Equal(t, fixedSuperfileCols, newSuperfileCols,
-			"iteration %d: post-split superfile width (%d) must equal FixedSuperfileCols (%d)",
-			i, newSuperfileCols, fixedSuperfileCols)
-		fixedSuperfileCols = newSuperfileCols
+		newMarmotaCols := totalWidth - agentCells - weztermSplitDividerCols
+		require.Equal(t, fixedMarmotaCols, newMarmotaCols,
+			"iteration %d: post-split Marmota width (%d) must equal FixedMarmotaCols (%d)",
+			i, newMarmotaCols, fixedMarmotaCols)
+		fixedMarmotaCols = newMarmotaCols
 	}
 
-	assert.Equal(t, startingFixedSuperfileCols, fixedSuperfileCols,
-		"FixedSuperfileCols must not drift across %d swaps", swapIterations)
+	assert.Equal(t, startingFixedMarmotaCols, fixedMarmotaCols,
+		"FixedMarmotaCols must not drift across %d swaps", swapIterations)
 }
 
 func setupWeztermStateDirForTest(t *testing.T) {
 	t.Helper()
 
-	setForTest(t, &variable.SuperFileStateDir, t.TempDir())
+	setForTest(t, &variable.MarmotaStateDir, t.TempDir())
 }
 
 func installFakeExec(t *testing.T, results ...fakeExecResult) *[]fakeExecCall {
@@ -541,5 +541,5 @@ func marshalWeztermPanesForTest(panes ...weztermPane) string {
 func TestProviderTokens(t *testing.T) {
 	assert.Equal(t, "c", managedAgentSession{Provider: managedAgentProviderClaude}.providerToken())
 	assert.Equal(t, "x", managedAgentSession{Provider: managedAgentProviderCodex}.providerToken())
-	assert.Equal(t, "?", managedAgentSession{Provider: "coco"}.providerToken(), "a provider SPF no longer starts")
+	assert.Equal(t, "?", managedAgentSession{Provider: "coco"}.providerToken(), "a provider Marmota no longer starts")
 }

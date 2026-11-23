@@ -12,7 +12,7 @@ import (
 type ThumbnailGenerator struct {
 	// This is a cache. Key -> Video file path, Value -> Thumbnail file path
 	// TODO: We can potentially make it persisitent, preventing generation
-	// of thumbnail on every launch or superfile
+	// of thumbnail on every launch or Marmota
 	tempFilesCache map[string]string
 	tempDirectory  string
 	mu             sync.Mutex
@@ -23,7 +23,7 @@ func NewThumbnailGenerator() (*ThumbnailGenerator, error) {
 		return nil, errors.New("ffmpeg is not installed")
 	}
 
-	tmp, err := os.MkdirTemp("", "superfiles-*")
+	tmp, err := os.MkdirTemp("", "marmotas-*")
 	if err != nil {
 		return nil, err
 	}

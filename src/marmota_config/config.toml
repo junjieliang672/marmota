@@ -1,10 +1,10 @@
 ##############################################
 #                                            #
-#           Superfile Configuration          #
+#           Marmota Configuration          #
 #                                            #
 ##############################################
 
-# This contains the root config file for superfile; each setting says what it
+# This contains the root config file for Marmota; each setting says what it
 # does. y path-list prints where this file is.
 
 ###############################################################################
@@ -52,12 +52,12 @@ computer_name = ""
 #-- Codex
 # The codex program Codex sessions start with. Leave blank for the newest
 # one that runs, from PATH or the ChatGPT app. Don't add -c or --config:
-# with one, Codex runs the session on a server of its own, where superfile
+# with one, Codex runs the session on a server of its own, where Marmota
 # can't see it.
 codex_command = ""
 
 #-- cd on quit
-# Should we cd the shell to the last directory open in superfile when the
+# Should we cd the shell to the last directory open in Marmota when the
 # program exits? 
 cd_on_quit = false
 
@@ -76,7 +76,7 @@ show_image_preview = true
 show_panel_footer_info = true
 
 #-- Default Directory
-# The initial path that the file panel should navigate to when superfile is
+# The initial path that the file panel should navigate to when Marmota is
 # opened. This setting understands relative paths such as ".", "..", etc.
 default_directory = "."
 
@@ -159,7 +159,7 @@ border_middle_right = '┤'
 #                                   Plugins                                   #
 ###############################################################################
 
-# This section is for using plugins with superfile, external addons that extend
+# This section is for using plugins with Marmota, external addons that extend
 # the default capabilities of the program.
 
 #-- Detailed Metadata
@@ -224,8 +224,8 @@ dir_preview_show_count = true
 
 #-- Hold the Input Method in ASCII Mode
 # With a CJK input method active, single-letter hotkeys (j, k, a, r, /) never
-# reach superfile at all: the input method swallows them into its composition
-# buffer first. When this is on, superfile asks the input method to pass keys
+# reach Marmota at all: the input method swallows them into its composition
+# buffer first. When this is on, Marmota asks the input method to pass keys
 # through while it is in hotkey mode, and releases that request as soon as a
 # text field (rename, search, prompt, zoxide) takes focus, so you can still
 # type Chinese where it matters.

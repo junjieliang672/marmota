@@ -2,7 +2,7 @@
 # Version used - 
 # https://gist.githubusercontent.com/maratori/47a4d00457a92aa426dbd48a18776322/raw/933de4558de48c79322aee44b44a9619eeaba167/.golangci.yml
 
-# Additional changes done for superfile
+# Additional changes done for Marmota
 # - govet shadow analyzer is set to "strict : false" settings.
 #   strict : true causes too much noise
 
@@ -123,7 +123,7 @@ linters:
     - staticcheck # is a go vet on steroids, applying a ton of static analysis checks
     - testableexamples # checks if examples are testable (have an expected output)
     - testifylint # checks usage of github.com/stretchr/testify
-    # [SPF Specific] Not needed - Makes it harder to test unexported package functions.
+    # [Marmota specific] Not needed - Makes it harder to test unexported package functions.
     # - testpackage # makes you use a separate _test package
 
     - tparallel # detects inappropriate usage of t.Parallel() method in your Go test codes

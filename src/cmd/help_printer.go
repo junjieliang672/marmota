@@ -11,9 +11,9 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-// CustomHelpPrinter provides cargo-style colored help output for superfile CLI
+// CustomHelpPrinter provides cargo-style colored help output for Marmota CLI
 func CustomHelpPrinter(w io.Writer, templ string, data interface{}) {
-	// Define color styles matching superfile's aesthetic
+	// Define color styles matching Marmota's aesthetic
 	titleColor := color.New(color.FgGreen, color.Bold)
 	flagColor := color.New(color.FgCyan, color.Bold)
 	commandColor := color.New(color.FgBlue, color.Bold)

@@ -36,7 +36,7 @@ func LoadConfigFile() {
 			if loadError.MissingFields() && !variable.FixConfigFile {
 				// Had missing fields and we did not fix
 				userMsg += "\nTo add missing fields to configuration file automatically run Marmota " +
-					"with the --fix-config-file flag `spf --fix-config-file`"
+					"with the --fix-config-file flag `y --fix-config-file`"
 			}
 			toExit = loadError.IsFatal()
 		}
@@ -113,13 +113,13 @@ func LoadHotkeysFile(ignoreMissingFields bool) {
 
 	fillMissingHotkeysFromDefaults()
 	if variable.FixHotkeys {
-		fixOldAskBarKey(variable.HotkeysFile)
+		fixOldKeys(variable.HotkeysFile)
 	}
 	validateHotkeys()
 }
 
 // reportHotkeysLoadError tells the user what loading the hotkeys file got
-// wrong, and exits when superfile can't go on.
+// wrong, and exits when Marmota can't go on.
 func reportHotkeysLoadError(err error) {
 	var loadError *utils.TomlLoadError
 	isLoadError := errors.As(err, &loadError)
@@ -201,25 +201,69 @@ func fillMissingHotkeysFromDefaults() {
 			Hotkeys.OpenAskBar = defaultHotkeys.OpenAskBar
 		}
 	}
+
+	// Until 2026-11-22 ! went to the session that needs you, and s or z
+	// opened the go to list. Now s goes to the session, z opens the list,
+	// and ! is no key. A file that still has an old default gets the new
+	// one.
+	if slices.Equal(Hotkeys.JumpToUnreadSession, oldSessionKey) {
+		Hotkeys.JumpToUnreadSession = defaultHotkeys.JumpToUnreadSession
+	}
+	if slices.Equal(Hotkeys.GoTo, oldGoToKeys) {
+		Hotkeys.GoTo = defaultHotkeys.GoTo
+	}
 }
 
-// oldAskBarKeys are open_ask_bar's earlier defaults.
-var oldAskBarKeys = [][]string{{"ctrl+k", ""}, {"alt+k", ""}} //nolint:gochecknoglobals // fixed old defaults
+//nolint:gochecknoglobals // fixed old defaults
+var (
+	// oldAskBarKeys are open_ask_bar's earlier defaults.
+	oldAskBarKeys = [][]string{{"ctrl+k", ""}, {"alt+k", ""}}
+	// oldSessionKey and oldGoToKeys are jump_to_unread_session's and go_to's.
+	oldSessionKey = []string{"!", ""}
+	oldGoToKeys   = []string{"s", "z"}
 
-var oldAskBarLine = regexp.MustCompile(`(?m)^open_ask_bar\s*=\s*\[\s*'(ctrl|alt)\+k'\s*,\s*''\s*\]`)
+	// oldKeyLines are the lines of a hotkeys file that still say an old
+	// default, with the line that says the new one.
+	oldKeyLines = []struct {
+		old *regexp.Regexp
+		now string
+	}{
+		{
+			regexp.MustCompile(`(?m)^open_ask_bar\s*=\s*\[\s*'(ctrl|alt)\+k'\s*,\s*''\s*\]`),
+			"open_ask_bar = ['K', 'ctrl+k']",
+		},
+		{
+			regexp.MustCompile(`(?m)^jump_to_unread_session\s*=\s*\[\s*'!'\s*,\s*''\s*\]`),
+			"jump_to_unread_session = ['s', '']",
+		},
+		{
+			regexp.MustCompile(`(?m)^go_to\s*=\s*\[\s*'s'\s*,\s*'z'\s*\]`),
+			"go_to = ['z', '']",
+		},
+	}
+)
 
-// fixOldAskBarKey writes the new Ask bar key into a hotkeys file that still
-// has the old default, so the file says what superfile does.
-func fixOldAskBarKey(path string) {
+// fixOldKeys writes the new keys into a hotkeys file that still has old
+// defaults, so the file says what Marmota does. It reports whether it
+// changed the file.
+func fixOldKeys(path string) bool {
 	data, err := os.ReadFile(path)
-	if err != nil || !oldAskBarLine.Match(data) {
-		return
+	if err != nil {
+		return false
 	}
-	fixed := oldAskBarLine.ReplaceAll(data, []byte("open_ask_bar = ['K', 'ctrl+k']"))
-	//nolint:gosec // the hotkeys file superfile was started with
+	fixed := data
+	for _, line := range oldKeyLines {
+		fixed = line.old.ReplaceAll(fixed, []byte(line.now))
+	}
+	if string(fixed) == string(data) {
+		return false
+	}
+	//nolint:gosec // the hotkeys file Marmota was started with
 	if err := os.WriteFile(path, fixed, utils.ConfigFilePerm); err != nil {
-		slog.Error("Could not write the new Ask bar key to the hotkeys file", "path", path, "error", err)
+		slog.Error("Could not write the new keys to the hotkeys file", "path", path, "error", err)
+		return false
 	}
+	return true
 }
 
 // LoadThemeFile : Load configurations from theme file into &theme
@@ -244,7 +288,7 @@ func LoadThemeFile() {
 	}
 }
 
-// LoadAllDefaultConfig : Load all default configurations from embedded superfile_config folder into global
+// LoadAllDefaultConfig : Load all default configurations from embedded marmota_config folder into global
 // configurations variables and write theme files if its needed.
 func LoadAllDefaultConfig(content embed.FS) {
 	err := LoadConfigStringGlobals(content)
@@ -355,13 +399,13 @@ func PopulateGlobalConfigs() error {
 	}
 
 	// This is src/internal/common/load_config.go
-	// we want src/superfile_config
-	spfConfigDir := filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filename))),
-		"superfile_config")
+	// we want src/marmota_config
+	marmotaConfigDir := filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filename))),
+		"marmota_config")
 
-	configFilePath := filepath.Join(spfConfigDir, "config.toml")
-	hotkeyFilePath := filepath.Join(spfConfigDir, "hotkeys.toml")
-	themeFilePath := filepath.Join(spfConfigDir, "theme", "monokai.toml")
+	configFilePath := filepath.Join(marmotaConfigDir, "config.toml")
+	hotkeyFilePath := filepath.Join(marmotaConfigDir, "hotkeys.toml")
+	themeFilePath := filepath.Join(marmotaConfigDir, "theme", "monokai.toml")
 
 	err := PopulateConfigFromFile(configFilePath)
 	if err != nil {

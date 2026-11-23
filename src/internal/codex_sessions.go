@@ -39,18 +39,18 @@ var (
 	codexBinary    = codexsession.Binary    //nolint:gochecknoglobals // test seam
 )
 
-// codexState is what superfile keeps about Codex sessions between refreshes.
+// codexState is what Marmota keeps about Codex sessions between refreshes.
 type codexState struct {
 	tracker *codexsession.Tracker
-	// panes are the panes superfile started Codex sessions in: session id →
+	// panes are the panes Marmota started Codex sessions in: session id →
 	// pane id. Other sessions' panes are known by their titles.
 	panes map[string]int
-	// forks are the forks superfile started whose sessions aren't listed
+	// forks are the forks Marmota started whose sessions aren't listed
 	// yet. A fork's pane title is the forked session's, so it is known by
 	// the pane it was started in instead.
 	forks []codexFork
 	// restored is set once panes are read back from the agent panes'
-	// state, which keeps them for the next superfile.
+	// state, which keeps them for the next Marmota.
 	restored bool
 	// moved is the folder = moved a session to, by id, until its rollout
 	// says so: from its next turn.
@@ -60,7 +60,7 @@ type codexState struct {
 	listed map[string]bool
 }
 
-// codexFork is a fork superfile started in a pane.
+// codexFork is a fork Marmota started in a pane.
 type codexFork struct {
 	parent string
 	paneID int
@@ -71,7 +71,7 @@ type codexFork struct {
 // asks whether to trust a worktree it hasn't seen.
 const codexForkWait = 10 * time.Minute
 
-// codexCommand is the codex superfile runs, quoted for a shell.
+// codexCommand is the codex Marmota runs, quoted for a shell.
 func codexCommand() string {
 	if c := strings.TrimSpace(common.Config.CodexCommand); c != "" {
 		return c
@@ -115,7 +115,7 @@ func (m *model) mergeCodexSessions(sessions []claudesession.Session) {
 			claimed[pane.PaneID] = true
 		}
 	}
-	// Sessions in panes superfile started first, then those found by title.
+	// Sessions in panes Marmota started first, then those found by title.
 	sort.SliceStable(sessions, func(i, j int) bool {
 		_, iKnown := m.codex.panes[sessions[i].ID]
 		_, jKnown := m.codex.panes[sessions[j].ID]
@@ -149,7 +149,7 @@ func (m *model) mergeCodexSessions(sessions []claudesession.Session) {
 	})
 }
 
-// matchCodexForks notes the panes of the forks superfile started, once
+// matchCodexForks notes the panes of the forks Marmota started, once
 // their sessions are listed: each the first fork of its session since.
 func (m *model) matchCodexForks(sessions []claudesession.Session) {
 	kept := m.codex.forks[:0]
@@ -202,7 +202,7 @@ func (m *model) withoutTemporaryCodex(sessions []claudesession.Session) []claude
 	return kept
 }
 
-// codexPane is the pane a Codex session runs in: the one superfile started
+// codexPane is the pane a Codex session runs in: the one Marmota started
 // it in, else one whose title Codex set for it, "<name> | <folder>", or
 // just "<folder>" before it has a name. Panes in claimed are taken.
 func (m *model) codexPane(s claudesession.Session, claimed map[int]bool) (weztermPane, bool) {
@@ -287,8 +287,8 @@ func codexPaneTitle(title string) (string, string, bool) {
 	return name, folder, true
 }
 
-// recordCodexPane notes the pane superfile started a Codex session in, also
-// in the agent panes' state, for the next superfile.
+// recordCodexPane notes the pane Marmota started a Codex session in, also
+// in the agent panes' state, for the next Marmota.
 func (m *model) recordCodexPane(id string, paneID int) {
 	if id == "" || paneID == 0 {
 		return
@@ -305,33 +305,33 @@ func (m *model) recordCodexPane(id string, paneID int) {
 			s.CodexSession = id
 		}
 	}
-	superfilePaneID, err := currentWeztermPaneID()
+	marmotaPaneID, err := currentWeztermPaneID()
 	if err != nil {
 		return
 	}
-	state, err := loadWeztermPaneLayoutState(superfilePaneID)
+	state, err := loadWeztermPaneLayoutState(marmotaPaneID)
 	if err != nil {
 		return
 	}
 	for i := range state.Sessions {
 		if s := &state.Sessions[i]; s.PaneID == paneID && s.CodexSession != id {
 			s.CodexSession = id
-			persistWeztermPaneLayoutState(superfilePaneID, state)
+			persistWeztermPaneLayoutState(marmotaPaneID, state)
 		}
 	}
 }
 
-// restoreCodexPanes reads back the panes an earlier superfile noted, once.
+// restoreCodexPanes reads back the panes an earlier Marmota noted, once.
 func (m *model) restoreCodexPanes() {
 	if m.codex.restored {
 		return
 	}
 	m.codex.restored = true
-	superfilePaneID, err := currentWeztermPaneID()
+	marmotaPaneID, err := currentWeztermPaneID()
 	if err != nil {
 		return
 	}
-	state, err := loadWeztermPaneLayoutState(superfilePaneID)
+	state, err := loadWeztermPaneLayoutState(marmotaPaneID)
 	if err != nil {
 		return
 	}
@@ -345,7 +345,7 @@ func (m *model) restoreCodexPanes() {
 	}
 }
 
-// lastLaunchedPaneID is the agent pane superfile started last.
+// lastLaunchedPaneID is the agent pane Marmota started last.
 func (m *model) lastLaunchedPaneID() int {
 	if m.tmuxSessionsOn() && m.tmux.lastLaunched != 0 {
 		return m.tmux.lastLaunched
@@ -357,7 +357,7 @@ func (m *model) lastLaunchedPaneID() int {
 	return sessions[len(sessions)-1].PaneID
 }
 
-// jumpToCodexSession shows a Codex session beside superfile: its pane when
+// jumpToCodexSession shows a Codex session beside Marmota: its pane when
 // one shows it, else a new pane resuming it. Codex attaches the new pane
 // to a session its server still runs.
 func (m *model) jumpToCodexSession(s claudesession.Session, focus bool) (string, error) {
@@ -408,7 +408,7 @@ const codexStartLookBack = 2 * time.Second
 
 // findCodexStart is the session a Codex start became: the first one loaded
 // in its folder since it began that no one else has. Codex can't be told an
-// id to give a session, so this is how superfile knows it.
+// id to give a session, so this is how Marmota knows it.
 func (m *model) findCodexStart(st *askStart) (claudesession.Session, bool) {
 	taken := map[string]bool{}
 	for id := range m.codex.panes {
