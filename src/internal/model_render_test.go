@@ -189,7 +189,7 @@ func TestThePanelEdgeShowsTheSortOrder(t *testing.T) {
 			m := defaultTestModel(testDir)
 			panel := m.getFocusedFilePanel()
 			panel.sortOptions.data = sortOptionsModelData{options: []string{tt.kind}, selected: 0, reversed: tt.reversed}
-			assert.Contains(t, ansi.Strip(m.filePanelRender()), tt.want)
+			assert.Contains(t, ansi.Strip(m.sidebarRender()), tt.want)
 		})
 	}
 }

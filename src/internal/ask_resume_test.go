@@ -51,7 +51,7 @@ func TestCtrlRListsTheEndedSessionsOfBothAgents(t *testing.T) {
 	m, _ := resumeTestModel(t)
 	press(m, common.Hotkeys.OpenAskBar[0])
 	require.True(t, m.askSending().New)
-	assert.Contains(t, viewText(m), "ctrl+r resume one")
+	assert.Contains(t, askKeys(m), "ctrl+r resume one")
 
 	press(m, common.Hotkeys.AskResume[0])
 
@@ -68,7 +68,7 @@ func TestCtrlRListsTheEndedSessionsOfBothAgents(t *testing.T) {
 	assert.Equal(t, dockAskFocus, m.focusPanel, "back in the Ask box")
 	assert.True(t, m.sessions.composer.StartsCodex(), "the box starts the agent it ran in")
 	assert.Contains(t, viewText(m), "resumes port the parser in the background")
-	assert.Contains(t, viewText(m), "ctrl+r another")
+	assert.Contains(t, askKeys(m), "ctrl+r another")
 
 	press(m, "tab")
 	assert.Nil(t, m.ask.resume, "the other agent: a new session again")
@@ -162,7 +162,8 @@ func TestEscClosesTheResumeListAndKeepsANewSession(t *testing.T) {
 	assert.False(t, m.jumpUI.IsOpen())
 	assert.Equal(t, dockAskFocus, m.focusPanel, "back in the Ask box")
 	assert.Nil(t, m.ask.resume)
-	assert.Contains(t, viewText(m), "starts in the background")
+	assert.Contains(t, viewText(m), "Ask → new ")
+	assert.NotContains(t, viewText(m), "resumes ")
 }
 
 func TestEnterOnAnEndedSessionInTheSPopupResumesItInTheBackground(t *testing.T) {

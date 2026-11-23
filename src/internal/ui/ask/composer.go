@@ -527,6 +527,9 @@ type Sending struct {
 	// Change is set when the model and effort keys change a running
 	// session's, from the next message; Changed when they have.
 	Change, Changed bool
+	// Usual is set when Text says only what sending always does, which a
+	// short box leaves out.
+	Usual bool
 }
 
 const (
@@ -584,6 +587,32 @@ func (c *Composer) RenderLines(inner, rows int, sending Sending) []string {
 	if rows > 0 && len(lines) > rows {
 		lines = lines[:rows]
 	}
+	for i := range lines {
+		if gap := inner - ansi.StringWidth(lines[i]); gap > 0 {
+			lines[i] += st.base.Render(strings.Repeat(" ", gap))
+		}
+	}
+	return lines
+}
+
+// DraftLines is what is written, inner wide, on at most rows rows (those
+// nearest the cursor), then a notice when there is one: the bar without
+// what sending does and its keys, for a frame that says those itself.
+func (c *Composer) DraftLines(inner, rows int) []string {
+	st := newComposerStyles()
+	inner, rows = max(1, inner), max(1, rows)
+	var tail []string
+	if c.notice != "" {
+		style := st.dim
+		if c.failed {
+			style = st.bad
+		}
+		for _, l := range strings.Split(ansi.Wrap(c.notice, inner, ""), "\n") {
+			tail = append(tail, style.Render(l))
+		}
+		tail = tail[:min(len(tail), rows-1)]
+	}
+	lines := append(c.inputRows(inner, rows-len(tail), st), tail...)
 	for i := range lines {
 		if gap := inner - ansi.StringWidth(lines[i]); gap > 0 {
 			lines[i] += st.base.Render(strings.Repeat(" ", gap))
@@ -703,6 +732,11 @@ func (c *Composer) keysLines(width int, sending Sending, st composerStyles) []st
 // the cursor when the bar has the keyboard. File mentions read in the
 // folder color, session mentions in their own.
 func (c *Composer) inputLines(width int, st composerStyles) []string {
+	return c.inputRows(width, maxInputRows, st)
+}
+
+// inputRows is the question on at most limit rows, those nearest the cursor.
+func (c *Composer) inputRows(width, limit int, st composerStyles) []string {
 	value := []rune(c.input.Value())
 	focused := c.Focused()
 	if len(value) == 0 {
@@ -712,13 +746,13 @@ func (c *Composer) inputLines(width int, st composerStyles) []string {
 	c.textWidth = textWidth
 	pos := min(c.input.Position(), len(value))
 	rows, cursorRow := c.rows(value, textWidth)
-	if c.folded && len(rows) > maxInputRows {
+	if c.folded && len(rows) > limit {
 		return []string{st.input.Render(inputMark) + foldedLine(value, textWidth, focused, st)}
 	}
 	kinds := c.mentionKinds(value)
-	first := max(0, cursorRow-maxInputRows+1)
-	lines := make([]string, 0, maxInputRows)
-	for i := first; i < len(rows) && len(lines) < maxInputRows; i++ {
+	first := max(0, cursorRow-limit+1)
+	lines := make([]string, 0, limit)
+	for i := first; i < len(rows) && len(lines) < limit; i++ {
 		cursor := -1
 		if focused && i == cursorRow {
 			cursor = pos

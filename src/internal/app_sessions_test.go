@@ -19,6 +19,7 @@ import (
 	sessionsui "github.com/junjieliang672/marmota/src/internal/ui/sessions"
 	"github.com/junjieliang672/marmota/src/internal/utils"
 	"github.com/junjieliang672/marmota/src/pkg/claudecloud"
+	"github.com/junjieliang672/marmota/src/pkg/claudesession"
 )
 
 // appTestModel is dockTestModel with claude.ai listing b1, waiting for you
@@ -41,6 +42,31 @@ func appTestModel(t *testing.T) *model {
 	return m
 }
 
+// claude.ai often answers before this computer's sessions are listed, and
+// lists those too: its rows wait, or the box would show this computer's
+// sessions as remote ones for a moment, and change height twice.
+func TestRemoteRowsWaitForThisComputersSessions(t *testing.T) {
+	setForTest(t, &appSessionsAutoRefresh, true)
+	m := appTestModel(t)
+	listed := len(m.dockSessions())
+	require.Equal(t, 4, listed, "two here, two remote: provider registry isn't listed twice")
+	local := m.claude.snapshot
+
+	// A start: claude.ai has answered, this computer's sessions aren't listed.
+	m.claude.loaded, m.claude.snapshot = false, claudesession.Snapshot{}
+	m.dock.rows, m.dock.rowsRead = listed, true // what the last run left
+	m.refreshSessionsList()
+	require.True(t, m.app.answered)
+	assert.Empty(t, m.dockSessions(), "no remote row yet: three would show, one of them this computer's")
+	assert.False(t, m.sessionsListed())
+	assert.Equal(t, listed, m.dockSessionLineCount(), "the box keeps the height it had")
+
+	m.claude.loaded, m.claude.snapshot = true, local
+	m.refreshSessionsList()
+	assert.Len(t, m.dockSessions(), listed, "listed: all of them at once")
+	assert.Equal(t, listed, m.dockSessionLineCount(), "and the box is as tall")
+}
+
 func TestTheRemoteSectionListsClaudeAppSessionsBelowThisComputers(t *testing.T) {
 	m := appTestModel(t)
 	var ids []string
@@ -50,7 +76,7 @@ func TestTheRemoteSectionListsClaudeAppSessionsBelowThisComputers(t *testing.T) 
 	assert.Equal(t, []string{"s20", "s50", "app:cse_01b1", "app:cse_01b2"}, ids,
 		"this computer's first; s20 is left out of the Remote section, the box lists it above")
 
-	box := ansi.Strip(m.dockSessionsRender())
+	box := ansi.Strip(sessionsBoxRender(m))
 	lines := strings.Split(box, "\n")
 	at := func(s string) int {
 		for i, l := range lines {
@@ -61,7 +87,7 @@ func TestTheRemoteSectionListsClaudeAppSessionsBelowThisComputers(t *testing.T) 
 		return -1
 	}
 	assert.Equal(t, -1, at("── Remote"), "no title: each row's cloud says where it runs")
-	assert.Equal(t, at("ime hold tests")+2, at(" b1 "), "right below this computer's sessions")
+	assert.Equal(t, at("ime hold tests")+1, at(" b1 "), "right below this computer's sessions, a row each")
 	assert.GreaterOrEqual(t, at("needs you: bring b2"), 0, box)
 	assert.GreaterOrEqual(t, at("offline · redteam-root · main"), 0, box)
 }
@@ -120,19 +146,21 @@ func TestAFailedListingKeepsTheLastOneGreyedWithWhy(t *testing.T) {
 	m := appTestModel(t)
 	m.applyAppSessions(appSessionsMsg{err: errors.New("dial tcp: timeout")})
 	assert.Len(t, m.appSessions(), 2, "the last list stays")
-	assert.Contains(t, ansi.Strip(m.dockSessionsRender()), "can't reach claude.ai · ")
+	assert.Contains(t, ansi.Strip(sessionsBoxRender(m)), "can't reach claude.ai · ")
 
 	m.applyAppSessions(appSessionsMsg{err: claudecloud.ErrExpired})
-	assert.Contains(t, ansi.Strip(m.dockSessionsRender()), "login expired: run claude")
+	assert.Contains(t, ansi.Strip(sessionsBoxRender(m)), "login expired: run claude")
 }
 
 func TestNotLoggedInSaysHowToLogIn(t *testing.T) {
 	m := dockTestModel(t)
 	m.applyAppSessions(appSessionsMsg{err: claudecloud.ErrNoLogin})
-	assert.Contains(t, ansi.Strip(m.dockSessionsRender()), "not logged in: run claude")
+	assert.Contains(t, ansi.Strip(sessionsBoxRender(m)), "not logged in: run claude")
 }
 
-func TestTheRefreshAsksOnceAtATimeAndOnlyWithTheDockShown(t *testing.T) {
+// The Sessions box is always on screen, so claude.ai is asked whether or not
+// Details and the Ask box are put away.
+func TestTheRefreshAsksOnceAtATime(t *testing.T) {
 	m := dockTestModel(t)
 	appSessionsAutoRefresh = true
 	t.Cleanup(func() { appSessionsAutoRefresh = false })
@@ -153,7 +181,7 @@ func TestTheRefreshAsksOnceAtATimeAndOnlyWithTheDockShown(t *testing.T) {
 
 	m.toggleFooterController()
 	require.False(t, m.toggleFooter)
-	assert.Nil(t, m.appSessionsRefreshCmd(), "not while the dock is hidden")
+	assert.NotNil(t, m.appSessionsRefreshCmd(), "with Details put away too: the Sessions box stays")
 }
 
 func TestThePreviewOfARemoteSessionSaysWhereItIs(t *testing.T) {
@@ -268,7 +296,7 @@ func TestTheGoToListShowsEachSessionsStateAndWhatARemoteOneWaitsFor(t *testing.T
 	}
 	require.NotEmpty(t, b1, view)
 	assert.Contains(t, b1, "⚑ cc", "its mark, as in the Sessions box")
-	assert.Contains(t, b1, "bring b2 back online", "what it waits for, in its folder's place")
+	assert.Contains(t, b1, "b2 back online", "what it waits for, in its folder's place, as much as the sidebar holds")
 }
 
 // listedWith is a listing as the first one since Marmota started brings it,

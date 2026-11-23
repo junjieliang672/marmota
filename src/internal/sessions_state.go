@@ -138,9 +138,6 @@ func (m *model) sessionsGroups() ([]claudeSessionsGroup, string) {
 
 // refreshSessionsList gives the list the latest sessions.
 func (m *model) refreshSessionsList() {
-	if !m.toggleFooter {
-		return // the dock that shows it is hidden
-	}
 	groups, _ := m.sessionsGroups()
 	out := make([]sessionsui.Group, 0, len(groups))
 	for _, g := range groups {

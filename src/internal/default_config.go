@@ -139,22 +139,22 @@ func getHelpMenuData() []helpMenuModalData {
 		},
 		{
 			hotkey:         common.Hotkeys.OpenAskBar,
-			description:    "Ask box at the foot: write to the session it names (→), or after n in the Sessions box, a new one",
+			description:    "Ask box, under the preview: write to the session it names (→), or after n in the Sessions box, a new one; its keys show on the status line",
 			hotkeyWorkType: globalType,
 		},
 		{
 			hotkey:         common.Hotkeys.JumpToUnreadSession,
-			description:    "Sessions box at the foot, on a session that needs you (again: the next one), else the first; esc goes back",
+			description:    "Sessions box under the preview, on a session that needs you (again: the next one), else the first; esc goes back",
 			hotkeyWorkType: globalType,
 		},
 		{
 			hotkey:         common.Hotkeys.NextSession,
-			description:    "Sessions box at the foot, on the next session (from the files: after the one it was last on); round at the end",
+			description:    "Sessions box under the preview, on the next session (from the files: after the one it was last on); round at the end",
 			hotkeyWorkType: globalType,
 		},
 		{
 			hotkey:         common.Hotkeys.PreviousSession,
-			description:    "Sessions box at the foot, on the previous session; in a session's files (W) these two go through the diff instead",
+			description:    "Sessions box under the preview, on the previous session; in a session's files (W) these two go through the diff instead",
 			hotkeyWorkType: globalType,
 		},
 		{
@@ -342,7 +342,7 @@ func getHelpMenuData() []helpMenuModalData {
 		},
 		{
 			hotkey:         common.Hotkeys.ToggleFooter,
-			description:    "Toggle footer",
+			description:    "Show or hide Details and the Ask box (hidden, the Ask box shows while you write in it); in the Sessions box too",
 			hotkeyWorkType: globalType,
 		},
 		{
@@ -357,7 +357,7 @@ func getHelpMenuData() []helpMenuModalData {
 		},
 		{
 			hotkey:         common.Hotkeys.GoTo,
-			description:    "Go to a pinned folder, a session (running, or ended to resume), a folder zoxide knows, a file edited lately",
+			description:    "Go to a session (running, or ended to resume), a pinned folder, a folder zoxide knows, a file edited lately",
 			hotkeyWorkType: globalType,
 		},
 		{

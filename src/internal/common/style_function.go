@@ -169,10 +169,19 @@ func FilePanelDividerStyle(filePanelFocussed bool) lipgloss.Style {
 		Background(FilePanelBGColor)
 }
 
+// FocusBorderColor is the color of the frame and title of the box that has
+// the keyboard, whichever box it is: a file panel, the s list, the Sessions
+// box, the Ask box, Details. It is the theme's footer_border_active, which
+// the Sessions box had first; file_panel_border_active stays the accent of
+// headings and marks.
+func FocusBorderColor() lipgloss.Color {
+	return FooterBorderActiveColor
+}
+
 // Return border color based on file panel status
 func FilePanelFocusColor(filePanelFocussed bool) lipgloss.Color {
 	if filePanelFocussed {
-		return FilePanelBorderActiveColor
+		return FocusBorderColor()
 	}
 	return FilePanelBorderColor
 }

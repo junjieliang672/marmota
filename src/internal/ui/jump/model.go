@@ -7,13 +7,14 @@
 // [n]g and G jump, and the keys that act on an item elsewhere act on the
 // picked one: t pins, r renames, a session's keys are the Sessions box's.
 // esc steps back: from picking to the search, then clears what is typed,
-// then closes. The sections sit one under the other: Pinned, Sessions,
+// then closes. The sections sit one under the other: Sessions, Pinned,
 // Resume, Folders, Files. The preview beside it shows the item enter goes
 // to (Picked).
 package jump
 
 import (
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -37,8 +38,9 @@ const (
 	File                // a file edited lately
 )
 
-// Kinds are the sections in order.
-var Kinds = []Kind{Pinned, Session, Ended, Folder, File}
+// Kinds are the sections in order: the running sessions first, which is
+// what the list is opened for most.
+var Kinds = []Kind{Session, Pinned, Ended, Folder, File} //nolint:gochecknoglobals // the order, only read
 
 func (k Kind) Title() string {
 	return [...]string{"Pinned", "Sessions", "Resume", "Folders", "Files"}[k]
@@ -177,7 +179,9 @@ func (m *Model) SetSize(width, height int) {
 // picked when it is still there.
 func (m *Model) SetSections(sections []Section) {
 	picked, wasPicked := m.Picked()
-	m.sections = sections
+	// In Kinds' order, whatever order they were gathered in.
+	m.sections = slices.Clone(sections)
+	slices.SortStableFunc(m.sections, func(a, b Section) int { return indexOf(a.Kind) - indexOf(b.Kind) })
 	m.filter()
 	if !wasPicked || !m.picking {
 		return

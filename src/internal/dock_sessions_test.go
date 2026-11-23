@@ -1,9 +1,9 @@
 package internal
 
 import (
+	"os"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -140,6 +140,7 @@ func TestBangWithNoSessions(t *testing.T) {
 func TestTheIdleAskBoxSaysWhereYourNextMessageGoes(t *testing.T) {
 	ownAskHistory(t)
 	m := dockTestModel(t)
+	m.fileModel.filePreview.SetOpen(true)
 	first := m.dockSessions()[0]
 	for i := range m.claude.snapshot.Live {
 		if m.claude.snapshot.Live[i].ID == first.ID {
@@ -148,15 +149,21 @@ func TestTheIdleAskBoxSaysWhereYourNextMessageGoes(t *testing.T) {
 		}
 	}
 
-	box := ansi.Strip(m.dockAskRender(40))
+	m.relayout()
+	lines := strings.Split(ansi.Strip(m.dockAskRender()), "\n")
+	box := strings.Join(lines, "\n")
 
-	assert.Contains(t, box, "→ "+first.DisplayTitle(), "nothing chosen yet: the first session")
-	assert.Contains(t, box, common.Hotkeys.OpenAskBar[0]+" write")
-	assert.Contains(t, box, "“question 29”", "your last message to it")
+	require.Len(t, lines, 3, "its frame and one line")
+	assert.Equal(t, askMinHeight, m.lay.ask.h)
+	assert.Contains(t, lines[0], "Ask → "+first.DisplayTitle(), "nothing chosen yet: the first session")
+	assert.Contains(t, lines[1], "“question 29”", "your last message to it")
+	assert.Contains(t, lines[2], "cc Claude Code", "the program it runs in; its model and effort aren't known")
+	assert.Contains(t, lines[2], common.Hotkeys.OpenAskBar[0]+" write")
 	assert.NotContains(t, box, "answer 29", "not its answer: the preview has that")
-	assert.Contains(t, box, "cc Claude Code", "the program it runs in; its model and effort aren't known")
-	assert.Contains(t, box, "› question 28", "your messages before fill the room left")
-	assert.Len(t, strings.Split(box, "\n"), m.footerHeight+common.BorderPadding, "within the box")
+	assert.NotContains(t, box, "question 28", "nor what you asked before: the preview has that too")
+	assert.Equal(t, m.lay.preview.w, ansi.StringWidth(lines[0]), "as wide as the preview")
+	assert.Equal(t, m.lay.preview.h, m.lay.ask.y, "right under it")
+	assert.Equal(t, m.lay.ask.y+m.lay.ask.h, m.lay.sessions.y, "and over the Sessions box")
 }
 
 func TestKFromTheSessionsBoxWritesToTheSelectedSession(t *testing.T) {
@@ -182,9 +189,13 @@ func TestKFromTheSessionsBoxWritesToTheSelectedSession(t *testing.T) {
 	assert.Equal(t, second, m.dockAskTarget(), "and the next K writes to the same session")
 }
 
-func TestTheOpenAskBoxListsYourQuestions(t *testing.T) {
+// K writes in the Ask box where it is: no box moves or changes size for
+// it. The box grows a row with each line more of what is written, on rows
+// of the preview's.
+func TestKWritesInTheAskBoxWhereItIs(t *testing.T) {
 	ownAskHistory(t)
 	m := dockTestModel(t)
+	m.fileModel.filePreview.SetOpen(true)
 	first := m.dockSessions()[0]
 	for i := range m.claude.snapshot.Live {
 		if m.claude.snapshot.Live[i].ID == first.ID {
@@ -192,19 +203,188 @@ func TestTheOpenAskBoxListsYourQuestions(t *testing.T) {
 			m.claude.snapshot.Live[i].Status = claudesession.StatusIdle
 		}
 	}
-	m.footerHeight = 10
+	m.relayout()
+	before := m.lay
 
 	pressKey(m, common.Hotkeys.OpenAskBar[0])
 	require.Equal(t, first.ID, m.sessions.list.SelectedID())
-	lines := strings.Split(ansi.Strip(m.dockAskRender(100)), "\n")
-	box := strings.Join(lines, "\n")
+	assert.Equal(t, before.ask, m.lay.ask, "the Ask box is where it was")
+	assert.Equal(t, before.preview, m.lay.preview, "and so is the preview")
+	assert.Equal(t, before.sessions, m.lay.sessions)
+	lines := strings.Split(ansi.Strip(m.dockAskRender()), "\n")
+	require.Len(t, lines, 3)
+	assert.Contains(t, lines[0], "Ask → "+first.DisplayTitle())
+	assert.Contains(t, lines[1], "› ", "the line is the one you write in")
+	assert.NotContains(t, lines[2], "write", "its edge no longer says the key that opens it")
+	assert.NotContains(t, strings.Join(lines, "\n"), "question 2", "what you asked before stays in the preview")
 
-	newest := slices.IndexFunc(lines, func(l string) bool { return strings.Contains(l, "› question 29") })
-	older := slices.IndexFunc(lines, func(l string) bool { return strings.Contains(l, "› question 28") })
-	require.GreaterOrEqual(t, newest, 0, box)
-	assert.Greater(t, older, newest, "newest first")
-	assert.Contains(t, lines[newest], "replied")
-	assert.NotContains(t, box, "answer 29", "no answers: the preview shows them")
+	typeInto(m, "one line")
+	assert.Equal(t, before.preview, m.lay.preview, "a line of draft: nothing moves")
+	typeInto(m, strings.Repeat(" and a good deal more", 4))
+	draft := m.dockAskLineCount(m.lay.ask.w)
+	require.Greater(t, draft, 1, "the draft wraps")
+	assert.Equal(t, draft+2, m.lay.ask.h, "a row each line")
+	assert.Equal(t, before.preview.h-(draft-1), m.lay.preview.h, "on rows of the preview's")
+	assert.Len(t, strings.Split(ansi.Strip(m.dockAskRender()), "\n"), m.lay.ask.h)
+
+	typeInto(m, strings.Repeat(" and still more to say about it", 40))
+	assert.Equal(t, askMaxLines+2, m.lay.ask.h, "ten lines at most; the draft scrolls in them")
+}
+
+// The keys of the files that act on no file work while the Sessions box has
+// the keyboard: those that change what the screen shows leave it there.
+func TestTheSessionsBoxTakesTheKeysThatChangeTheScreen(t *testing.T) {
+	m := dockTestModel(t)
+	m.fileModel.filePreview.SetOpen(true)
+	bang(m)
+	require.Equal(t, dockSessionsFocus, m.focusPanel)
+	selected := m.sessions.list.SelectedID()
+
+	pressKey(m, common.Hotkeys.ToggleFooter[0])
+	assert.False(t, m.toggleFooter, "F puts Details and the Ask box away")
+	assert.False(t, m.lay.details.shown())
+	assert.False(t, m.lay.ask.shown())
+	pressKey(m, common.Hotkeys.ToggleFooter[0])
+	assert.True(t, m.lay.details.shown(), "and brings them back")
+
+	pressKey(m, common.Hotkeys.ToggleFilePreviewPanel[0])
+	assert.False(t, m.fileModel.filePreview.IsOpen(), "ctrl+f closes the preview")
+	assert.Equal(t, m.lay.body-m.lay.ask.h, m.lay.sessions.h, "the Sessions box has its rows")
+	pressKey(m, common.Hotkeys.ToggleFilePreviewPanel[0])
+	assert.True(t, m.fileModel.filePreview.IsOpen())
+
+	dots := m.toggleDotFile
+	pressKey(m, common.Hotkeys.ToggleDotFile[0])
+	assert.NotEqual(t, dots, m.toggleDotFile, ". shows or hides the dot files")
+
+	pressKey(m, common.Hotkeys.BackToEditor[0])
+	assert.Contains(t, m.claude.flash, "No editor is put away", "b is the editor's key here too")
+
+	assert.Equal(t, dockSessionsFocus, m.focusPanel, "the keyboard stayed in the Sessions box")
+	assert.Equal(t, selected, m.sessions.list.SelectedID(), "on the same session")
+}
+
+// The keys that go to another box take the keyboard there from the Sessions
+// box.
+func TestTheSessionsBoxLetsGoForTheKeysThatGoElsewhere(t *testing.T) {
+	m := dockTestModel(t)
+	require.NoError(t, m.createNewFilePanel(t.TempDir()))
+	require.Equal(t, 1, m.filePanelFocusIndex)
+
+	bang(m)
+	pressKey(m, common.Hotkeys.FocusOnMetaData[0])
+	assert.Equal(t, metadataFocus, m.focusPanel, "M: Details")
+
+	bang(m)
+	pressKey(m, common.Hotkeys.NextFilePanel[0])
+	assert.Equal(t, nonePanelFocus, m.focusPanel, "tab: the files")
+	assert.Equal(t, 0, m.filePanelFocusIndex, "the next panel")
+	assert.True(t, m.getFocusedFilePanel().isFocused)
+
+	bang(m)
+	pressKey(m, common.Hotkeys.PreviousFilePanel[0])
+	assert.Equal(t, nonePanelFocus, m.focusPanel)
+	assert.Equal(t, 1, m.filePanelFocusIndex, "the one before")
+}
+
+// The keys that act on the file under a panel's cursor do nothing in the
+// Sessions box: you aren't looking at that file.
+func TestTheSessionsBoxLeavesTheFilesAlone(t *testing.T) {
+	m := dockTestModel(t)
+	require.NoError(t, m.createNewFilePanel(folderOf(t, 3)))
+	TeaUpdate(m, nil)
+	require.Len(t, m.getFocusedFilePanel().element, 3, "the cursor is on a file")
+	dir := m.getFocusedFilePanel().location
+	names := func() []string {
+		entries, err := os.ReadDir(dir)
+		require.NoError(t, err)
+		var out []string
+		for _, e := range entries {
+			out = append(out, e.Name())
+		}
+		return out
+	}
+	before := names()
+	require.NotEmpty(t, before)
+	bang(m)
+	selected := m.sessions.list.SelectedID()
+
+	for _, keys := range [][]string{common.Hotkeys.DeleteItems, common.Hotkeys.PermanentlyDeleteItems,
+		common.Hotkeys.OpenFileWithEditor, common.Hotkeys.OpenFileWithSecondEditor, common.Hotkeys.PasteItems,
+		common.Hotkeys.CutItems, common.Hotkeys.FilePanelItemCreate, common.Hotkeys.ExtractFile,
+		common.Hotkeys.CompressFile, common.Hotkeys.OpenSortOptionsMenu, common.Hotkeys.SearchBar,
+		common.Hotkeys.ParentDirectory, common.Hotkeys.PinnedDirectory} {
+		pressKey(m, keys[0])
+		assert.Equal(t, dockSessionsFocus, m.focusPanel, "%s: the keyboard stays", keys[0])
+		assert.Equal(t, selected, m.sessions.list.SelectedID(), keys[0])
+		assert.False(t, m.typingModal.open, "%s opens nothing", keys[0])
+		assert.False(t, m.notifyModel.IsOpen(), "%s asks nothing", keys[0])
+	}
+	assert.Equal(t, before, names(), "no file was made, removed or renamed")
+	assert.Equal(t, dir, m.getFocusedFilePanel().location, "and the panel is where it was")
+}
+
+// The Ask box's one line, in each state the session it writes to can be in.
+func TestTheAskBoxsLineSaysHowYourLastMessageStands(t *testing.T) {
+	ownAskHistory(t)
+	m := dockTestModel(t)
+	line := func(s claudesession.Session) string {
+		l := m.dockAskIdleLine(s, 60)
+		require.Equal(t, 60, ansi.StringWidth(l), "one line, as wide as the box: %q", ansi.Strip(l))
+		return strings.TrimRight(ansi.Strip(l), " ")
+	}
+	s := claudesession.Session{ID: "a1", Title: "fix", Live: true, LastPrompt: "run the tests"}
+
+	assert.Equal(t, "starts in the background", line(claudesession.Session{}), "no session: a new one")
+	assert.Equal(t, "you: “run the tests”", line(s), "replied: its row and the preview say so")
+	s.LastPrompt = ""
+	assert.Equal(t, "nothing sent yet", line(s))
+	s.LastPrompt = "run the tests"
+
+	s.Status = claudesession.StatusWorking
+	assert.True(t, strings.HasSuffix(line(s), "✳ working"), line(s))
+	s.Status, s.PendingTool = claudesession.StatusWaiting, "Bash(go test ./...)"
+	assert.True(t, strings.HasSuffix(line(s), "◉ asks you: Bash(go test ./...)"), line(s))
+	s.PendingTool = "Bash(" + strings.Repeat("a very long command ", 6) + ")"
+	asks := line(s)
+	assert.Contains(t, asks, "you: “run the", "what it asks takes half the line at most: your message keeps the rest")
+	assert.Contains(t, asks, "◉ asks you: Bash(a very")
+
+	remote := claudesession.Session{ID: "app:cse_1", Title: "b1", Live: true,
+		App: &claudesession.AppSession{Doing: "redteam-root · arch/agent-swarm"}}
+	assert.Equal(t, "redteam-root · arch/agent-swarm", line(remote),
+		"a session of the Remote section: what claude.ai says")
+	assert.Contains(t, m.dockAskEdge(remote, 60), "on another computer · enter: open in Claude app")
+
+	m.sessions.composer.SetValue("half a\nthought")
+	assert.True(t, strings.HasPrefix(line(s), "draft: half a thought"),
+		"a draft that waits shows in the message's place, its lines as one: %q", line(s))
+}
+
+// While the Ask box is written in, a line under the draft says what sending
+// does when that isn't the usual: here, that the session asks you something.
+func TestTheAskBoxSaysWhenSendingIsntTheUsual(t *testing.T) {
+	ownAskHistory(t)
+	m := dockTestModel(t)
+	m.fileModel.filePreview.SetOpen(true)
+	bang(m)
+	selected, ok := m.selectedSession()
+	require.True(t, ok)
+	pressKey(m, common.Hotkeys.OpenAskBar[0])
+	require.True(t, m.askSending().Usual, m.askSending().Text)
+	assert.Equal(t, askMinHeight, m.lay.ask.h, "the usual: the draft's line alone")
+
+	for i := range m.claude.snapshot.Live {
+		if m.claude.snapshot.Live[i].ID == selected.ID {
+			m.claude.snapshot.Live[i].Status = claudesession.StatusWaiting
+		}
+	}
+	m.refreshSessionsList()
+	m.relayout()
+	require.False(t, m.askSending().Usual, m.askSending().Text)
+	lines := strings.Split(ansi.Strip(m.dockAskRender()), "\n")
+	require.Len(t, lines, askMinHeight+1, "a line more")
+	assert.Contains(t, lines[2], "→ it asks you something")
 }
 
 func TestEscFromTheAskBoxGoesBackToTheFiles(t *testing.T) {
@@ -311,7 +491,7 @@ func TestTheSessionsBoxMarksRemoteControl(t *testing.T) {
 	}
 	m.refreshSessionsList()
 
-	box := ansi.Strip(m.dockSessionsRender())
+	box := ansi.Strip(sessionsBoxRender(m))
 	var marked []string
 	for _, line := range strings.Split(box, "\n") {
 		if strings.Contains(line, " rc ") {

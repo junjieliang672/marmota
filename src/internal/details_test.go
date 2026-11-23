@@ -3,6 +3,7 @@ package internal
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -48,7 +49,11 @@ func TestDetailsReplacesTheFooterBoxes(t *testing.T) {
 func TestMFocusesDetailsAndArrowsScrollIt(t *testing.T) {
 	m := detailsTestModel(t)
 	m.macStats = &sysstat.Stats{CPUOK: true, MemOK: true, MemTotal: 1, DiskOK: true, DiskTotal: 1}
-	m.details.SetDimensions(m.fullWidth, 3) // one line shows, so it can scroll
+	// Details is as tall as FILE, MAC and two operations: with twelve
+	// operations, it can scroll.
+	for i := range 12 {
+		require.NoError(t, m.processBarModel.AddProcess(processbar.NewProcess(strconv.Itoa(i), "copy", 1)))
+	}
 	m.View()
 
 	TeaUpdate(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(common.Hotkeys.FocusOnMetaData[0])})
@@ -77,16 +82,17 @@ func TestStatusLineMeterOnlyWhileDetailsIsHidden(t *testing.T) {
 
 func TestWheelOverDetails(t *testing.T) {
 	m := detailsTestModel(t)
-	top := m.mainPanelHeight + common.BorderPadding
+	d := m.lay.details
+	require.True(t, d.shown(), "Details is at the sidebar's foot")
+	require.Equal(t, m.lay.body, d.y+d.h)
 
-	x := m.dockSessionsWidth() // Details starts after the Sessions box
-	assert.Equal(t, detailsArea, m.previewUnder(x, top))
-	assert.Equal(t, detailsArea, m.previewUnder(x, top+m.footerHeight+1))
-	assert.NotEqual(t, detailsArea, m.previewUnder(x, top-1))
-	assert.NotEqual(t, detailsArea, m.previewUnder(x-1, top), "the Sessions box isn't Details")
+	assert.Equal(t, detailsArea, m.previewUnder(d.x, d.y))
+	assert.Equal(t, detailsArea, m.previewUnder(d.x+d.w-1, d.y+d.h-1))
+	assert.NotEqual(t, detailsArea, m.previewUnder(d.x, d.y-1), "the Ask box above it isn't Details")
+	assert.NotEqual(t, detailsArea, m.previewUnder(d.x+d.w, d.y), "nor is what is right of the sidebar")
 
 	m.toggleFooterController()
-	assert.NotEqual(t, detailsArea, m.previewUnder(x, top))
+	assert.NotEqual(t, detailsArea, m.previewUnder(d.x, d.y))
 }
 
 func TestMOpensAHiddenDetailsBox(t *testing.T) {

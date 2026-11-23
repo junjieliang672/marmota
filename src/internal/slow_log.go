@@ -44,6 +44,9 @@ func noteSlow(what string, msg any, start time.Time) {
 		if k, ok := msg.(tea.KeyMsg); ok {
 			name += " " + k.String()
 		}
+		if text, ok := msg.(string); ok {
+			name = text // a step of work off the screen's loop, named
+		}
 		fmt.Fprintf(f, "%s %s %s %s\n", time.Now().Format("15:04:05.000"), what, name, took)
 	}
 }

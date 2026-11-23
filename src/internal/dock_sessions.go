@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -10,6 +12,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 
+	variable "github.com/junjieliang672/marmota/src/config"
 	"github.com/junjieliang672/marmota/src/internal/common"
 	"github.com/junjieliang672/marmota/src/internal/ui"
 	askui "github.com/junjieliang672/marmota/src/internal/ui/ask"
@@ -18,12 +21,14 @@ import (
 	"github.com/junjieliang672/marmota/src/pkg/claudesession"
 )
 
-// The Sessions box is the left of the dock at the foot of the screen: the
-// live sessions, two lines each. ! gives it the keyboard, on the session
-// that most recently started needing you, else the one you were last on,
-// else the first; ! or esc gives the keyboard back. While it has the
-// keyboard, the preview shows the selected session, and its question when
-// it asks one. It moves m.sessions.list.
+// The Sessions box is under the preview, as wide as it: the live sessions,
+// a row each, in two columns when the box is wide enough for both to say
+// everything. It is as tall as its sessions, up to a share of the screen
+// (layout.go). ! gives it the keyboard, on the session that most recently
+// started needing you, else the one you were last on, else the first; ! or
+// esc gives the keyboard back. While it has the keyboard, the preview shows
+// the selected session, and its question when it asks one. It moves
+// m.sessions.list.
 
 // dockState is what the Sessions box keeps between visits.
 type dockState struct {
@@ -45,19 +50,20 @@ type dockState struct {
 	// popupFrom is set while the s or z popup the box opened is open:
 	// closed without going anywhere, it gives the keyboard back to the box.
 	popupFrom bool
+	// rows is the lines the box had when Marmota last ran, read once from
+	// SessionsRowsFile (rowsRead) and kept there as it changes: the box is
+	// that tall from the first frame, before the sessions are listed.
+	rows     int
+	rowsRead bool
 }
 
 const (
-	dockSessionsMinWidth = 30
-	dockSessionsMaxWidth = 56
-	dockRowLines         = 2
+	// dockTitleMaxWidth is the widest the titles' column gets.
+	dockTitleMaxWidth = 22
+	// dockDoingMinWidth is the room what a session does needs to be worth
+	// saying; with less, its title has the row.
+	dockDoingMinWidth = 10
 )
-
-// dockSessionsWidth is the Sessions box's width: a third of the screen,
-// within limits.
-func (m *model) dockSessionsWidth() int {
-	return min(max(m.fullWidth/3, dockSessionsMinWidth), dockSessionsMaxWidth) //nolint:mnd // a third
-}
 
 // sessionsShown reports whether a session is on screen to watch: sessions
 // mode, or the Sessions box with the keyboard.
@@ -93,8 +99,7 @@ func (m *model) dockPick(sessions []claudesession.Session, from string) string {
 	return sessions[0].ID
 }
 
-// focusDockSessions gives the Sessions box the keyboard, showing the dock
-// first when it is hidden.
+// focusDockSessions gives the Sessions box the keyboard.
 func (m *model) focusDockSessions() tea.Cmd {
 	return m.focusDockSessionsOn("")
 }
@@ -103,9 +108,6 @@ func (m *model) focusDockSessions() tea.Cmd {
 // with id "", on the one ! picks.
 func (m *model) focusDockSessionsOn(id string) tea.Cmd {
 	var cmds []tea.Cmd
-	if !m.toggleFooter {
-		cmds = append(cmds, m.toggleFooterController())
-	}
 	m.refreshSessionsList()
 	if id == "" || !slices.ContainsFunc(m.dockSessions(), func(s claudesession.Session) bool { return s.ID == id }) {
 		from := ""
@@ -280,10 +282,45 @@ func (m *model) dockSessionsKey(msg tea.KeyMsg) tea.Cmd {
 		m.leaveDockSessions()
 		m.dock.popupFrom = true
 		return m.openJump()
+	default:
+		return m.dockScreenKey(key)
 	}
 	if list.SelectedID() != prev {
 		m.sessions.scroll = 0
 		return m.sessionsSelectionChanged()
+	}
+	return nil
+}
+
+// dockScreenKey handles, while the Sessions box has the keyboard, the keys
+// of the files that act on no file: those that change what the screen shows
+// do it and leave the keyboard here, those that go to another box take it
+// there. A key that acts on the file under a panel's cursor (open, delete,
+// paste) does nothing here: that file isn't what you are looking at.
+func (m *model) dockScreenKey(key string) tea.Cmd {
+	toFiles := func() {
+		m.leaveDockSessions()
+		m.focusPanel = nonePanelFocus
+		m.getFocusedFilePanel().isFocused = true
+	}
+	switch {
+	case slices.Contains(common.Hotkeys.ToggleFooter, key):
+		return m.toggleFooterController()
+	case slices.Contains(common.Hotkeys.ToggleFilePreviewPanel, key):
+		m.toggleFilePreviewPanel()
+	case slices.Contains(common.Hotkeys.ToggleDotFile, key):
+		m.toggleDotFileController()
+	case slices.Contains(common.Hotkeys.BackToEditor, key):
+		return m.backToEditor()
+	case slices.Contains(common.Hotkeys.FocusOnMetaData, key):
+		toFiles()
+		return m.focusOnMetadata()
+	case slices.Contains(common.Hotkeys.NextFilePanel, key):
+		toFiles()
+		m.nextFilePanel()
+	case slices.Contains(common.Hotkeys.PreviousFilePanel, key):
+		toFiles()
+		m.previousFilePanel()
 	}
 	return nil
 }
@@ -316,65 +353,200 @@ func (m *model) startingSessionKey(st *askStart, key string) bool {
 	return true
 }
 
-// dockRender is the dock: the Sessions box, Details and the Ask box; the
-// Ask box takes Details' room while it has the keyboard.
-func (m *model) dockRender() string {
-	if m.dockAskOpen() {
-		return lipgloss.JoinHorizontal(lipgloss.Top, m.dockSessionsRender(),
-			m.dockAskRender(m.fullWidth-m.dockSessionsWidth()))
+// dockEntry is a line of the Sessions box: a session, or the Remote
+// section's note.
+type dockEntry struct {
+	session int // its place in the sessions, -1 for the note
+}
+
+// dockEntries is the box's lines in order: this computer's sessions, the
+// Remote section's note when claude.ai can't be asked, then its sessions.
+func (m *model) dockEntries(sessions []claudesession.Session) []dockEntry {
+	note := m.appSectionNote() != ""
+	var out []dockEntry
+	noted := false
+	for i, s := range sessions {
+		if note && !noted && s.App != nil {
+			out = append(out, dockEntry{session: -1})
+			noted = true
+		}
+		out = append(out, dockEntry{session: i})
 	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, m.dockSessionsRender(), m.detailsRender(),
-		m.dockAskRender(m.dockAskIdleWidth()))
+	if note && !noted && m.app.err != nil {
+		out = append(out, dockEntry{session: -1})
+	}
+	return out
+}
+
+// dockNoSessionsLines is how many lines say there are no sessions and how
+// to start one.
+const dockNoSessionsLines = 2
+
+// dockSessionLineCount is how many lines the box has to show, which is how
+// tall it is. Until the sessions are listed it is what the box had when
+// Marmota last ran, so the boxes are where they will be from the first
+// frame: this computer's sessions and claude.ai's arrive one after the
+// other, each a moment after the screen is first drawn.
+func (m *model) dockSessionLineCount() int {
+	sessions := m.dockSessions()
+	n := len(m.dockEntries(sessions))
+	if len(sessions) == 0 {
+		n += dockNoSessionsLines
+	}
+	if !m.sessionsListed() {
+		n = max(n, m.dockRowsBefore())
+	}
+	return n
+}
+
+// sessionsListed reports whether both lists have answered once: this
+// computer's sessions, and claude.ai's (or that it can't be asked).
+func (m *model) sessionsListed() bool {
+	return m.claude.loaded && (m.app.answered || !appSessionsAutoRefresh)
+}
+
+// dockRowsBefore is the lines the Sessions box had when Marmota last ran, 0
+// when that isn't known.
+func (m *model) dockRowsBefore() int {
+	if !m.dock.rowsRead {
+		m.dock.rowsRead = true
+		if data, err := os.ReadFile(variable.SessionsRowsFile); err == nil {
+			m.dock.rows, _ = strconv.Atoi(strings.TrimSpace(string(data)))
+		}
+	}
+	return m.dock.rows
+}
+
+// rememberDockRows keeps the lines the Sessions box has, once the sessions
+// are listed and when the number changes, for the next start.
+func (m *model) rememberDockRows() tea.Cmd {
+	if !m.sessionsListed() {
+		return nil
+	}
+	rows := m.dockSessionLineCount()
+	if rows == m.dockRowsBefore() {
+		return nil
+	}
+	m.dock.rows = rows
+	path := variable.SessionsRowsFile
+	return func() tea.Msg {
+		if err := os.MkdirAll(filepath.Dir(path), 0o750); err == nil {
+			_ = os.WriteFile(path, []byte(strconv.Itoa(rows)+"\n"), 0o600)
+		}
+		return nil
+	}
 }
 
 // dockSessionsRender draws the Sessions box.
 func (m *model) dockSessionsRender() string {
-	width, height := m.dockSessionsWidth(), m.footerHeight+common.BorderPadding
+	box := m.lay.sessions
+	if !box.shown() {
+		return ""
+	}
 	focused := m.focusPanel == dockSessionsFocus
-	r := ui.DefaultFooterRenderer(height, width, focused)
+	r := ui.DefaultFooterRenderer(box.h, box.w, focused)
 	r.SetBorderTitleGlyph("✳", lipgloss.Color(claudeColor))
 	r.SetBorderTitle("Sessions")
 	hint := firstKey(common.Hotkeys.JumpToUnreadSession) + " go"
 	if focused {
 		hint = "esc back"
 	}
-	r.SetBorderInfoItems(hint)
 
-	inner := width - common.BorderPadding
-	view := height - common.BorderPadding
+	inner := box.w - common.BorderPadding
+	view := box.h - common.BorderPadding
 	sessions := m.dockSessions()
+	entries := m.dockEntries(sessions)
+	if len(sessions) == 0 && !m.sessionsListed() {
+		// Not listed yet: the box has the height it had last time.
+		r.SetBorderInfoItems(hint)
+		r.AddLines(dockDim(" Listing the sessions…"))
+		return r.Render()
+	}
 	if len(sessions) == 0 {
+		r.SetBorderInfoItems(hint)
 		r.AddLines(dockDim(" No live sessions"), dockDim(" "+firstKey(common.Hotkeys.OpenAgentPrompt)+"claude or "+
 			firstKey(common.Hotkeys.OpenAgentPrompt)+"codex starts one"))
-		if m.app.err != nil {
+		if len(entries) > 0 {
 			r.AddLines(m.remoteSectionLines(inner)...)
 		}
 		return r.Render()
 	}
-	now := time.Now()
-	sel := m.sessions.list.SelectedID()
-	var lines []string
-	selLine := 0
-	for i, s := range sessions {
-		if s.App != nil && (i == 0 || sessions[i-1].App == nil) {
-			lines = append(lines, m.remoteSectionLines(inner)...)
-		}
-		selected := focused && s.ID == sel
-		if selected {
-			selLine = len(lines)
-		}
-		lines = append(lines, m.dockRow(i+1, s, selected, inner, now)...)
-	}
-	if m.app.err != nil && !slices.ContainsFunc(sessions, func(s claudesession.Session) bool { return s.App != nil }) {
-		lines = append(lines, m.remoteSectionLines(inner)...)
+
+	cols := max(1, m.lay.sessionCols)
+	colWidth := inner
+	if cols > 1 {
+		colWidth = (inner - sessionColumnGap*(cols-1)) / cols
 	}
 	// Keep the selected session in view.
-	top := 0
-	if selLine+dockRowLines > view {
-		top = selLine + dockRowLines - view
+	sel, selAt := m.sessions.list.SelectedID(), 0
+	for i, e := range entries {
+		if e.session >= 0 && sessions[e.session].ID == sel {
+			selAt = i
+		}
 	}
-	r.AddLines(lines[top:min(len(lines), top+view)]...)
+	room := view * cols
+	top := 0
+	if focused && selAt >= room {
+		top = selAt - room + 1
+	}
+	shown := entries[top:min(len(entries), top+room)]
+	if seen := countSessions(shown); seen < len(sessions) {
+		hint = strconv.Itoa(seen) + "/" + strconv.Itoa(len(sessions)) + " · " + hint
+	}
+	r.SetBorderInfoItems(hint)
+
+	now := time.Now()
+	titles := m.dockTitleWidth(sessions)
+	base := lipgloss.NewStyle().Background(common.FooterBGColor)
+	for row := 0; row < view && row < len(shown); row++ {
+		var line strings.Builder
+		for c := range cols {
+			if c > 0 {
+				line.WriteString(base.Render(strings.Repeat(" ", sessionColumnGap)))
+			}
+			if at := c*view + row; at < len(shown) {
+				line.WriteString(m.dockEntryLine(shown[at], sessions, focused, colWidth, titles, now))
+			} else {
+				line.WriteString(base.Render(strings.Repeat(" ", colWidth)))
+			}
+		}
+		r.AddLines(line.String())
+	}
 	return r.Render()
+}
+
+func countSessions(entries []dockEntry) int {
+	n := 0
+	for _, e := range entries {
+		if e.session >= 0 {
+			n++
+		}
+	}
+	return n
+}
+
+// dockTitleWidth is the titles' column: as wide as the longest title, so
+// what the sessions do starts in one column.
+func (m *model) dockTitleWidth(sessions []claudesession.Session) int {
+	w := 0
+	for _, s := range sessions {
+		w = max(w, ansi.StringWidth(s.DisplayTitle()))
+	}
+	return min(w, dockTitleMaxWidth)
+}
+
+func (m *model) dockEntryLine(e dockEntry, sessions []claudesession.Session, focused bool, width, titles int,
+	now time.Time,
+) string {
+	if e.session < 0 {
+		if lines := m.remoteSectionLines(width); len(lines) > 0 {
+			return lines[0]
+		}
+		return strings.Repeat(" ", width)
+	}
+	s := sessions[e.session]
+	selected := focused && s.ID == m.sessions.list.SelectedID()
+	return m.dockRow(e.session+1, len(sessions), s, selected, width, titles, now)
 }
 
 // remoteSectionLines head the Remote section: nothing, its rows' cloud says
@@ -393,9 +565,13 @@ func (m *model) remoteSectionLines(width int) []string {
 // claudeColor is the ✳ orange superfile uses for Claude.
 const claudeColor = "#D97757"
 
-// dockRow is a session's two lines: number, state, agent (cc, co), title
-// and age; then what it is doing or asking.
-func (m *model) dockRow(n int, s claudesession.Session, selected bool, width int, now time.Time) []string {
+// dockRow is a session's row: number, state, agent (cc, co), title, what it
+// is doing or asking, then where it runs and how long ago it last did
+// something. count is how many sessions there are: the numbers are as wide
+// as the largest, so the titles start in one column, titles wide.
+func (m *model) dockRow(n, count int, s claudesession.Session, selected bool, width, titles int,
+	now time.Time,
+) string {
 	bg := common.FilePanelBGColor
 	if selected && common.FilePanelCursorRowBGColor != "" {
 		bg = common.FilePanelCursorRowBGColor
@@ -403,16 +579,17 @@ func (m *model) dockRow(n int, s claudesession.Session, selected bool, width int
 	base := lipgloss.NewStyle().Background(bg).Foreground(common.FooterFGColor)
 	dim := base.Foreground(lipgloss.Color(common.Theme.FooterBorder))
 	state := m.sessionState(s)
-	// The selected session has a bar down its left edge, on both its lines;
-	// the cursor glyph sat on top of the number.
-	mark := base.Render("  ")
+	// The selected session has a bar at its left edge; the cursor glyph sat
+	// on top of the number.
+	mark := base.Render(" ")
 	if selected {
-		mark = base.Foreground(lipgloss.Color(common.Theme.FilePanelBorderActive)).Render("▌") + base.Render(" ")
+		mark = base.Foreground(lipgloss.Color(common.Theme.FilePanelBorderActive)).Render("▌")
 	}
-	prefix := mark + dim.Render(strconv.Itoa(n)+" ") + sessionsui.Glyph(state, bg) + base.Render(" ") +
+	number := strconv.Itoa(n)
+	number = strings.Repeat(" ", max(0, len(strconv.Itoa(count))-len(number))) + number
+	prefix := mark + dim.Render(number+" ") + sessionsui.Glyph(state, bg) + base.Render(" ") +
 		common.AgentTag(s.IsCodex(), bg) + base.Render(" ")
-	// Where it runs, then Remote Control, beside the age, so the titles stay
-	// in line and keep the room.
+	// Where it runs, then Remote Control, beside the age, at the row's end.
 	age := dim.Render(shortAge(now, sessionAgeAnchor(s)))
 	if s.RemoteControl {
 		age = common.RemoteControlMark(bg) + base.Render(" ") + age
@@ -435,26 +612,38 @@ func (m *model) dockRow(n int, s claudesession.Session, selected bool, width int
 	if state == sessionsui.NeedsYou {
 		titleStyle = titleStyle.Foreground(sessionsui.StateColor(state))
 	}
-	var title string
-	if m.sessions.list.IsRenaming() && selected {
-		title = m.sessions.list.RenameView(max(1, width-ansi.StringWidth(prefix)-1))
-	} else {
-		room := width - ansi.StringWidth(prefix) - ansi.StringWidth(age) - 1
-		title = titleStyle.Render(ansi.Truncate(s.DisplayTitle(), max(1, room), "…"))
+	// The room between the prefix and the age, a space before the age.
+	room := max(1, width-ansi.StringWidth(prefix)-ansi.StringWidth(age)-1)
+	var middle string
+	switch doingRoom := room - titles - 2; { //nolint:mnd // two spaces after the title
+	case m.sessions.list.IsRenaming() && selected:
+		middle = m.sessions.list.RenameView(room)
+	case doingRoom >= dockDoingMinWidth:
+		doingStyle := dim
+		if state == sessionsui.NeedsYou {
+			doingStyle = base.Foreground(sessionsui.StateColor(state))
+		}
+		title := ansi.Truncate(s.DisplayTitle(), titles, "…")
+		doing := m.dockDoing(s, state)
+		// What it does starts in the titles' column's line, two spaces after
+		// the widest title. When it doesn't fit there, it starts as far left
+		// as it needs, up to two spaces after this row's own title.
+		pad := titles - ansi.StringWidth(title)
+		if over := ansi.StringWidth(doing) - doingRoom; over > 0 {
+			give := min(over, pad)
+			pad -= give
+			doingRoom += give
+		}
+		middle = titleStyle.Render(title) + base.Render(strings.Repeat(" ", pad+2)) + //nolint:mnd // two spaces
+			doingStyle.Render(ansi.Truncate(doing, doingRoom, "…"))
+	default:
+		middle = titleStyle.Render(ansi.Truncate(s.DisplayTitle(), room, "…"))
 	}
-	first := prefix + title
-	if gap := width - ansi.StringWidth(first) - ansi.StringWidth(age); gap > 0 {
-		first += base.Render(strings.Repeat(" ", gap))
+	line := prefix + middle
+	if gap := width - ansi.StringWidth(line) - ansi.StringWidth(age); gap > 0 {
+		line += base.Render(strings.Repeat(" ", gap))
 	}
-	first += age
-
-	doingStyle := dim
-	if state == sessionsui.NeedsYou {
-		doingStyle = base.Foreground(sessionsui.StateColor(state))
-	}
-	indent := mark + base.Render(strings.Repeat(" ", ansi.StringWidth(prefix)-ansi.StringWidth(mark)))
-	second := indent + doingStyle.Render(ansi.Truncate(m.dockDoing(s, state), max(1, width-ansi.StringWidth(indent)), "…"))
-	return []string{dockFill(first, width, base), dockFill(second, width, base)}
+	return dockFill(line+age, width, base)
 }
 
 // dockDoing is what a session is doing, in a few words.
@@ -470,6 +659,11 @@ func (m *model) dockDoing(s claudesession.Session, state sessionsui.State) strin
 	case sessionsui.Unread:
 		return "replied, unread"
 	case sessionsui.Idle:
+		// What you last asked it says which session this is; that it waits
+		// for you, its mark says.
+		if p := oneLine(s.LastPrompt); p != "" {
+			return "you: " + p
+		}
 		return "waiting for your next prompt"
 	case sessionsui.Ended:
 	}

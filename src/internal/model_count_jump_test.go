@@ -138,7 +138,7 @@ func TestFilePanelRender_ShowsLineNumbers(t *testing.T) {
 
 	m := defaultTestModel(root)
 
-	plain := ansi.Strip(m.filePanelRender())
+	plain := ansi.Strip(m.sidebarRender())
 	assert.Regexp(t, `(?m)\s1 .*file01\.txt`, plain)
 	assert.Regexp(t, `(?m)\s10 .*file10\.txt`, plain)
 }

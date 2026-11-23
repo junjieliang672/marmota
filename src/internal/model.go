@@ -80,6 +80,14 @@ func (m *model) Init() tea.Cmd {
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	defer noteSlow("update", msg, time.Now())
 	newModel, cmd := m.update(typedText(msg))
+	if m.relayout() {
+		// The preview has another size: what it shows is drawn again for it.
+		m.previewRefreshPending = false
+		cmd = tea.Batch(cmd, m.requestFilePreviewRender(true))
+	}
+	if remember := m.rememberDockRows(); remember != nil {
+		cmd = tea.Batch(cmd, remember)
+	}
 	m.syncIMEHold()
 	return newModel, cmd
 }
@@ -642,106 +650,19 @@ func (m *model) handleWindowResize(msg tea.WindowSizeMsg) {
 	m.fullHeight = msg.Height
 	m.fullWidth = msg.Width
 
-	m.setHeightValues(msg.Height)
-
-	if m.fileModel.filePreview.IsOpen() {
-		// File preview panel width same as file panel
-		m.setFilePreviewPanelSize()
-	}
-
-	m.setFilePanelsSize(msg.Width)
-	m.setHelpMenuSize()
-	m.setDetailsSize()
-	m.setPromptModelSize()
-	m.setJumpSize()
 	m.setStatusLineModelSize()
-
-	if m.fileModel.maxFilePanel >= common.FilePanelMax {
-		m.fileModel.maxFilePanel = common.FilePanelMax
-	}
+	m.relayout()
+	m.setHelpMenuSize()
+	m.setPromptModelSize()
 }
 
-func (m *model) setFilePreviewPanelSize() {
-	m.fileModel.filePreview.SetWidth(m.getFilePreviewWidth())
-	m.fileModel.filePreview.SetHeight(m.mainPanelHeight + common.BorderPadding)
-}
-
-// Set file preview panel Widht to width. Assure that
-func (m *model) getFilePreviewWidth() int {
-	if common.Config.FilePreviewWidth == 0 {
-		return (m.fullWidth -
-			(common.BorderPadding + (len(m.fileModel.filePanels))*common.BorderPadding)) / (len(m.fileModel.filePanels) + 1)
-	}
-	return (m.fullWidth) / common.Config.FilePreviewWidth
-}
-
-// Proper set panels size. Assure that panels do not overlap
-func (m *model) setFilePanelsSize(width int) {
-	// set each file panel size and max file panel amount
-	availableWidth := width - m.fileModel.filePreview.GetWidth()
-	requiredPadding := common.BorderPadding + (len(m.fileModel.filePanels)-1)*common.BorderPadding
-
-	// Prevent negative/zero width
-	if availableWidth-requiredPadding <= 0 {
-		slog.Error("Insufficient width for file panels",
-			"availableWidth", availableWidth,
-			"requiredPadding", requiredPadding,
-			"numPanels", len(m.fileModel.filePanels))
-		m.fileModel.width = common.MinWidthForRename
-		m.fileModel.maxFilePanel = 1
-		return
-	}
-
-	m.fileModel.width = (availableWidth - requiredPadding) / len(m.fileModel.filePanels)
-
-	// Enforce minimum
-	if m.fileModel.width < common.MinWidthForRename {
-		slog.Warn("File panel width below minimum",
-			"calculatedWidth", m.fileModel.width,
-			"minimum", common.MinWidthForRename)
-		m.fileModel.width = common.MinWidthForRename
-	}
-
-	m.fileModel.maxFilePanel = availableWidth / common.FilePanelWidthUnit
-
-	for i := range m.fileModel.filePanels {
-		m.fileModel.filePanels[i].searchBar.Width = m.fileModel.width - common.InnerPadding
-	}
-}
+// setFilePreviewPanelSize and setHeightValues gave the preview and the panels
+// their sizes; every box has its place from relayout now.
+func (m *model) setFilePreviewPanelSize() { m.relayout() }
 
 func (m *model) setHeightValues(height int) {
-	//nolint: gocritic // This is to be separated out to a function, and made better later. No need to refactor here
-	if !m.toggleFooter {
-		m.footerHeight = 0
-	} else if height < common.HeightBreakA {
-		m.footerHeight = 6
-	} else if height < common.HeightBreakB {
-		m.footerHeight = 7
-	} else if height < common.HeightBreakC {
-		m.footerHeight = 8
-	} else if height < common.HeightBreakD {
-		m.footerHeight = 9
-	} else {
-		m.footerHeight = 10
-	}
-	// TODO : Make it grow even more for bigger screen sizes.
-	// TODO : Calculate the value , instead of manually hard coding it.
-
-	// Calculate status line height
-	statusLineHeight := 0
-	if common.Config.ShowStatusLine && m.statusLineModel.IsEnabled() {
-		statusLineHeight = m.statusLineModel.GetHeight()
-	}
-
-	// Main panel height = Total terminal height - 2(file panel border) - footer height - status line height
-	m.mainPanelHeight = height - common.BorderPadding - utils.FullFooterHeight(
-		m.footerHeight,
-		m.toggleFooter,
-	) - statusLineHeight
-
-	for index := range m.fileModel.filePanels {
-		m.fileModel.filePanels[index].handleResize(m.mainPanelHeight)
-	}
+	m.fullHeight = height
+	m.relayout()
 }
 
 // Set help menu size
@@ -1101,46 +1022,44 @@ func (m *model) View() string {
 		slog.Error("Invalid layout", "error", err)
 	}
 
-	// No sidebar column: s lists its places in the focused panel.
-	sidebar := ""
+	// The sidebar, and right of it the preview, the Ask box and the Sessions
+	// box (layout.go).
+	sidebar := m.sidebarRender()
 
-	filePanel := m.filePanelRender()
-
-	filePreview := m.filePreviewPanelRender()
-	if s, ok := m.jumpPreviewSession(); ok {
-		// The s list is on a session: the preview shows it.
-		filePreview = m.jumpSessionPreview(s, m.fileModel.filePreview.GetWidth(),
-			m.fileModel.filePreview.GetHeight()) + filepreview.ClearKittyImages()
-	} else if m.previewShowsASession() {
-		// The preview shows the session the Sessions box is on. An image
-		// the file preview drew, such as a PDF's page, stays on the screen
-		// over it until cleared; back in the files, it is drawn again.
-		filePreview = highlightSelection(m.dockSessionPreview(m.fileModel.filePreview.GetWidth(),
-			m.fileModel.filePreview.GetHeight()), m.sessions.selection) + filepreview.ClearKittyImages()
+	var right []string
+	if m.lay.preview.shown() {
+		filePreview := m.filePreviewPanelRender()
+		if s, ok := m.jumpPreviewSession(); ok {
+			// The s list is on a session: the preview shows it.
+			filePreview = m.jumpSessionPreview(s, m.fileModel.filePreview.GetWidth(),
+				m.fileModel.filePreview.GetHeight()) + filepreview.ClearKittyImages()
+		} else if m.previewShowsASession() {
+			// The preview shows the session the Sessions box is on. An image
+			// the file preview drew, such as a PDF's page, stays on the screen
+			// over it until cleared; back in the files, it is drawn again.
+			filePreview = highlightSelection(m.dockSessionPreview(m.fileModel.filePreview.GetWidth(),
+				m.fileModel.filePreview.GetHeight()), m.sessions.selection) + filepreview.ClearKittyImages()
+		}
+		right = append(right, filePreview)
 	}
-
-	mainPanel := lipgloss.JoinHorizontal(0, sidebar, filePanel, filePreview)
+	// Hidden, the preview draws nothing but what clears an image it showed.
+	hiddenPreview := ""
+	if !m.lay.preview.shown() {
+		hiddenPreview = m.filePreviewPanelRender()
+	}
+	if m.lay.ask.shown() {
+		right = append(right, m.dockAskRender())
+	}
+	if m.lay.sessions.shown() {
+		right = append(right, m.dockSessionsRender())
+	}
+	rightColumn := strings.Join(right, "\n")
 
 	if common.Config.Debug {
-		showRenderDebugStatsMain(sidebar, filePanel, filePreview)
+		showRenderDebugStatsMain(sidebar, rightColumn)
 	}
 
-	var footer string
-	slog.Debug("Rendering, toggleFooter state", "value", m.toggleFooter, "footerHeight", m.footerHeight)
-	if m.toggleFooter {
-		footer = m.dockRender()
-	}
-
-	var finalRender string
-
-	// Each part is as wide as the screen already: lines put one under
-	// another (lipgloss.JoinVertical would measure every line of the screen
-	// again, on each drawing).
-	if m.toggleFooter {
-		finalRender = mainPanel + "\n" + footer
-	} else {
-		finalRender = mainPanel
-	}
+	finalRender := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, hiddenPreview, rightColumn)
 
 	// Add status line at the bottom if enabled
 	if common.Config.ShowStatusLine && m.statusLineModel.IsEnabled() {
@@ -1213,11 +1132,10 @@ func (m *model) updateRenderForOverlay(finalRender string) string {
 	return finalRender
 }
 
-func showRenderDebugStatsMain(sidebar, filePanel, filePreview string) {
-	slog.Debug("Render stats for main panel",
+func showRenderDebugStatsMain(sidebar, right string) {
+	slog.Debug("Render stats for the screen",
 		"sidebarLineCnt", getLineCnt(sidebar), "sidebarMaxW", getMaxW(sidebar),
-		"filePanelLineCnt", getLineCnt(filePanel), "filePanelMaxW", getMaxW(filePanel),
-		"filePreviewLineCnt", getLineCnt(filePreview), "filePreviewMaxW", getMaxW(filePreview),
+		"rightLineCnt", getLineCnt(right), "rightMaxW", getMaxW(right),
 	)
 }
 
@@ -1245,7 +1163,7 @@ func (m *model) getFilePanelItems() {
 				!filePanel.needsReRender() {
 				// only time says to look again: read off the screen's loop
 				m.refreshDirInBackground(i, nowTime)
-				filePanel.scrollToCursor(m.mainPanelHeight)
+				filePanel.scrollToCursor(m.panelRows(i))
 				continue
 			}
 			// Throttle expired — invalidate cache to pick up external filesystem changes.
@@ -1261,7 +1179,7 @@ func (m *model) getFilePanelItems() {
 			}
 		}
 		// Due to applyTargetFileCursor, cursor might go out of range
-		filePanel.scrollToCursor(m.mainPanelHeight)
+		filePanel.scrollToCursor(m.panelRows(i))
 	}
 
 	m.updatedToggleDotFile = false

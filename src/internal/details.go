@@ -17,9 +17,10 @@ import (
 	"github.com/junjieliang672/marmota/src/pkg/sysstat"
 )
 
-// The Details box at the foot of the screen (F shows or hides it, M gives
-// it the keyboard) replaces the Processes and Metadata boxes: the cursor's
-// file, file operations and the machine, in one box that scrolls.
+// The Details box at the foot of the sidebar (F shows or hides it and the
+// Ask box above it, M gives it the keyboard) replaces the Processes and
+// Metadata boxes: the cursor's file, file operations and the machine, in one
+// box that scrolls. It is as tall as its sections (layout.go).
 
 // macInterval is how often the MAC section reads the machine.
 const macInterval = 2 * time.Second
@@ -207,20 +208,42 @@ func (m *model) detailsRender() string {
 		firstKey(common.Hotkeys.FocusOnMetaData))
 }
 
-// setDetailsSize gives Details the dock's width the Sessions and Ask boxes
-// leave.
-func (m *model) setDetailsSize() {
-	m.details.SetDimensions(m.detailsWidth(), m.footerHeight+common.BorderPadding)
-}
+// The lines each of Details' sections has for the box's height. FILE counts
+// as four whatever the file (its path, its name, and its size, date and
+// permissions on two rows in the sidebar's width), so the box keeps its
+// height as the cursor moves; a path that takes more rows scrolls.
+const (
+	detailsFileLines = 4
+	detailsMacLines  = 3
+	detailsOpsLines  = 2
+)
 
-func (m *model) detailsWidth() int {
-	return m.fullWidth - m.dockSessionsWidth() - m.dockAskIdleWidth()
+// detailsLineCount is how many lines Details is given: a section's lines,
+// and a blank line between two.
+func detailsLineCount(in details.Input) int {
+	n := 0
+	add := func(lines int) {
+		if n > 0 {
+			n++
+		}
+		n += lines
+	}
+	// FILE and MAC have their lines whether or not they have arrived: the
+	// file's facts and the machine's readings are read a moment after the
+	// screen is first drawn, and an empty folder has no file, and the box
+	// must not change height for either, or every box above it moves.
+	add(detailsFileLines)
+	add(detailsMacLines)
+	if len(in.Ops) > 0 {
+		add(min(len(in.Ops), detailsOpsLines))
+	}
+	return n
 }
 
 // opsStatus is the status line's word on file operations while the Details
 // box is hidden: the running one with a meter, else one that just finished.
 func (m *model) opsStatus() string {
-	if m.toggleFooter && !m.dockAskOpen() {
+	if m.toggleFooter {
 		return "" // Details shows them
 	}
 	now := time.Now()

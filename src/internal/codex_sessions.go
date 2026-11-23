@@ -481,7 +481,7 @@ func (m *model) codexSending(s claudesession.Session) askui.Sending {
 		return askui.Sending{Text: "it asks you something: " + firstKey(common.Hotkeys.OpenAskBar) +
 			" in the list answers it", Fixed: true}
 	}
-	sending := askui.Sending{Text: "sent to it (" + m.sessionPlace(s) + ")", Fixed: true,
+	sending := askui.Sending{Text: "sent to it (" + m.sessionPlace(s) + ")", Fixed: true, Usual: true,
 		Model: s.Model, Effort: s.Effort, Change: true}
 	if ch := m.ask.change; ch.id == s.ID && (ch.model != "" || ch.effort != "") {
 		sending.Model, sending.Effort = firstNonEmpty(ch.model, s.Model), firstNonEmpty(ch.effort, s.Effort)

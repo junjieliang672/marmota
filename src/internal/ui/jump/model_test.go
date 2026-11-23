@@ -53,7 +53,7 @@ func TestFilesAndFoldersShowFiveUntilSomethingIsTyped(t *testing.T) {
 	m.SetSize(140, 40)
 	m.Open(testSections())
 
-	assert.Equal(t, []string{"marmota", "notes", "group the logos", "logo sizes", "site", "archive",
+	assert.Equal(t, []string{"group the logos", "marmota", "notes", "logo sizes", "site", "archive",
 		"file0", "file1", "file2", "file3", "file4"}, titles(&m))
 
 	typeText(&m, "file7")
@@ -85,8 +85,8 @@ func TestTheSectionsSitOneUnderTheOtherInThePanel(t *testing.T) {
 
 	view := ansi.Strip(m.Render(true))
 	assert.Contains(t, view, "go to", "the panel's title")
-	assert.Equal(t, []string{"marmota", "notes", "group the logos", "logo sizes", "site", "archive",
-		"file0", "file1", "file2", "file3", "file4"}, titles(&m), "Pinned, Sessions, Resume, Folders, Files")
+	assert.Equal(t, []string{"group the logos", "marmota", "notes", "logo sizes", "site", "archive",
+		"file0", "file1", "file2", "file3", "file4"}, titles(&m), "Sessions, Pinned, Resume, Folders, Files")
 	lines := strings.Split(view, "\n")
 	var order []string
 	for _, l := range lines[3:] { // under the sections' names
@@ -96,7 +96,7 @@ func TestTheSectionsSitOneUnderTheOtherInThePanel(t *testing.T) {
 			}
 		}
 	}
-	assert.Equal(t, []string{"Pinned", "Sessions", "Resume", "Folders", "Files"}, order)
+	assert.Equal(t, []string{"Sessions", "Pinned", "Resume", "Folders", "Files"}, order)
 	for _, l := range lines {
 		assert.LessOrEqual(t, ansi.StringWidth(l), 60, "fits the panel")
 	}
@@ -119,7 +119,7 @@ func TestRowsAreNumbered(t *testing.T) {
 	m.Open(testSections())
 
 	view := ansi.Strip(m.Render(true))
-	assert.Contains(t, view, " 1 · marmota")
+	assert.Contains(t, view, " 2 · marmota", "the first pin, under the session")
 	assert.Contains(t, view, "11 · file4")
 }
 
@@ -193,17 +193,40 @@ func TestAShortPanelDropsBlankLinesThenEmptySections(t *testing.T) {
 	assert.Contains(t, view, "none")
 }
 
+// In the sidebar's 40 columns a row hasn't room for a name and where it is:
+// the name shows whole.
+func TestANarrowRowKeepsTheNameWhole(t *testing.T) {
+	m := New()
+	m.SetSize(40, 30)
+	m.Open([]Section{{Kind: Session, Items: []Item{{Kind: Session, Key: "s1", Title: "demo-session-01",
+		Where: "/repo/tidepool/branch-1", Tag: "cc", Meta: "working"}}}})
+
+	view := ansi.Strip(m.Render(true))
+	assert.Contains(t, view, "cc demo-session-01 ", "the name whole")
+	assert.Contains(t, view, "working")
+
+	m.SetSize(70, 30)
+	assert.Contains(t, ansi.Strip(m.Render(true)), "cc demo-session-01 /repo/tidepool/branch-1", "room for both: both")
+}
+
 func TestTheSectionsAreNamedUnderTheInput(t *testing.T) {
 	m := New()
 	m.SetSize(70, 30)
 	m.Open(testSections())
 
 	lines := strings.Split(ansi.Strip(m.Render(true)), "\n")
-	assert.Contains(t, lines[2], "All · Pinned · Sessions · Resume · Folders · Files", "under what you type")
+	assert.Contains(t, lines[2], "All · Sessions · Pinned · Resume · Folders · Files", "under what you type")
+	rows := len(lines)
 
-	m.SetSize(42, 30)
+	m.SetSize(40, 30) // the sidebar's width
 	lines = strings.Split(ansi.Strip(m.Render(true)), "\n")
-	assert.Contains(t, lines[2], "All Pinned Sessions Resume Folders Files", "narrow: only spaced")
+	assert.Equal(t, "All · Sessions · Pinned", strings.Trim(lines[2], "│ "), "narrow: they wrap, three a row")
+	assert.Equal(t, "Resume · Folders · Files", strings.Trim(lines[3], "│ "), "and none is cut")
+	assert.Len(t, lines, rows, "the list gives the row up: the panel is as tall")
+
+	m.SetSize(22, 30)
+	lines = strings.Split(ansi.Strip(m.Render(true)), "\n")
+	assert.Equal(t, "All · Sessions", strings.Trim(lines[2], "│ "), "narrower still: two a row")
 
 	m.Open(testSections(), Ended)
 	lines = strings.Split(ansi.Strip(m.Render(true)), "\n")

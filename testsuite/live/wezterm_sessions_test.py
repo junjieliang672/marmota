@@ -75,11 +75,11 @@ def screen(pane_id: int) -> str:
     return wezterm("get-text", "--pane-id", str(pane_id))
 
 
-# A row of the dock's Sessions box, at the screen's left edge: the bar that
-# marks the selected session, the number, the state glyph, the agent (cc for
-# Claude Code, which the fake claude stands for), the computer's mark, the
-# title.
-DOCK_ROW = re.compile(r"^│([▌ ]) (\d+) \S cc (?:\S )?(.+?)(?:\s{2,}|│)")
+# A row of the Sessions box, which is under the preview, right of the
+# sidebar: the bar that marks the selected session, the number, the state
+# glyph, the agent (cc for Claude Code, which the fake claude stands for) and
+# the title; what the session does and where it runs follow in the same row.
+DOCK_ROW = re.compile(r"│([▌ ])\s*(\d+) \S cc (.+?)(?:\s{2,}|│)")
 
 
 # The mark of a session with Remote Control on, with a Nerd Font (the default).
@@ -89,13 +89,13 @@ REMOTE_MARK = "\U000F011C"
 def dock_rows(pane_id: int) -> list[tuple[str, str, bool]]:
     """The Sessions box's rows, as (number, title, selected)."""
     rows = []
-    in_box = False
+    left = -1  # the column of the box's left edge
     for line in screen(pane_id).splitlines():
-        if line.startswith("╭─ ✳ Sessions"):
-            in_box = True
-        elif in_box and line.startswith("╰"):
+        if left < 0:
+            left = line.find("╭─ ✳ Sessions")
+        elif line[left:left + 1] == "╰":
             break
-        elif in_box and (m := DOCK_ROW.search(line)):
+        elif m := DOCK_ROW.match(line[left:]):
             rows.append((m.group(2), m.group(3), m.group(1) == "▌"))
     return rows
 
@@ -105,6 +105,13 @@ def in_sessions_box(pane_id: int) -> bool:
     to leave it."""
     lines = screen(pane_id).splitlines()
     return bool(lines) and "esc:files" in lines[-1]
+
+
+def in_ask_box(pane_id: int) -> bool:
+    """Whether the Ask box has the keyboard: the status line has its keys.
+    The box itself is on the screen all the time."""
+    lines = screen(pane_id).splitlines()
+    return bool(lines) and "enter:send" in lines[-1]
 
 
 def selected_session(pane_id: int) -> str:
@@ -192,6 +199,10 @@ def main() -> int:
     (data / "pinned.json").write_text(json.dumps([{"location": str(project / "assets"), "name": "assets"}]))
     (data / "recent_edits.json").write_text(json.dumps(
         [{"location": str(project / "notes.md"), "name": "notes.md", "edited_at": int(time.time())}]))
+    # The Sessions box's Remote section, read from a file in place of
+    # claude.ai: your sessions there stay out of the test's list, and
+    # claude.ai isn't asked.
+    (iso / "remote.json").write_text("[]")
 
     env_args = [
         "env",
@@ -210,6 +221,7 @@ def main() -> int:
         "MARMOTA_NO_TMUX=1",
         # It never has your focus: it mustn't hold your input method in ASCII.
         "MARMOTA_NO_IME_HOLD=1",
+        f"MARMOTA_APP_SESSIONS_FILE={iso / 'remote.json'}",
     ]
     before_workspace, before_focus = client_state()
     started: list[int] = []
@@ -276,7 +288,7 @@ def main() -> int:
         assert (pane_by_id(second["pane_id"]) or {}).get("tab_id") == spf_tab, "! switched before enter"
         # The rc session runs with Remote Control: its row carries the phone.
         rows = {title: line for line in screen(spf).splitlines() if (m := DOCK_ROW.search(line))
-                for title in [m.group(3)]}
+                and "Sessions" not in line for title in [m.group(3)]}
         remote_row = next(line for title, line in rows.items() if "remote2" in title)
         local_row = next(line for title, line in rows.items() if "local1" in title)
         assert REMOTE_MARK in remote_row and REMOTE_MARK not in local_row, (remote_row, local_row)
@@ -354,7 +366,8 @@ def main() -> int:
         type_keys(spf, "!")
         wait_for("the Sessions box", lambda: in_sessions_box(spf))
         type_keys(spf, "n")
-        wait_for("the Ask box on a new session", lambda: "Ask → new Claude Code session in project" in screen(spf))
+        wait_for("the Ask box on a new session",
+                 lambda: in_ask_box(spf) and "Ask → new Claude Code session in project" in screen(spf))
         wait_for("the item under the cursor in the question", lambda: "@assets/" in screen(spf))
         type_keys(spf, "what is in here?")
         time.sleep(0.3)
@@ -379,7 +392,7 @@ def main() -> int:
             assert (pane_by_id(first["pane_id"]) or {}).get("tab_id") == spf_tab, \
                 f"{why}: the session beside Marmota changed"
             assert (pane_by_id(spf) or {}).get("is_active"), f"{why}: the keyboard left superfile"
-            assert "enter send" in screen(spf), f"{why}: the Ask bar lost the keyboard"
+            assert in_ask_box(spf), f"{why}: the Ask box lost the keyboard"
 
         new_id = wait_for("the new session", lambda: asked_session("what is in here?"))
         transcript = Path((registry / f"{new_id}.transcript").read_text().strip()).read_text()
@@ -399,7 +412,7 @@ def main() -> int:
         # 9. stopped, the folder's session leaves the list: ! n starts a new
         # one, in the background too
         type_keys(spf, "\x1b")  # esc closes the Ask box, back to the Sessions box
-        wait_for("the Ask box closed", lambda: "Ask → " not in screen(spf))
+        wait_for("the Ask box closed", lambda: not in_ask_box(spf))
         if not in_sessions_box(spf):
             type_keys(spf, "!")
             wait_for("the Sessions box", lambda: in_sessions_box(spf))
@@ -414,7 +427,8 @@ def main() -> int:
         wait_for("its pane to close", lambda: pane_by_id(asked_pane["pane_id"]) is None)
         wait_for("it to leave the box", lambda: len(dock_rows(spf)) == listed - 1)
         type_keys(spf, "n")
-        wait_for("the Ask box on a new session", lambda: "Ask → new Claude Code session in project" in screen(spf))
+        wait_for("the Ask box on a new session",
+                 lambda: in_ask_box(spf) and "Ask → new Claude Code session in project" in screen(spf))
         type_keys(spf, "\x15")  # ctrl+u: a question of its own
         type_keys(spf, "now write the notes")
         time.sleep(0.3)
@@ -433,8 +447,12 @@ def main() -> int:
                  lambda: superfile_knows_sessions(iso, registry, 2))
         # The Ask box stays open, and writes to the session it started once
         # it is listed.
-        wait_for("the Ask box on a running session", lambda: "typed into its pane" in screen(spf))
-        chosen = next(line for line in screen(spf).splitlines() if "Ask → " in line)
+        def ask_title() -> str:
+            return next((line for line in screen(spf).splitlines() if "Ask → " in line), "")
+
+        wait_for("the Ask box on a running session",
+                 lambda: in_ask_box(spf) and ask_title() and "Ask → new " not in ask_title())
+        chosen = ask_title()
         type_keys(spf, "\x1b[A")  # up: the question sent last
         wait_for("the last question back in the bar", lambda: "› now write the notes" in screen(spf))
         type_keys(spf, "\x1b[B")  # down: back to what was there, nothing
@@ -455,7 +473,7 @@ def main() -> int:
         time.sleep(0.3)
         if in_sessions_box(spf):
             type_keys(spf, "\x1b")  # the files
-        wait_for("the files", lambda: not in_sessions_box(spf) and "Ask → " not in screen(spf))
+        wait_for("the files", lambda: not in_sessions_box(spf) and not in_ask_box(spf))
         number = wait_for("long.md in the file panel", lambda: next(
             (m.group(1) for line in screen(spf).splitlines() if (m := re.search(r"│\S?\s*(\d+) \S long\.md", line))),
             None))
@@ -483,12 +501,16 @@ def main() -> int:
             type_keys(spf, f"\x1b[<66;{column};6M")
         wait_for("the preview back at its left edge", lambda: "row 001 ---" in screen(spf))
         def panels() -> list[str]:
-            """The sidebar, the file panel and the preview, without the top rows
-            a toast may show over, and without the dock under them, whose MAC
-            readings change every 2 seconds on their own."""
+            """The file panel and the preview, without the top rows a toast may
+            show over, and without what changes on its own: Details, whose MAC
+            readings change every 2 seconds, and the Ask box and the Sessions
+            box under the preview, which say how long ago."""
             lines = screen(spf).splitlines()
-            end = next((i for i, line in enumerate(lines) if line.startswith("╰")), len(lines) - 3)
-            return lines[5:end]
+            side = lines[0].index("╮") + 1  # the sidebar's width
+            details = next((i for i, line in enumerate(lines) if line.startswith("╭─ Details")), len(lines) - 3)
+            ask = next((i for i, line in enumerate(lines) if "╭─ Ask → " in line or "╭─ ✳ Sessions" in line),
+                       len(lines) - 3)
+            return [line[:side] for line in lines[5:details]] + [line[side:] for line in lines[5:ask]]
 
         before = panels()
         for button in (65, 64, 66, 67):

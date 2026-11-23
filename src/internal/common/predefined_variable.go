@@ -25,9 +25,8 @@ const (
 
 	// TODO : These are model object properties, not global properties
 	// We are modifying them in the code many time. They need to be part of model struct.
-	MinFooterHeight = 6
-	ModalWidth      = 60
-	ModalHeight     = 7
+	ModalWidth  = 60
+	ModalHeight = 7
 )
 
 var (

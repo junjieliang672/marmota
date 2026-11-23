@@ -103,7 +103,7 @@ func TestUpAndDownInTheAskBoxRecallTheSessionsOwnPrompts(t *testing.T) {
 	assert.Equal(t, 0, m.sessions.scroll, "the session in the preview doesn't scroll")
 	assert.Equal(t, "s20", m.sessions.list.SelectedID(), "it still writes to the same session")
 	assert.False(t, m.sessions.list.NewSelected())
-	assert.Contains(t, ansi.Strip(m.View()), "↑↓ history")
+	assert.Contains(t, askKeys(m), "↑↓ history")
 
 	pressKey(m, common.Hotkeys.PageUp[0])
 	assert.Positive(t, m.sessions.scroll, "pgup scrolls it a page")

@@ -34,14 +34,26 @@ func askTestModel(t *testing.T) (*model, string) {
 	return m, dir
 }
 
+// press gives m a key as Update does, without the refreshes Update runs
+// after it: the boxes have their places again, as after every message.
 func press(m *model, key string) tea.Cmd {
-	return m.handleKeyInput(utils.TeaKeyMsg(key))
+	cmd := m.handleKeyInput(utils.TeaKeyMsg(key))
+	m.relayout()
+	return cmd
 }
 
 func typeInto(m *model, text string) {
 	for _, r := range text {
 		m.handleKeyInput(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
 	}
+	m.relayout()
+}
+
+// sessionsBoxRender draws the Sessions box as the screen has it after a
+// message: with its place worked out from the sessions there are now.
+func sessionsBoxRender(m *model) string {
+	m.relayout()
+	return m.dockSessionsRender()
 }
 
 // ask writes a question in the Ask bar, opening it with alt+k first, and
@@ -73,13 +85,28 @@ func ownAskHistory(t *testing.T) {
 	t.Cleanup(func() { variable.AskHistoryFile = history })                  //nolint:reassign // restored
 }
 
+// askKeys is the keys the Ask box takes now, as the status line names them:
+// "enter send · tab Codex".
+func askKeys(m *model) string {
+	var parts []string
+	for _, k := range m.dockAskKeys() {
+		parts = append(parts, k.Key+" "+k.Description)
+	}
+	return strings.Join(parts, " · ")
+}
+
+// viewText is the screen as it is after a message, without its colours.
 func viewText(m *model) string {
+	m.relayout()
 	return ansi.Strip(m.View())
 }
 
 func TestKOpensTheAskBoxInTheDock(t *testing.T) {
 	ownAskHistory(t)
 	m, dir := askTestModel(t)
+	if !m.toggleFooter {
+		m.toggleFooterController() // the Ask box and Details are in the sidebar
+	}
 	setFilePanelSelectedItemByName(t, m.getFocusedFilePanel(), "logo.png")
 
 	press(m, common.Hotkeys.OpenAskBar[0])
@@ -91,8 +118,9 @@ func TestKOpensTheAskBoxInTheDock(t *testing.T) {
 	assert.True(t, m.isTextInputActive(), "typing goes to the bar, so the input method is let go")
 	view := viewText(m)
 	assert.Contains(t, view, "Ask → new Claude Code session in "+filepath.Base(dir))
-	assert.Contains(t, view, "starts in the background, ⏵⏵ bypass")
-	assert.NotContains(t, view, "─ Details ─", "the Ask box grows over Details")
+	assert.Contains(t, view, "cc default · medium · ⏵⏵ bypass", "what the session starts with, on the box's edge")
+	assert.Contains(t, askKeys(m), "enter send · tab Codex", "its keys are the status line's")
+	assert.Contains(t, view, "─ Details ─", "Details stays")
 
 	typeInto(m, "hi")
 	press(m, "esc")
@@ -201,7 +229,7 @@ func TestTheAskBoxWritesToANewSessionWhenItsSessionLeaves(t *testing.T) {
 	assert.True(t, m.sessions.list.NewSelected())
 	assert.Equal(t, "provider registry left the list: your question now starts a new session", m.claude.flash)
 	assert.Equal(t, "keep me", m.sessions.composer.Value())
-	assert.Contains(t, viewText(m), "starts in the background")
+	assert.Contains(t, viewText(m), "Ask → new Claude Code session in")
 }
 
 // The folder's session is where alt+k writes next time.
@@ -282,7 +310,8 @@ func TestSendingToARunningSessionTypesIntoItsPane(t *testing.T) {
 	bang(m)
 	require.True(t, m.sessions.list.Select("s20"))
 	press(m, common.Hotkeys.OpenAskBar[0])
-	assert.Contains(t, viewText(m), "typed into its pane")
+	assert.Contains(t, m.askSending().Text, "typed into its pane")
+	assert.Contains(t, viewText(m), "Ask → ")
 	typeInto(m, "also update the docs")
 	for _, msg := range batchMsgs(t, press(m, "enter")) {
 		TeaUpdate(m, msg)
@@ -434,7 +463,8 @@ func TestARequestSentWhileTheNewSessionStartsWaitsForItsReply(t *testing.T) {
 	assert.Len(t, sent, 2)
 	assert.Equal(t, "Sent to logos", m.claude.flash)
 	assert.Empty(t, m.ask.starts, "sent, it is no longer watched")
-	assert.Contains(t, viewText(m), "typed into its pane", "what you send now goes straight in")
+	assert.Contains(t, m.askSending().Text, "typed into its pane", "what you send now goes straight in")
+	assert.NotContains(t, viewText(m), "sent once", "and the box no longer says it waits")
 }
 
 // What waits for a new session that ends before its first reply comes back
@@ -475,7 +505,7 @@ func TestARequestForANewSessionThatClosesComesBack(t *testing.T) {
 	assert.Contains(t, m.claude.flash, "closed before it started")
 	assert.Empty(t, m.ask.starts)
 	assert.Empty(t, m.sessions.pendingSelect)
-	assert.Contains(t, viewText(m), "starts in the background", "the next send starts a session")
+	assert.Contains(t, viewText(m), "Ask → new Claude Code session in", "the next send starts a session")
 }
 
 // K from the files writes to the folder's session while it starts.

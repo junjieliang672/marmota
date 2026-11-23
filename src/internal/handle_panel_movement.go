@@ -150,15 +150,9 @@ func (m *model) toggleFooterController() tea.Cmd {
 	if err != nil {
 		slog.Error("Error while updating toggleFooter data", "error", err)
 	}
-	// Recalculate heights when footer is toggled
-	m.setHeightValues(m.fullHeight)
-	// Update footer panel dimensions
-	m.setDetailsSize()
-	// File preview panel requires explicit height update, unlike sidebar/file panels
-	// which receive height as render parameters and update automatically on each frame
-	if m.fileModel.filePreview.IsOpen() {
-		m.setFilePreviewPanelSize()
-		// Force re-render of preview content with new dimensions
+	// Details goes from, or comes back to, the sidebar, and the Ask box
+	// from under the preview.
+	if m.relayout() {
 		return m.getFilePreviewCmd(true)
 	}
 	return nil
@@ -179,6 +173,7 @@ func (m *model) searchBarFocus() {
 		panel.searchBar.Focus()
 		m.firstTextInput = true
 		// The search row takes a row from the items; keep the cursor on screen.
+		m.relayout()
 		panel.scrollToCursor(m.mainPanelHeight)
 	}
 

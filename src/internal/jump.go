@@ -49,15 +49,14 @@ type jumpZoxideMsg struct {
 	results []zoxidelib.Result
 }
 
-// setJumpSize sizes the list as the focused file panel it is drawn in. Its
-// keys go to the status line when there is one: it is wider.
+// setJumpSize sizes the list as the sidebar it is drawn in. Its keys go to
+// the status line when there is one: it is wider.
 func (m *model) setJumpSize() {
 	m.jumpUI.KeysElsewhere = common.Config.ShowStatusLine && m.statusLineModel.IsEnabled()
 	if len(m.fileModel.filePanels) == 0 {
 		return
 	}
-	m.jumpUI.SetSize(m.filePanelWidthAt(m.filePanelFocusIndex)+common.BorderPadding,
-		m.mainPanelHeight+common.BorderPadding)
+	m.jumpUI.SetSize(m.lay.sidebar.w, m.lay.sidebar.h)
 }
 
 // openJump opens the s list on every section, nothing typed.

@@ -19,12 +19,13 @@ func FilePanelRenderer(totalHeight int, totalWidth int, filePanelFocussed bool) 
 	cfg.BorderBGColor = common.FilePanelBGColor
 	cfg.BorderFGColor = common.FilePanelBorderColor
 	// The title reads in the text color, or the active border's when focused;
-	// what follows it, such as "9/15", is dimmer.
+	// what follows it, such as "9/15", is dimmer. Focused, the frame is the
+	// color every box with the keyboard has.
 	cfg.TitleFGColor = common.FilePanelFGColor
 	cfg.TitleSuffixFGColor = common.FilePanelBorderColor
 	if filePanelFocussed {
-		cfg.BorderFGColor = common.FilePanelBorderActiveColor
-		cfg.TitleFGColor = common.FilePanelBorderActiveColor
+		cfg.BorderFGColor = common.FocusBorderColor()
+		cfg.TitleFGColor = common.FocusBorderColor()
 	}
 	cfg.Border = DefaultLipglossBorder()
 
@@ -96,8 +97,8 @@ func FilePreviewFrameRenderer(totalHeight int, totalWidth int, focused bool) *re
 	cfg.BorderFGColor = common.FilePanelBorderColor
 	cfg.TitleFGColor = common.FilePanelFGColor
 	if focused {
-		cfg.BorderFGColor = common.FilePanelBorderActiveColor
-		cfg.TitleFGColor = common.FilePanelBorderActiveColor
+		cfg.BorderFGColor = common.FocusBorderColor()
+		cfg.TitleFGColor = common.FocusBorderColor()
 	}
 	cfg.Border = DefaultLipglossBorder()
 
@@ -173,8 +174,8 @@ func DefaultFooterRenderer(totalHeight int, totalWidth int, focussed bool) *rend
 	cfg.BorderFGColor = common.FooterBorderColor
 	cfg.TitleFGColor = common.FooterFGColor
 	if focussed {
-		cfg.BorderFGColor = common.FooterBorderActiveColor
-		cfg.TitleFGColor = common.FooterBorderActiveColor
+		cfg.BorderFGColor = common.FocusBorderColor()
+		cfg.TitleFGColor = common.FocusBorderColor()
 	}
 	cfg.Border = DefaultLipglossBorder()
 

@@ -37,10 +37,7 @@ const (
 	ManagedAgentPaneCapacity = ManagedAgentPaneCols * ManagedAgentPaneRows
 	ResponsiveWidthThreshold = 95 // width breakpoint for layout behavior
 
-	HeightBreakA = 30 // responsive height tiers
-	HeightBreakB = 35
-	HeightBreakC = 40
-	HeightBreakD = 45
+	HeightBreakB = 35 // the help menu keeps its own height on a screen taller than this
 
 	ReRenderChunkDivisor = 100 // divisor for re-render throttling
 

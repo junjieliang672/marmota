@@ -110,9 +110,16 @@ var (
 	// TemporarySessionsFile holds the sessions started to answer one
 	// program's questions, as the editor's: Marmota doesn't list them.
 	TemporarySessionsFile = filepath.Join(SuperFileStateDir, "temporary_sessions.json")
+	// SessionsRowsFile holds how many lines the Sessions box last had, so
+	// the next start gives it that height before the sessions are listed,
+	// and no box moves when they are.
+	SessionsRowsFile = filepath.Join(SuperFileStateDir, "sessions_rows")
 	// AppSessionsSeenFile holds how far each session of the Sessions box's
 	// Remote section has been seen, so a restart doesn't show them unread.
 	AppSessionsSeenFile = filepath.Join(SuperFileStateDir, "app_sessions_seen.json")
+	// TranscriptSummariesFile holds what was read of each transcript, so a
+	// start reads only what was written since and not every one whole.
+	TranscriptSummariesFile = filepath.Join(SuperFileCacheDir, "transcript_summaries.json")
 	// RemoteTranscriptsDir holds copies of the transcripts of sessions on
 	// other computers, read a piece at a time.
 	RemoteTranscriptsDir = filepath.Join(SuperFileCacheDir, "remote-transcripts")

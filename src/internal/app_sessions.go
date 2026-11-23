@@ -31,8 +31,7 @@ import (
 // so those claude.ai lists too are left out here.
 
 const (
-	// appSessionsInterval is how often claude.ai is asked, while the dock
-	// is shown.
+	// appSessionsInterval is how often claude.ai is asked.
 	appSessionsInterval = 15 * time.Second
 	// appSessionsTimeout bounds one listing.
 	appSessionsTimeout = 10 * time.Second
@@ -89,6 +88,9 @@ type appSessionsState struct {
 	err      error
 	at       time.Time
 	inflight bool
+	// answered is set once a listing has come back, with sessions or with
+	// why not.
+	answered bool
 	// seen is, by claude.ai id, how far each session has been seen, saved
 	// in AppSessionsSeenFile; seenRead says it has been read from there.
 	seen     map[string]appSeen
@@ -136,11 +138,11 @@ func (m *model) applyAppSessionsTick() tea.Cmd {
 	return tea.Batch(m.appSessionsRefreshCmd(), scheduleAppSessionsTick())
 }
 
-// appSessionsRefreshCmd asks claude.ai in the background, while the dock
-// is shown and no listing is under way: the keychain, the request and
+// appSessionsRefreshCmd asks claude.ai in the background, while no listing
+// is under way: the keychain, the request and
 // reading this computer's sessions all happen off the screen's loop.
 func (m *model) appSessionsRefreshCmd() tea.Cmd {
-	if !appSessionsAutoRefresh || !m.toggleFooter || m.app.inflight {
+	if !appSessionsAutoRefresh || m.app.inflight {
 		return nil
 	}
 	m.app.inflight = true
@@ -203,7 +205,7 @@ func (m *model) saveAppSeenCmd() tea.Cmd {
 // applyAppSessions keeps a listing. One that failed keeps the last list,
 // shown greyed with why.
 func (m *model) applyAppSessions(msg appSessionsMsg) tea.Cmd {
-	m.app.inflight = false
+	m.app.inflight, m.app.answered = false, true
 	m.app.bridge = msg.bridge
 	if msg.err != nil {
 		if m.app.err == nil || m.app.err.Error() != msg.err.Error() {
@@ -267,7 +269,11 @@ func (m *model) noteAppSeen(first bool) bool {
 // appSessions is the Remote section's sessions, as rows of the box: what
 // claude.ai lists, but those on this computer, which the box lists above.
 func (m *model) appSessions() []claudesession.Session {
-	if len(m.app.listed) == 0 {
+	// Not before this computer's sessions are listed: claude.ai lists those
+	// too, and which of its rows are theirs isn't known until then. Shown
+	// sooner, they would be rows of the Remote section for a moment, with
+	// the ones their ended sessions leave on claude.ai, and then go.
+	if len(m.app.listed) == 0 || !m.claude.loaded {
 		return nil
 	}
 	here := map[string]bool{}

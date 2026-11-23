@@ -17,7 +17,7 @@ import (
 // panelRow returns the file panel row that shows name.
 func panelRow(t *testing.T, m *model, name string) string {
 	t.Helper()
-	for _, line := range strings.Split(ansi.Strip(m.filePanelRender()), "\n") {
+	for _, line := range strings.Split(ansi.Strip(m.sidebarRender()), "\n") {
 		if strings.Contains(line, " "+name+" ") || strings.HasSuffix(strings.TrimRight(line, " │"), " "+name) {
 			return line
 		}

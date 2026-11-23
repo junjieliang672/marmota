@@ -9,7 +9,7 @@ import (
 // The mouse wheel scrolls the preview under the pointer: the file preview,
 // down and sideways, or the session it shows, which wraps its lines and so
 // only scrolls down. It also scrolls the
-// Details box at the foot, without giving it the keyboard, and the help
+// Details box at the sidebar's foot, without giving it the keyboard, and the help
 // menu while it is open. The left button selects text in the session
 // preview, and copies it (the user, 2026-11-17). Everything else takes
 // nothing from the mouse, the file panels and the session list included
@@ -122,14 +122,8 @@ func (m *model) previewUnder(x, y int) previewArea {
 		}
 		return filePreviewArea
 	}
-	if m.toggleFooter {
-		// The dock sits right under the panels: Sessions, then Details.
-		top := m.mainPanelHeight + common.BorderPadding
-		left := m.dockSessionsWidth()
-		if !m.dockAskOpen() && y >= top && y < top+m.footerHeight+common.BorderPadding &&
-			x >= left && x < left+m.detailsWidth() {
-			return detailsArea
-		}
+	if m.lay.details.contains(x, y) {
+		return detailsArea
 	}
 	return noPreview
 }

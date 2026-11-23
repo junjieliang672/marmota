@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -13,7 +12,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/junjieliang672/marmota/src/config/icon"
 	"github.com/junjieliang672/marmota/src/internal/common"
 	"github.com/junjieliang672/marmota/src/internal/ui"
 	sessionsui "github.com/junjieliang672/marmota/src/internal/ui/sessions"
@@ -23,26 +21,16 @@ import (
 	"github.com/junjieliang672/marmota/src/pkg/codexsession"
 )
 
-// The Ask box is the right end of the dock, under the preview. Idle, it
-// says where your next message goes and how your last one went; K gives it
-// the keyboard, and it grows over Details while you write. It writes to the
-// session the Sessions box is on, else the one you were last on, else the
-// first; with none live, it starts one in this folder. It is sessions
-// mode's Ask bar (m.sessions.composer), so the draft, its history and how a
-// new session runs are the same in both.
+// The Ask box is under the preview, as wide as it, above the Sessions box:
+// three rows that say where your next message goes (its top edge), what you
+// last asked and how that stands (its line), and what it runs with (its
+// bottom edge). K gives it the keyboard and you write in that same line; the
+// box grows a row with each line more of what is written, on rows of the
+// preview's (layout.go). It writes to the session the Sessions box is on,
+// else the one you were last on, else the first; with none live, it starts
+// one in this folder. Its draft is m.sessions.composer.
 
-const (
-	dockAskMinWidth = 28
-	dockAskMaxWidth = 40
-)
-
-// dockAskIdleWidth is the Ask box's width while it doesn't have the
-// keyboard.
-func (m *model) dockAskIdleWidth() int {
-	return min(max(m.fullWidth/4, dockAskMinWidth), dockAskMaxWidth) //nolint:mnd // a quarter
-}
-
-// dockAskOpen reports whether the Ask box has the keyboard, and so is grown.
+// dockAskOpen reports whether the Ask box has the keyboard: it is written in.
 func (m *model) dockAskOpen() bool {
 	return m.focusPanel == dockAskFocus
 }
@@ -76,9 +64,6 @@ func (m *model) dockAskTarget() string {
 // new session in this folder).
 func (m *model) openDockAsk(target string) tea.Cmd {
 	var cmds []tea.Cmd
-	if !m.toggleFooter {
-		cmds = append(cmds, m.toggleFooterController())
-	}
 	m.refreshSessionsList()
 	if target == "" || !m.sessions.list.Select(target) {
 		m.sessions.list.SelectNew()
@@ -234,212 +219,181 @@ func (m *model) newSessionName() string {
 	return "new " + agent + " session in " + folderName(m.sessionsHere())
 }
 
-// dockAskRender draws the Ask box, width wide: grown while it has the
-// keyboard, else the idle summary.
-func (m *model) dockAskRender(width int) string {
-	height := m.footerHeight + common.BorderPadding
-	open := m.dockAskOpen()
-	r := ui.DefaultFooterRenderer(height, width, open)
-	target, _ := m.findSession(m.dockAskTarget())
-	title := "Ask"
-	if open {
-		name := m.newSessionName()
-		if s, ok := m.selectedSession(); ok && !m.sessions.list.NewSelected() {
-			name = s.DisplayTitle()
-		}
-		title = "Ask → " + name
-		r.SetBorderTitle(title)
-		inner := width - common.BorderPadding - 2 //nolint:mnd // 1 space each side
-		lines := m.sessions.composer.RenderLines(inner, m.footerHeight, m.askSending())
-		lines = append(lines, m.dockAskMore(inner, m.footerHeight-len(lines))...)
-		for _, l := range lines {
-			r.AddLines(" " + l)
-		}
-		r.SetBorderInfoItems("Details folded")
-		return r.Render()
+// askSidePadding is the space each side of the Ask box's lines, inside its
+// frame. askEdgeChrome is what the bottom edge puts around its words: a
+// space each side and a piece of the edge after them.
+const (
+	askSidePadding = 1
+	askEdgeChrome  = 3
+)
+
+// askInner is the width of the Ask box's lines in a box width wide.
+func askInner(width int) int {
+	return max(1, width-common.BorderPadding-2*askSidePadding)
+}
+
+// dockAskLineCount is how many lines the Ask box has to show, width wide:
+// one, or while it is written in those of what is written.
+func (m *model) dockAskLineCount(width int) int {
+	if !m.dockAskOpen() {
+		return 1 // without drawing it: this is asked after every message
 	}
+	return len(m.dockAskLines(askInner(width), askMaxLines))
+}
+
+// dockAskShown is the session the Ask box says it writes to: the one being
+// written to while it has the keyboard, else the one K would write to; one
+// without an ID for a new session.
+func (m *model) dockAskShown() claudesession.Session {
+	if !m.dockAskOpen() {
+		s, _ := m.findSession(m.dockAskTarget())
+		return s
+	}
+	if s, ok := m.selectedSession(); ok && !m.sessions.list.NewSelected() {
+		return s
+	}
+	return claudesession.Session{}
+}
+
+// dockAskRender draws the Ask box: who your next message goes to on its top
+// edge, what it runs with on its bottom edge, and between them what you
+// write, else what you last asked and how that stands.
+func (m *model) dockAskRender() string {
+	box := m.lay.ask
+	if !box.shown() {
+		return ""
+	}
+	r := ui.DefaultFooterRenderer(box.h, box.w, m.dockAskOpen())
+	target := m.dockAskShown()
 	m.loadAskHistory() // a draft left last time shows
-	r.SetBorderTitle(title)
-	r.SetBorderInfoItems(firstKey(common.Hotkeys.OpenAskBar))
-	r.AddLines(m.dockAskIdleLines(target, width-common.BorderPadding, m.footerHeight)...)
+	name := m.newSessionName()
+	if target.ID != "" {
+		name = target.DisplayTitle()
+	}
+	r.SetBorderTitle("Ask → " + name)
+	r.SetBorderInfoItems(m.dockAskEdge(target, box.w-common.BorderPadding-askEdgeChrome))
+	for _, l := range m.dockAskLines(askInner(box.w), box.h-common.BorderPadding) {
+		r.AddLines(strings.Repeat(" ", askSidePadding) + l)
+	}
 	return r.Render()
 }
 
-// askRecentTurns is how many of your questions the open Ask box can list.
-const askRecentTurns = 8
-
-// dockAskMore fills the room under the bar while you write, rows tall: the
-// git branch and how many files are changed, then the questions you asked
-// the session, newest first, each with when it was replied to. The
-// answers themselves stay in the preview.
-func (m *model) dockAskMore(width, rows int) []string {
-	if rows < 2 { //nolint:mnd // a gap and a line
-		return nil
+// dockAskLines is the Ask box's lines, width wide, on rows rows at most:
+// while it is written in, what is written and, when sending does something
+// other than usual, what; else the one line dockAskIdleLine draws.
+func (m *model) dockAskLines(width, rows int) []string {
+	rows = max(1, rows)
+	if !m.dockAskOpen() {
+		return []string{m.dockAskIdleLine(m.dockAskShown(), width)}
 	}
-	st := dockStyles()
-	out := []string{""}
-	if c := m.askContext(); c.InGit {
-		out = append(out, st.dim.Render(ansi.Truncate(icon.Git+" "+firstNonEmpty(c.GitBranch, "detached")+
-			" · "+strconv.Itoa(c.GitChanged)+" changed", width, "…")))
+	var note []string
+	if sending := m.askSending(); !sending.Usual && sending.Text != "" && rows > 1 {
+		note = []string{dockStyles().dim.Render(ansi.Truncate("→ "+sending.Text, width, "…"))}
 	}
-	s, ok := m.selectedSession()
-	if !ok || m.sessions.list.NewSelected() {
-		out = append(out, st.dim.Render(ansi.Truncate(
-			"Sending starts a session in "+folderName(m.sessionsHere())+" in the background.", width, "…")))
-		return out[:min(len(out), rows)]
-	}
-	turns := m.askTurns(s)
-	if len(turns) == 0 && s.LastPrompt != "" {
-		// A turn longer than the transcript tail that is read has its
-		// prompt out of reach; the session still knows it.
-		turns = []claudesession.Turn{{Prompt: s.LastPrompt}}
-	}
-	if len(turns) == 0 {
-		return append(out, st.dim.Render("Nothing asked yet."))[:min(len(out)+1, rows)]
-	}
-	now := time.Now()
-	state := m.sessionState(s)
-	for i := len(turns) - 1; i >= 0 && len(out) < rows; i-- {
-		t := turns[i]
-		var when string
-		switch {
-		case i == len(turns)-1 && state == sessionsui.Working:
-			when = "working"
-		case i == len(turns)-1 && state == sessionsui.NeedsYou:
-			when = "asks you"
-		case !t.RepliedAt.IsZero():
-			when = "replied " + agoWords(now, t.RepliedAt)
-		case t.Reply != "":
-			when = "replied"
-		default:
-			when = "no reply"
-		}
-		right := st.dim.Render(" " + when)
-		if when == "working" {
-			right = lipgloss.NewStyle().Foreground(lipgloss.Color(claudeColor)).
-				Background(common.FooterBGColor).Render(" ✳ working")
-		} else if when == "asks you" {
-			right = lipgloss.NewStyle().Foreground(sessionsui.StateColor(state)).
-				Background(common.FooterBGColor).Render(" ◉ asks you")
-		}
-		room := width - ansi.StringWidth(right) - 2 //nolint:mnd // "› "
-		q := st.val.Render("› " + ansi.Truncate(oneLine(t.Prompt), max(1, room), "…"))
-		if gap := width - ansi.StringWidth(q) - ansi.StringWidth(right); gap > 0 {
-			q += st.val.Render(strings.Repeat(" ", gap))
-		}
-		out = append(out, q+right)
-	}
-	return out
+	return append(m.sessions.composer.DraftLines(width, rows-len(note)), note...)
 }
 
-// dockAskIdleLines is the folded box, rows tall: where your next message
-// goes, which program and model it runs with, then your last message to it
-// and how it stands; in the rows left, what it is doing or asking, else
-// your messages before. Its replies stay in the preview.
-func (m *model) dockAskIdleLines(s claudesession.Session, width, rows int) []string {
-	st := dockStyles()
-	key := firstKey(common.Hotkeys.OpenAskBar)
+// dockAskEdge is the Ask box's bottom edge, within width: the program,
+// model and effort a message runs with, the computer, and the key that
+// writes; for a new session its permission mode in the computer's place.
+// Short of room the computer goes first, then what it runs with.
+func (m *model) dockAskEdge(s claudesession.Session, width int) string {
+	where := ansi.Strip(dockHostLine(s.Host, width))
 	if s.ID == "" {
-		lines := []string{st.val.Render(ansi.Truncate("→ "+m.newSessionName(), width, "…")),
-			m.dockAgentLine(s, width), dockHostLine("", width), st.dim.Render(key + " write")}
-		lines = append(lines, m.dockDraftLine(width)...)
-		mode := "⏵⏵ " + claudeask.PermissionModeLabel(m.sessions.composer.PermissionMode())
-		return fillRows(lines, dimLines(wrapLines("starts in the background, "+mode, width, rows)), rows)
+		where = "⏵⏵ " + claudeask.PermissionModeLabel(m.sessions.composer.PermissionMode())
 	}
-	if s.App != nil {
-		return m.dockAskAppLines(s, width, rows)
+	parts := []string{ansi.Strip(m.dockAgentLine(s, width)), where}
+	switch key := firstKey(common.Hotkeys.OpenAskBar); {
+	case s.App != nil:
+		// Written to in the Claude app: which computer and model aren't known here.
+		parts = []string{ansi.Strip(common.HostMark(remoteSectionTitle, common.FooterBGColor)) + " on another computer",
+			"enter: open in Claude app"}
+	case m.dockAskOpen():
+		if m.askSending().Changed {
+			parts = append(parts, "from your next message")
+		}
+	case s.ID != "" && m.sessionState(s) == sessionsui.NeedsYou:
+		parts = append(parts, key+" answer")
+	default:
+		parts = append(parts, key+" write")
 	}
-	state := m.sessionState(s)
-	verb := " write"
-	if state == sessionsui.NeedsYou {
-		verb = " answer its question"
+	for len(parts) > 1 && ansi.StringWidth(strings.Join(parts, " · ")) > width {
+		drop := min(1, len(parts)-2) //nolint:mnd // the last says the key, and stays
+		parts = slices.Delete(parts, drop, drop+1)
 	}
-	head := []string{st.val.Render(ansi.Truncate("→ "+s.DisplayTitle(), width, "…")),
-		m.dockAgentLine(s, width), dockHostLine(s.Host, width), st.dim.Render(key + verb)}
-	head = append(head, m.dockDraftLine(width)...)
-	turn, ok := lastOf(m.askTurns(s))
-	now := time.Now()
-	var body []string
+	return ansi.Truncate(strings.Join(parts, " · "), width, "…")
+}
+
+// dockAskIdleLine is the Ask box's line while it isn't written in, width
+// wide: a draft that waits, else your last message to the session and, at
+// its right, how that stands: working, what it asks you, when it replied.
+// Its replies stay in the preview.
+func (m *model) dockAskIdleLine(s claudesession.Session, width int) string {
+	st := dockStyles()
+	draft := ""
+	if text := strings.TrimSpace(m.sessions.composer.Value()); text != "" {
+		draft = st.dim.Render("draft: " + oneLine(text))
+	}
+	left, right := draft, ""
 	switch {
+	case s.ID == "":
+		left = firstNonEmpty(draft, st.dim.Render("starts in the background"))
+	case s.App != nil && draft == "":
+		left = st.dim.Render(firstNonEmpty(s.App.Doing, "its conversation is in the Claude app"))
+		if m.sessionState(s) == sessionsui.NeedsYou {
+			left = lipgloss.NewStyle().Foreground(sessionsui.StateColor(sessionsui.NeedsYou)).
+				Background(common.FooterBGColor).Render(ansi.Strip(left))
+		}
+	case s.App == nil:
+		left, right = m.dockAskLastTurn(s, width, draft)
+	}
+	room := width - ansi.StringWidth(right)
+	if right != "" {
+		room -= 2 // the gap before it
+	}
+	left = ansi.Truncate(left, max(1, room), st.dim.Render("…"))
+	gap := max(0, width-ansi.StringWidth(left)-ansi.StringWidth(right))
+	return left + st.val.Render(strings.Repeat(" ", gap)) + right
+}
+
+// dockAskLastTurn is your last message to a running session, or the draft
+// that waits when there is one, and how the message stands, for a line
+// width wide.
+func (m *model) dockAskLastTurn(s claudesession.Session, width int, draft string) (string, string) {
+	st := dockStyles()
+	now := time.Now()
+	left, right := st.dim.Render("nothing sent yet"), ""
+	turn, ok := lastOf(m.askTurns(s))
+	switch {
+	case draft != "":
+		left = draft
 	case ok:
-		body = append(body, st.dim.Render("you, "+agoWords(now, turn.At)+":"))
+		left = st.dim.Render("you, "+agoWords(now, turn.At)+": ") + st.val.Render("“"+oneLine(turn.Prompt)+"”")
 	case s.LastPrompt != "":
 		// A turn longer than the transcript's tail Conversation reads has
 		// its prompt out of reach; the session still knows it.
-		turn.Prompt = s.LastPrompt
-		body = append(body, st.dim.Render("you:"))
-	default:
-		return fillRows(head, []string{st.dim.Render("nothing sent yet")}, rows)
+		left = st.dim.Render("you: ") + st.val.Render("“"+oneLine(s.LastPrompt)+"”")
 	}
-	// The message gets a second row when how it stands still fits under it.
-	promptRows := min(maxIdlePromptRows, max(1, rows-len(head)-len(body)-1))
-	for _, l := range wrapLines("“"+oneLine(turn.Prompt)+"”", width, promptRows) {
-		body = append(body, st.val.Render(l))
-	}
-	var more string
-	switch state {
+	switch state := m.sessionState(s); state {
 	case sessionsui.Working:
-		body = append(body, lipgloss.NewStyle().Foreground(lipgloss.Color(claudeColor)).
-			Background(common.FooterBGColor).Render("✳ working"))
-		more = m.dockDoing(s, state)
+		right = lipgloss.NewStyle().Foreground(lipgloss.Color(claudeColor)).
+			Background(common.FooterBGColor).Render("✳ working")
 	case sessionsui.NeedsYou:
-		body = append(body, lipgloss.NewStyle().Foreground(sessionsui.StateColor(state)).
-			Background(common.FooterBGColor).Render("◉ asks you"))
-		more = firstNonEmpty(s.PendingTool, s.WaitingFor)
+		asks := "◉ asks you"
+		if what := firstNonEmpty(s.PendingTool, s.WaitingFor); what != "" {
+			asks += ": " + oneLine(what)
+		}
+		// Half the line, and what your message leaves of the other half.
+		room := max(width/2, width-ansi.StringWidth(left)-2) //nolint:mnd // half; the gap between them
+		right = lipgloss.NewStyle().Foreground(sessionsui.StateColor(state)).
+			Background(common.FooterBGColor).Render(ansi.Truncate(asks, max(1, room), "…"))
 	case sessionsui.Unread, sessionsui.Idle, sessionsui.Ended:
-		// It has replied: its row and the preview say so.
-	}
-	if more == "working" {
-		more = ""
-	}
-	if len(head)+len(body) > rows && len(body) > 2 {
-		// Short of rows, "you, 3m ago:" goes first: the message and how it
-		// stands say more.
-		body = body[1:]
-	}
-	lines := fillRows(head, body, rows)
-	room := rows - len(lines)
-	if room > 0 && more != "" {
-		return append(lines, dimLines(wrapLines(more, width, room))...)
-	}
-	turns := m.askTurns(s)
-	for i := len(turns) - 2; i >= 0 && room > 0; i-- { // the last is above
-		if p := oneLine(turns[i].Prompt); p != "" {
-			lines = append(lines, st.dim.Render(ansi.Truncate("› "+p, width, "…")))
-			room--
+		if ok && !turn.RepliedAt.IsZero() {
+			right = st.dim.Render("replied " + agoWords(now, turn.RepliedAt))
 		}
 	}
-	return lines
+	return left, right
 }
-
-// dockAskAppLines is the folded box for a session of the Remote section,
-// which is written to in the Claude app: its title, then what claude.ai says
-// it is doing or waits for. Which computer it runs on and its model aren't
-// known from there, so they aren't said.
-func (m *model) dockAskAppLines(s claudesession.Session, width, rows int) []string {
-	st := dockStyles()
-	head := []string{st.val.Render(ansi.Truncate("→ "+s.DisplayTitle(), width, "…")),
-		common.HostMark(remoteSectionTitle, common.FooterBGColor) + st.dim.Render(" "+
-			ansi.Truncate("on another computer", max(1, width-2), "…")),
-		st.dim.Render(ansi.Truncate("enter: open in Claude app", width, "…"))}
-	body := []string{}
-	if s.App.Doing != "" {
-		body = wrapLines(s.App.Doing, width, max(1, rows-len(head)))
-		if m.sessionState(s) == sessionsui.NeedsYou {
-			for i, l := range body {
-				body[i] = lipgloss.NewStyle().Foreground(sessionsui.StateColor(sessionsui.NeedsYou)).
-					Background(common.FooterBGColor).Render(l)
-			}
-		} else {
-			body = dimLines(body)
-		}
-	}
-	return fillRows(head, body, rows)
-}
-
-// maxIdlePromptRows is how many rows your last message takes in the folded
-// box.
-const maxIdlePromptRows = 2
 
 // dockAgentLine is "cc opus 5.5 · high": the program a session runs in and
 // the model and effort it answers with; for a new session, the box's
@@ -478,52 +432,6 @@ func (m *model) dockAgentLine(s claudesession.Session, width int) string {
 	return tag + st.val.Render(ansi.Truncate(" "+strings.Join(parts, " · "), max(1, width-ansi.StringWidth(tag)), "…"))
 }
 
-// fillRows is head, a blank row when there is room for it, then body, within
-// rows.
-func fillRows(head, body []string, rows int) []string {
-	lines := append([]string{}, head...)
-	if len(head)+1+len(body) <= rows {
-		lines = append(lines, "")
-	}
-	lines = append(lines, body...)
-	if len(lines) > rows {
-		lines = lines[:rows]
-	}
-	return lines
-}
-
-// dimLines draws lines dim.
-func dimLines(lines []string) []string {
-	out := make([]string, len(lines))
-	for i, l := range lines {
-		out[i] = dockStyles().dim.Render(l)
-	}
-	return out
-}
-
-// wrapLines wraps text to width over at most rows rows, the last ending in
-// "…" when there is more.
-func wrapLines(text string, width, rows int) []string {
-	if rows <= 0 || width <= 0 {
-		return nil
-	}
-	lines := strings.Split(ansi.Wrap(text, width, ""), "\n")
-	if len(lines) > rows {
-		lines = lines[:rows]
-		lines[rows-1] = ansi.Truncate(strings.TrimRight(lines[rows-1], " ")+" …", width, "…")
-	}
-	return lines
-}
-
-// dockDraftLine says a draft waits, when one does.
-func (m *model) dockDraftLine(width int) []string {
-	draft := strings.TrimSpace(m.sessions.composer.Value())
-	if draft == "" {
-		return nil
-	}
-	return []string{dockStyles().dim.Render(ansi.Truncate("draft: "+oneLine(draft), width, "…"))}
-}
-
 type dockStyleSet struct{ val, dim, ok lipgloss.Style }
 
 func dockStyles() dockStyleSet {
@@ -534,6 +442,9 @@ func dockStyles() dockStyleSet {
 		ok:  base.Foreground(lipgloss.Color(common.Theme.Correct)),
 	}
 }
+
+// askRecentTurns is how many of a session's last turns the Ask box reads.
+const askRecentTurns = 8
 
 // dockTurns is a session's recent turns, read again only when its
 // transcript changes.
@@ -595,24 +506,48 @@ func oneLine(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
-// dockAskStatusLine is the status line while the Ask box has the keyboard.
+// dockAskStatusLine is the status line while the Ask box has the keyboard:
+// its keys, which the box itself has no room for. As many as fit show.
 func (m *model) dockAskStatusLine() string {
-	keys := []statusline.Hotkey{
-		{Key: "enter", Description: "send"},
-		{Key: "shift+enter", Description: "new line"},
-		{Key: firstKey(common.Hotkeys.AskEdit), Description: "editor"},
-		{Key: "↑↓", Description: "history"},
-		{Key: firstKey(common.Hotkeys.AskClear), Description: "clear"},
+	return m.statusLineModel.RenderModeHotkeys("Ask", m.dockAskKeys())
+}
+
+// dockAskKeys are the keys the Ask box takes while it is written in, the
+// ones that are its own first: what a new session starts with, then those
+// every text field has.
+func (m *model) dockAskKeys() []statusline.Hotkey {
+	sending := m.askSending()
+	keys := []statusline.Hotkey{{Key: "enter", Description: "send"}} //nolint:goconst // the key's name
+	if sending.New {
+		other := "Codex"
+		if m.askStartsCodex() {
+			other = "Claude Code"
+		}
+		keys = append(keys, statusline.Hotkey{Key: firstKey(common.Hotkeys.AskChooseAgent), Description: other})
 	}
-	if !m.askSending().Fixed {
-		// What a new session starts with; a running one keeps its own.
+	if !sending.Fixed || sending.Change {
+		// What a new session starts with, or a running Codex session's next message.
 		keys = append(keys,
 			statusline.Hotkey{Key: firstKey(common.Hotkeys.AskChooseModel), Description: "model"},
-			statusline.Hotkey{Key: firstKey(common.Hotkeys.AskChooseEffort), Description: "effort"},
+			statusline.Hotkey{Key: firstKey(common.Hotkeys.AskChooseEffort), Description: "effort"})
+	}
+	if !sending.Fixed {
+		keys = append(keys,
 			statusline.Hotkey{Key: firstKey(common.Hotkeys.AskChoosePermissionMode), Description: "permissions"})
 	}
-	keys = append(keys, statusline.Hotkey{Key: "esc", Description: "close, keeps the draft"})
-	return m.statusLineModel.RenderModeHotkeys("Ask", keys)
+	if sending.New {
+		resume := "resume one"
+		if sending.Resume != "" {
+			resume = "another"
+		}
+		keys = append(keys, statusline.Hotkey{Key: firstKey(common.Hotkeys.AskResume), Description: resume})
+	}
+	return append(keys,
+		statusline.Hotkey{Key: "esc", Description: "close"},
+		statusline.Hotkey{Key: "shift+enter", Description: "new line"},
+		statusline.Hotkey{Key: "↑↓", Description: "history"},
+		statusline.Hotkey{Key: firstKey(common.Hotkeys.AskEdit), Description: "editor"},
+		statusline.Hotkey{Key: firstKey(common.Hotkeys.AskClear), Description: "clear"})
 }
 
 // dockHostLine is the Ask box's line for the computer the session runs on

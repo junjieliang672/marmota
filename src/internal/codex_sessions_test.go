@@ -122,19 +122,21 @@ func TestCodexSessionsJoinTheList(t *testing.T) {
 	assert.Equal(t, claudesession.StatusWaiting, live["named"].Status)
 
 	now = time.Now()
-	codexRow := ansi.Strip(strings.Join(m.dockRow(1, live["named"], false, 40, now), "\n"))
-	assert.Regexp(t, `1 \S co Fix login +\x{F0379} `, codexRow, "co: Codex; the computer's mark on the right")
-	claudeRow := ansi.Strip(strings.Join(m.dockRow(2, claudesession.Session{ID: "c", Title: "Tidy", Live: true},
-		false, 40, now), "\n"))
-	assert.Regexp(t, `2 \S cc Tidy +\x{F0379} `, claudeRow, "cc: Claude Code")
-	remoteRow := ansi.Strip(strings.Join(m.dockRow(3, claudesession.Session{ID: "r", Title: "Sweep", Live: true,
-		Host: "nova"}, false, 40, now), "\n"))
-	assert.Regexp(t, `3 \S cc nova · Sweep +\x{F0163} `, remoteRow, "another computer's session says which, in its name")
-	named := ansi.Strip(strings.Join(m.dockRow(4, claudesession.Session{ID: "n", Title: "eval", Live: true,
-		Host: "nova", Named: true}, false, 40, now), "\n"))
-	assert.Regexp(t, `4 \S cc eval +\x{F0163} `, named, "renamed, it is its name alone; the cloud says it is elsewhere")
-	rc := ansi.Strip(strings.Join(m.dockRow(5, claudesession.Session{ID: "rc", Title: "eval", Live: true,
-		Host: "nova", RemoteControl: true}, false, 40, now), "\n"))
+	// Its title, what it does where there is room, then where it runs.
+	row := func(n int, s claudesession.Session) string {
+		return ansi.Strip(m.dockRow(n, 4, s, false, 36, 12, now))
+	}
+	codexRow := row(1, live["named"])
+	assert.Regexp(t, `1 \S co Fix login .*\x{F0379} `, codexRow, "co: Codex; the computer's mark on the right")
+	claudeRow := row(2, claudesession.Session{ID: "c", Title: "Tidy", Live: true})
+	assert.Regexp(t, `2 \S cc Tidy .*\x{F0379} `, claudeRow, "cc: Claude Code")
+	remoteRow := row(3, claudesession.Session{ID: "r", Title: "Sweep", Live: true, Host: "nova"})
+	assert.Regexp(t, `3 \S cc nova · Sweep .*\x{F0163} `, remoteRow,
+		"another computer's session says which, in its name")
+	named := row(4, claudesession.Session{ID: "n", Title: "eval", Live: true, Host: "nova", Named: true})
+	assert.Regexp(t, `4 \S cc eval .*\x{F0163} `, named,
+		"renamed, it is its name alone; the cloud says it is elsewhere")
+	rc := row(5, claudesession.Session{ID: "rc", Title: "eval", Live: true, Host: "nova", RemoteControl: true})
 	assert.Regexp(t, `\x{F0163} \S `, rc, "the computer's mark goes left of Remote Control's")
 }
 
@@ -149,7 +151,8 @@ func TestTheAskBoxStartsACodexSession(t *testing.T) {
 	cx := newFakeCodex(t)
 	m.sessions.composer.SetStartsCodex(true)
 	press(m, common.Hotkeys.OpenAskBar[0])
-	assert.Contains(t, viewText(m), "model codex default · ctrl+t effort medium", "no model in Codex's config; medium")
+	assert.Contains(t, viewText(m), "co default · medium", "no model in Codex's config; medium")
+	assert.Contains(t, askKeys(m), "ctrl+o model · ctrl+t effort")
 
 	ask(t, m, "group the logos")
 
@@ -224,12 +227,12 @@ func TestTheAskBoxChoosesTheAgentOfANewSession(t *testing.T) {
 	press(m, common.Hotkeys.OpenAskBar[0])
 	view := viewText(m)
 	assert.Contains(t, view, "Ask → new Claude Code session in")
-	assert.Contains(t, view, "tab Codex")
+	assert.Contains(t, askKeys(m), "tab Codex")
 
 	press(m, "tab")
 	view = viewText(m)
 	assert.Contains(t, view, "Ask → new Codex session in")
-	assert.Contains(t, view, "tab Claude Code")
+	assert.Contains(t, askKeys(m), "tab Claude Code")
 	assert.Empty(t, m.sessions.composer.Value(), "tab types nothing")
 	press(m, common.Hotkeys.AskChooseModel[0])
 	typeInto(m, "group the logos")
@@ -284,28 +287,28 @@ func TestACodexStartGetsTheChosenModelAndEffort(t *testing.T) {
 	assert.Equal(t, []codexsession.TurnOptions{{Effort: "max", Reviewer: "auto_review"}}, cx.turns)
 }
 
-// The folded Ask box says which program, model and effort the next message
-// goes to: a running session's own, or what a new session gets.
-func TestTheFoldedAskBoxSaysTheProgramAndModel(t *testing.T) {
+// The Ask box's bottom edge says which program, model and effort the next
+// message goes to: a running session's own, or what a new session gets.
+func TestTheAskBoxSaysTheProgramAndModel(t *testing.T) {
 	ownAskHistory(t)
 	m := newClaudeTestModel(t)
-	idle := func(s claudesession.Session) string {
-		return ansi.Strip(strings.Join(m.dockAskIdleLines(s, 30, 8), "\n"))
-	}
-	assert.Contains(t, idle(claudesession.Session{}), "cc default · medium", "a new session: the defaults")
+	edge := func(s claudesession.Session) string { return m.dockAskEdge(s, 60) }
+	assert.Contains(t, edge(claudesession.Session{}), "cc default · medium", "a new session: the defaults")
 	m.sessions.composer.SetStartsCodex(true)
-	assert.Contains(t, idle(claudesession.Session{}), "co default · medium")
+	assert.Contains(t, edge(claudesession.Session{}), "co default · medium")
 	codex := claudesession.Session{ID: "t1", Agent: claudesession.AgentCodex, Title: "fix", Live: true,
 		Model: "gpt-6.1-sol", Effort: "low"}
-	assert.Contains(t, idle(codex), "co gpt-6.1-sol · low")
+	assert.Contains(t, edge(codex), "co gpt-6.1-sol · low")
 
 	codex.LastPrompt = "can you show a checkbox instead of me answering the question in words"
-	lines := m.dockAskIdleLines(codex, 30, 7)
-	assert.NotContains(t, ansi.Strip(strings.Join(lines, "\n")), "replied", "its row says it has replied")
+	line := ansi.Strip(m.dockAskIdleLine(codex, 60))
+	assert.Contains(t, line, "you: “can you show a checkbox", "what you last asked it")
+	assert.NotContains(t, line, "replied", "its row says it has replied")
 	codex.Status = claudesession.StatusWorking
-	lines = m.dockAskIdleLines(codex, 30, 6)
-	assert.Len(t, lines, 6)
-	assert.Contains(t, ansi.Strip(lines[5]), "working", "how it stands keeps its row over the message's second")
+	line = ansi.Strip(m.dockAskIdleLine(codex, 60))
+	assert.Equal(t, 60, ansi.StringWidth(line), "one line, as wide as the box")
+	assert.True(t, strings.HasSuffix(line, "✳ working"), "how it stands keeps its place: the message is cut, %q", line)
+	assert.Contains(t, line, "…")
 }
 
 // A second Codex start in a folder waits for the first to be found: they
@@ -343,8 +346,9 @@ func TestSendingToACodexSessionGoesThroughCodex(t *testing.T) {
 	require.True(t, m.sessions.list.Select("t1"))
 	press(m, common.Hotkeys.OpenAskBar[0])
 	view := viewText(m)
-	assert.Contains(t, view, "sent to it (beside Marmota)")
-	assert.Contains(t, view, "ctrl+o model gpt-6.1-sol · ctrl+t effort low", "its own, which the keys change")
+	assert.Contains(t, m.askSending().Text, "sent to it (beside Marmota)")
+	assert.Contains(t, view, "co gpt-6.1-sol · low", "its own")
+	assert.Contains(t, askKeys(m), "ctrl+o model · ctrl+t effort", "which the keys change")
 
 	// A model and effort chosen for it go with the next message.
 	m.sessions.composer.SetCodexModels([]codexsession.Model{
@@ -356,7 +360,8 @@ func TestSendingToACodexSessionGoesThroughCodex(t *testing.T) {
 	press(m, common.Hotkeys.AskChooseEffort[0])
 	press(m, common.Hotkeys.AskChooseEffort[0])
 	view = viewText(m)
-	assert.Contains(t, view, "model gpt-6-luna · ctrl+t effort medium · from your next message")
+	assert.Contains(t, view, "co gpt-6-luna · medium")
+	assert.Contains(t, view, "from your next message")
 	typeInto(m, "also update the docs")
 	runCmd(t, m, press(m, "enter"))
 	assert.Equal(t, []codexsession.TurnOptions{{Model: "gpt-6-luna", Effort: "medium"}}, cx.turns)
@@ -609,23 +614,27 @@ func TestEqualsMovesACodexSessionHere(t *testing.T) {
 	assert.Equal(t, "Couldn't move fix the login: no server", m.claude.flash)
 }
 
-// The folded Ask box says, on a line of its own, which computer the session
-// at the cursor runs on.
-func TestTheFoldedAskBoxSaysTheComputer(t *testing.T) {
+// The Ask box's bottom edge says which computer the session runs on; a new
+// session's says its permission mode there. Short of room, the computer
+// goes and the key that writes stays.
+func TestTheAskBoxSaysTheComputer(t *testing.T) {
 	ownAskHistory(t)
 	m := newClaudeTestModel(t)
-	hostLine := func(s claudesession.Session) string {
-		return strings.TrimSpace(ansi.Strip(m.dockAskIdleLines(s, 30, 8)[2]))
-	}
+	edge := func(s claudesession.Session) string { return m.dockAskEdge(s, 60) }
 	here := thisComputerName()
 	require.NotEmpty(t, here)
-	assert.True(t, strings.HasSuffix(hostLine(claudesession.Session{}), here), "a new session starts here")
+	key := common.Hotkeys.OpenAskBar[0]
+	assert.Contains(t, edge(claudesession.Session{}), "⏵⏵ ", "a new session: how far it may go")
+	assert.True(t, strings.HasSuffix(edge(claudesession.Session{}), key+" write"))
 	local := claudesession.Session{ID: "a1", Title: "fix", Live: true}
-	assert.True(t, strings.HasSuffix(hostLine(local), here), hostLine(local))
+	assert.Contains(t, edge(local), here+" · "+key+" write")
 	remote := claudesession.Session{ID: "r1", Title: "sweep", Live: true, Host: "a-long-computer-name"}
-	assert.True(t, strings.HasSuffix(hostLine(remote), "a-long-computer-name"), hostLine(remote))
-	assert.Contains(t, ansi.Strip(m.dockAskIdleLines(remote, 30, 8)[3]), "write", "the keys keep their line")
+	assert.Contains(t, edge(remote), "a-long-computer-name · "+key+" write")
+	narrow := m.dockAskEdge(remote, 28)
+	assert.NotContains(t, narrow, "a-long-computer-name", "no room: the computer goes first")
+	assert.True(t, strings.HasSuffix(narrow, key+" write"), narrow)
+	assert.LessOrEqual(t, ansi.StringWidth(narrow), 28)
 
 	setForTest(t, &common.Config.ComputerName, "kingjj-nova")
-	assert.True(t, strings.HasSuffix(hostLine(local), "kingjj-nova"), "computer_name names this computer")
+	assert.Contains(t, edge(local), "kingjj-nova", "computer_name names this computer")
 }

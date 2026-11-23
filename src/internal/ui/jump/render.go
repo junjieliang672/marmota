@@ -35,12 +35,13 @@ type grid struct {
 func (m *Model) innerWidth() int { return max(20, m.width-common.BorderPadding) } //nolint:mnd // narrowest
 
 // chromeRows is the panel's rows that aren't the list: its frame, the
-// input and its rule, and the rule and path line at the foot, then the
-// keys unless the status line shows them.
+// input, the sections' names on a row (more when they wrap), and the rule
+// and path line at the foot, then the keys unless the status line shows
+// them.
 const chromeRows = 6
 
 func (m *Model) bodyRows() int {
-	rows := m.height - chromeRows
+	rows := m.height - chromeRows - (len(m.scopeNames(m.innerWidth())) - 1)
 	if !m.KeysElsewhere {
 		rows--
 	}
@@ -169,7 +170,8 @@ func (m *Model) Render(focused bool) string {
 	width := m.innerWidth()
 	st := common.PopupStyles(false)
 	g := m.layout()
-	lines := []string{m.topLine(width, st), m.scopeLine(width, st)}
+	lines := append([]string{m.topLine(width, st)}, m.scopeLines(width, st)...)
+	head := len(lines)
 
 	target, hasTarget := m.Picked()
 	m.numWidth = len(strconv.Itoa(max(1, len(g.items))))
@@ -177,7 +179,7 @@ func (m *Model) Render(focused bool) string {
 		lines = append(lines, m.slotLine(g, r, width, target, hasTarget))
 	}
 	if len(g.items) == 0 && strings.TrimSpace(m.input.Value()) != "" {
-		lines[2] = padTo(st.Muted.Render("  Nothing matches"), width)
+		lines[head] = padTo(st.Muted.Render("  Nothing matches"), width)
 	}
 	lines = append(lines, st.Rule.Render(strings.Repeat("─", width)), m.pathLine(width, st, target, hasTarget))
 	if !m.KeysElsewhere {
@@ -202,36 +204,66 @@ func (m *Model) topLine(width int, st common.PopupStyleSet) string {
 	return st.Key.Render("› ") + m.input.View()
 }
 
-// scopeLine names the sections tab goes through, under what you type, the
-// one shown lit: "All · Pinned · Sessions · Resume · Folders · Files". In a
-// narrow panel they are only spaced apart; a list of one section names it
-// alone.
-func (m *Model) scopeLine(width int, st common.PopupStyleSet) string {
+// scopeNames are the names of the sections tab goes through, row by row,
+// width wide, with the index of the one shown: "All", then Kinds'. They
+// sit on one row when they fit there, " · " between them; else on as few
+// rows as hold them, the same number on each, so a narrow panel wraps them
+// and cuts none. A list of one section names it alone.
+func (m *Model) scopeNames(width int) [][]string {
 	names := []string{"All"}
 	for _, k := range Kinds {
 		names = append(names, k.Title())
 	}
-	lit := m.scope + 1
 	if m.only {
-		names, lit = []string{Kinds[m.scope].Title()}, 0
+		names = []string{Kinds[m.scope].Title()}
 	}
-	plain := 0
-	for _, n := range names {
-		plain += ansi.StringWidth(n)
+	fits := func(row []string) bool {
+		return ansi.StringWidth(strings.Join(row, scopeSep)) <= width
 	}
-	sep := " · "
-	if plain+len(sep)*(len(names)-1) > width {
-		sep = " "
-	}
-	parts := make([]string, len(names))
-	for i, n := range names {
-		if i == lit {
-			parts[i] = st.Key.Render(n)
-		} else {
-			parts[i] = st.Faint.Render(n)
+	for rows := 1; rows < len(names); rows++ {
+		per := (len(names) + rows - 1) / rows
+		var out [][]string
+		ok := true
+		for at := 0; at < len(names); at += per {
+			row := names[at:min(at+per, len(names))]
+			ok = ok && fits(row)
+			out = append(out, row)
+		}
+		if ok {
+			return out
 		}
 	}
-	return padTo(ansi.Truncate(strings.Join(parts, st.Faint.Render(sep)), width, "…"), width)
+	out := make([][]string, len(names))
+	for i, n := range names {
+		out[i] = []string{n}
+	}
+	return out
+}
+
+const scopeSep = " · "
+
+// scopeLines draws scopeNames under what you type, the section shown lit:
+// "All · Sessions · Pinned · Resume · Folders · Files".
+func (m *Model) scopeLines(width int, st common.PopupStyleSet) []string {
+	lit := m.scope + 1
+	if m.only {
+		lit = 0
+	}
+	var lines []string
+	n := 0
+	for _, row := range m.scopeNames(width) {
+		parts := make([]string, len(row))
+		for i, name := range row {
+			if n == lit {
+				parts[i] = st.Key.Render(name)
+			} else {
+				parts[i] = st.Faint.Render(name)
+			}
+			n++
+		}
+		lines = append(lines, padTo(ansi.Truncate(strings.Join(parts, st.Faint.Render(scopeSep)), width, "…"), width))
+	}
+	return lines
 }
 
 func (m *Model) slotLine(g grid, row, width int, target Item, hasTarget bool) string {
@@ -262,6 +294,10 @@ func (m *Model) slotLine(g grid, row, width int, target Item, hasTarget bool) st
 	return m.itemLine(it, s.item+1, onIt, width)
 }
 
+// minWhereWidth is the columns where an item is needs to be cut to: under
+// them it isn't shown.
+const minWhereWidth = 10
+
 // itemLine is one item: what it is (cc or co for a session, ▸ a folder,
 // · a file), its name, where it is, and on the right its age or state.
 // The row enter goes to (picked) is drawn as a file panel's cursor row: the
@@ -288,10 +324,13 @@ func (m *Model) itemLine(it Item, n int, picked bool, width int) string {
 		where = m.ShortPath(where)
 	}
 	room := width - ansi.StringWidth(head) - len(it.Meta) - 2 //nolint:mnd // the gaps
-	title := ansi.Truncate(it.Title, max(4, room*3/5), "…")   //nolint:mnd // the name gets most of it
+	// The name first, whole when the row holds it: in the sidebar's 40
+	// columns a row hasn't room for both, and where it is shows at the foot
+	// for the row enter goes to.
+	title := ansi.Truncate(it.Title, max(4, room), "…") //nolint:mnd // a few letters at least
 	whereRoom := room - ansi.StringWidth(title) - 1
-	if whereRoom < 4 { //nolint:mnd // too narrow to say where
-		where = ""
+	if whereRoom < minWhereWidth && ansi.StringWidth(where) > whereRoom {
+		where = "" // its last few letters would say nothing
 	} else {
 		where = cutFromLeft(where, whereRoom)
 	}

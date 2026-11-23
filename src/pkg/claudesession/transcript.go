@@ -442,6 +442,10 @@ func parseTime(s string) time.Time {
 type Tracker struct {
 	mu    sync.Mutex
 	files map[string]*trackedFile
+	// changed is set when a transcript was read since Save last wrote, at
+	// savedAt (tracker_cache.go).
+	changed bool
+	savedAt time.Time
 }
 
 type trackedFile struct {
@@ -481,6 +485,7 @@ func (t *Tracker) Summary(path string) (Summary, error) {
 	tf.size = info.Size()
 	tf.modTime = info.ModTime()
 	t.files[path] = tf
+	t.changed = true
 	return copySummary(tf.summary), nil
 }
 

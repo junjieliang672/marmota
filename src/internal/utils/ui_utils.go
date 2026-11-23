@@ -17,11 +17,3 @@ const BorderPaddingForFooter = 2
 func FooterWidth(fullWidth int) int {
 	return fullWidth/FilePanelMax - BorderPaddingForFooter
 }
-
-// Including borders
-func FullFooterHeight(footerHeight int, toggleFooter bool) int {
-	if toggleFooter {
-		return footerHeight + BorderPaddingForFooter
-	}
-	return 0
-}

@@ -161,11 +161,11 @@ func (m *model) askSending() askui.Sending {
 	mode := "⏵⏵ " + claudeask.PermissionModeLabel(m.sessions.composer.PermissionMode())
 	s, ok := m.selectedSession()
 	if !ok || m.sessions.list.NewSelected() {
-		sending := askui.Sending{Text: "starts in the background, " + mode, New: true,
+		sending := askui.Sending{Text: "starts in the background, " + mode, New: true, Usual: true,
 			DefaultModel: m.ask.defaultModel, DefaultEffort: m.ask.defaultEffort}
 		if r, ok := m.resumeTargetFor(); ok {
 			sending.Text = "resumes " + r.title + " in the background, " + mode + " (enter alone: beside Marmota)"
-			sending.Resume = r.title
+			sending.Resume, sending.Usual = r.title, false
 		}
 		if m.askStartsCodex() {
 			sending.DefaultModel, sending.DefaultEffort = m.ask.codexModel, m.sessions.composer.CodexStartEffort()
@@ -188,7 +188,7 @@ func (m *model) askSending() askui.Sending {
 		return askui.Sending{Text: "it asks you something: " + firstKey(common.Hotkeys.OpenAskBar) +
 			" in the list answers it", Fixed: true}
 	}
-	return askui.Sending{Text: "typed into its pane (" + m.sessionPlace(s) + ")", Fixed: true,
+	return askui.Sending{Text: "typed into its pane (" + m.sessionPlace(s) + ")", Fixed: true, Usual: true,
 		Model: s.Model, Effort: s.Effort}
 }
 

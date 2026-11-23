@@ -176,7 +176,7 @@ func (m *model) cancelSearch() {
 	}
 
 	// Recalculate heights (footer may need to show)
-	m.setHeightValues(m.fullHeight)
+	m.relayout()
 
 	// OLD: Keep old behavior during migration (dual-write)
 	if len(panel.recursiveBaseElems) > 0 {
@@ -254,7 +254,7 @@ func (m *model) confirmSearch() tea.Cmd {
 		}
 
 		// Recalculate heights (footer may need to hide)
-		m.setHeightValues(m.fullHeight)
+		m.relayout()
 	}
 
 	panel.searchBar.Blur()

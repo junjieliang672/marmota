@@ -105,9 +105,9 @@ func TestSOpensTheListWithEverySection(t *testing.T) {
 	pressKey(m, common.Hotkeys.GoTo[0])
 
 	require.True(t, m.jumpUI.IsOpen())
-	assert.Equal(t, []string{"logos", "plan.md", "provider registry", "ime hold tests", "logo sizes for the deck",
+	assert.Equal(t, []string{"provider registry", "ime hold tests", "logos", "plan.md", "logo sizes for the deck",
 		"logo-notes.md", "todo.txt"}, jumpTitles(m),
-		"numbered down the sections: Pinned, Sessions, Resume, Folders, Files")
+		"numbered down the sections: Sessions, Pinned, Resume, Folders, Files")
 	view := viewText(m)
 	for _, s := range []string{"Pinned", "Sessions", "Resume", "Folders", "Files", "go to"} {
 		assert.Contains(t, view, s)
@@ -170,14 +170,14 @@ func TestPickingMovesAndJumpsByNumber(t *testing.T) {
 
 	pressKey(m, "down")
 	it, _ := m.jumpUI.Picked()
-	assert.Equal(t, "logos", it.Title, "↓ picks the first")
+	assert.Equal(t, "provider registry", it.Title, "↓ picks the first: a session")
 	typeInto(m, "6")
 	pressKey(m, "g")
 	it, _ = m.jumpUI.Picked()
 	assert.Equal(t, "logo-notes.md", it.Title, "6g: row 6")
 	pressKey(m, "g")
 	it, _ = m.jumpUI.Picked()
-	assert.Equal(t, "logos", it.Title, "g: the first")
+	assert.Equal(t, "provider registry", it.Title, "g: the first")
 	pressKey(m, "G")
 	it, _ = m.jumpUI.Picked()
 	assert.Equal(t, "todo.txt", it.Title, "G: the last")
@@ -200,7 +200,7 @@ func TestTPinsAndUnpinsThePickedItem(t *testing.T) {
 
 	pressKey(m, "esc")
 	pressKey(m, "esc")
-	pressKey(m, "down") // todo.txt, pinned last so listed first
+	pickJumpRow(m, 3) // todo.txt: pinned last so the first pin, under the two sessions
 	pressKey(m, common.Hotkeys.PinnedDirectory[0])
 	assert.Equal(t, "Unpinned todo.txt", m.claude.flash)
 	assert.NotContains(t, pinnedLocations(m), f.recentB)
@@ -218,7 +218,7 @@ func TestShiftArrowsMoveAPin(t *testing.T) {
 	f := jumpTestModel(t)
 	m := f.m
 	pressKey(m, common.Hotkeys.GoTo[0])
-	pressKey(m, "down")
+	pickJumpRow(m, 3) // logos, the first pin, under the two sessions
 
 	pressKey(m, "shift+down")
 
@@ -231,7 +231,7 @@ func TestRRenamesAPinsNameAndAFileOnDisk(t *testing.T) {
 	f := jumpTestModel(t)
 	m := f.m
 	pressKey(m, common.Hotkeys.GoTo[0])
-	pressKey(m, "down")
+	pickJumpRow(m, 3) // logos, the first pin, under the two sessions
 	pressKey(m, common.Hotkeys.FilePanelItemRename[0])
 	require.True(t, m.jumpUI.Renaming())
 	for range "logos" {
@@ -319,9 +319,9 @@ func TestTabShowsOneSectionAlone(t *testing.T) {
 	pressKey(m, common.Hotkeys.GoTo[0])
 
 	pressKey(m, "tab")
-	assert.Equal(t, []string{"logos", "plan.md"}, jumpTitles(m), "Pinned alone")
+	assert.Equal(t, []string{"provider registry", "ime hold tests"}, jumpTitles(m), "Sessions alone")
 	pressKey(m, "tab")
-	assert.Equal(t, []string{"provider registry", "ime hold tests"}, jumpTitles(m), "then Sessions")
+	assert.Equal(t, []string{"logos", "plan.md"}, jumpTitles(m), "then Pinned")
 	pressKey(m, "shift+tab")
 	pressKey(m, "shift+tab")
 	assert.Len(t, jumpTitles(m), 7, "back to every section")
@@ -350,7 +350,7 @@ func TestAPinnedFolderIsntListedTwice(t *testing.T) {
 	m.applyJumpZoxide(jumpZoxideMsg{query: "", results: []zoxidelib.Result{{Path: f.pinnedDir, Score: 9},
 		{Path: f.recentFolder, Score: 3}}})
 
-	assert.Equal(t, []string{"logos", "plan.md", "provider registry", "ime hold tests", "logo sizes for the deck",
+	assert.Equal(t, []string{"provider registry", "ime hold tests", "logos", "plan.md", "logo sizes for the deck",
 		"notes", "logo-notes.md", "todo.txt"}, jumpTitles(m), "zoxide's logos is the pinned one")
 }
 
@@ -366,7 +366,7 @@ func TestTheListTakesTheFocusedPanelsPlace(t *testing.T) {
 	after := strings.Split(viewText(m), "\n")
 	require.Len(t, after, len(before), "nothing over the screen: the same rows")
 	assert.True(t, strings.HasPrefix(after[0], "╭─ go to "), "the panel's frame, named go to: %q", after[0])
-	width := m.filePanelWidthAt(m.filePanelFocusIndex) + common.BorderPadding
+	width := m.lay.sidebar.w
 	assert.Equal(t, before[0][strings.Index(before[0], "╮")+len("╮"):], after[0][strings.Index(after[0], "╮")+len("╮"):],
 		"the preview's frame where it was")
 	assert.Equal(t, width, ansi.StringWidth(after[0][:strings.Index(after[0], "╮")+len("╮")]), "the panel's width")

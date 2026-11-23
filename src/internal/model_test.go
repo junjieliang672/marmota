@@ -84,6 +84,9 @@ func TestMain(m *testing.M) {
 	//nolint:reassign // test isolation
 	variable.TemporarySessionsFile = filepath.Join(testDir, "temporary_sessions.json")
 	variable.AppSessionsSeenFile = filepath.Join(testDir, "app_sessions_seen.json") //nolint:reassign // test isolation
+	variable.SessionsRowsFile = filepath.Join(testDir, "sessions_rows")             //nolint:reassign // test isolation
+	//nolint:reassign // test isolation
+	variable.TranscriptSummariesFile = filepath.Join(testDir, "transcript_summaries.json")
 	// Nor ask claude.ai, or open the Claude app.
 	appSessionsAutoRefresh = false
 	listAppSessions = func(context.Context) ([]claudecloud.Session, error) {
@@ -180,8 +183,8 @@ func TestInitialFilePathPositionsCursorWindow(t *testing.T) {
 	}
 
 	m := defaultTestModel(dir1, file2, file7)
-	// View port of 5
-	TeaUpdate(m, tea.WindowSizeMsg{Width: common.MinimumWidth, Height: 10})
+	// View port of 5: the three panels are one under another, nine rows each
+	TeaUpdate(m, tea.WindowSizeMsg{Width: common.MinimumWidth, Height: 28})
 	// Uncomment below to understand the distribution
 	// t.Logf("Heights : %d [%d - [%d] %d]\n", m.fullHeight, m.footerHeight, m.mainPanelHeight,
 	//	m.fileModel.filePanels[2].elementHeight(m.mainPanelHeight))
@@ -192,8 +195,8 @@ func TestInitialFilePathPositionsCursorWindow(t *testing.T) {
 	assert.Equal(t, 0, m.fileModel.filePanels[1].render)
 	assert.Equal(t, file7, m.fileModel.filePanels[2].getSelectedItem().location)
 	assert.Equal(t, 7, m.fileModel.filePanels[2].cursor)
-	// render=3: with Height=10, toggleFooter=false (footerHeight=0), statusLine=1,
-	// mainPanelHeight = 10 - 2(border) - 0(footer) - 1(statusLine) = 7,
+	// render=3: with Height=28, toggleFooter=false (no Ask box, no Details), statusLine=1,
+	// the panels share 27 rows, 9 each: 9 - 2(border) = 7 rows inside the frame,
 	// elementHeight(7) = 7 - 2(path, divider) = 5 (viewport size).
 	// To keep cursor=7 visible: minVisibleRender = 7 - 5 + 1 = 3, so render=3.
 	assert.Equal(t, 3, m.fileModel.filePanels[2].render)

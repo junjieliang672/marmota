@@ -48,9 +48,9 @@ const (
 const (
 	nonePanelFocus focusPanelType = iota
 	metadataFocus
-	// dockSessionsFocus is the Sessions box at the foot (!).
+	// dockSessionsFocus is the Sessions box under the preview (!).
 	dockSessionsFocus
-	// dockAskFocus is the Ask box at the foot (K), grown while it has it.
+	// dockAskFocus is the Ask box (K): it is written in while it has it.
 	dockAskFocus
 )
 
@@ -104,12 +104,12 @@ type model struct {
 	zClient *zoxidelib.Client
 
 	fileMetaData metadata.Model
-	// details is the box at the foot of the screen; macSampler reads the
+	// details is the box at the sidebar's foot; macSampler reads the
 	// machine for it every 2 seconds, and macStats is the last reading.
 	details    details.Model
 	macSampler *sysstat.Sampler
 	macStats   *sysstat.Stats
-	// dock is what the Sessions box at the foot keeps between visits.
+	// dock is what the Sessions box keeps between visits.
 	dock                 dockState
 	diff                 diffView // the preview of a session's change to the cursor's file (W)
 	ioReqCnt             int
@@ -126,12 +126,14 @@ type model struct {
 	filePanelFocusIndex     int
 	wasSelectModeKeyHandled bool
 
-	// Height in number of lines of actual viewport of
-	// main panel and sidebar excluding border
+	// lay is where every box is: worked out after each message from what
+	// each has to show (layout.go).
+	lay layout
+
+	// The rows inside the focused file panel's frame.
 	mainPanelHeight int
 
-	// Height in number of lines of actual viewport of
-	// footer panels - process/metadata/clipboard - excluding border
+	// The rows inside Details' frame, 0 while it is put away.
 	footerHeight int
 	fullWidth    int
 	fullHeight   int
@@ -246,8 +248,11 @@ type fileModel struct {
 
 // Panel representing a file
 type filePanel struct {
-	cursor           int
-	render           int
+	cursor int
+	render int
+	// rowsBeforeSearch is the rows the panel wanted before a search narrowed
+	// it (layout.go).
+	rowsBeforeSearch int
 	isFocused        bool
 	location         string
 	sortOptions      sortOptionsModel

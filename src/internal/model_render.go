@@ -23,11 +23,14 @@ import (
 	"github.com/junjieliang672/marmota/src/config/icon"
 )
 
-// This also modifies the m.fileModel.filePanels, which it should not
-// what modifications we do on this model object are of no consequence.
-// Since bubblea passed this 'model' by value in View() function.
-func (m *model) filePanelRender() string {
-	f := make([]string, len(m.fileModel.filePanels))
+// sidebarRender draws the sidebar: the file panels one under another, each
+// as tall as the layout gave it, then Details. The s list takes all of it
+// while it is open.
+func (m *model) sidebarRender() string {
+	if m.jumpUI.IsOpen() {
+		return m.jumpUI.Render(true)
+	}
+	parts := make([]string, 0, len(m.fileModel.filePanels)+1)
 	badges := m.fileBadges()
 	for i, filePanel := range m.fileModel.filePanels {
 		// check if cursor or render out of range
@@ -38,29 +41,13 @@ func (m *model) filePanelRender() string {
 			filePanel.render = 0
 		}
 		m.fileModel.filePanels[i] = filePanel
-
-		// The s list takes the focused panel's place while it is open.
-		if m.jumpUI.IsOpen() && i == m.filePanelFocusIndex {
-			f[i] = m.jumpUI.Render(true)
-			continue
-		}
-		f[i] = filePanel.renderWithBadges(m.mainPanelHeight, m.filePanelWidthAt(i), filePanel.isFocused, badges)
+		parts = append(parts,
+			filePanel.renderWithBadges(m.panelRows(i), m.fileModel.width, filePanel.isFocused, badges))
 	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, f...)
-}
-
-// filePanelWidthAt is panel i's width inside its frame: the last panel
-// takes what doesn't divide evenly, so the panels fill the window exactly.
-func (m *model) filePanelWidthAt(i int) int {
-	n := len(m.fileModel.filePanels)
-	space := m.fullWidth - (common.BorderPadding + (n-1)*common.BorderPadding)
-	if m.fileModel.filePreview.IsOpen() {
-		space -= m.fileModel.filePreview.GetWidth()
+	if m.lay.details.shown() {
+		parts = append(parts, m.detailsRender())
 	}
-	if i == n-1 && space%n != 0 {
-		return m.fileModel.width + space%n
-	}
-	return m.fileModel.width
+	return strings.Join(parts, "\n")
 }
 
 func (panel *filePanel) Render(mainPanelHeight int, filePanelWidth int, focussed bool) string {
@@ -72,7 +59,7 @@ func (panel *filePanel) renderWithBadges(mainPanelHeight int, filePanelWidth int
 ) string {
 	r := ui.FilePanelRenderer(mainPanelHeight+common.BorderPadding, filePanelWidth+common.BorderPadding, focussed)
 
-	panel.renderTitle(r, uint(len(panel.selected)))
+	panel.renderTitle(r, uint(len(panel.selected)), mainPanelHeight)
 	panel.renderTopBar(r, filePanelWidth)
 	if panel.showsSearchRow() {
 		panel.renderSearchBar(r)
@@ -84,8 +71,9 @@ func (panel *filePanel) renderWithBadges(mainPanelHeight int, filePanelWidth int
 
 // renderTitle names the folder in the panel's top border, with the cursor's
 // place after it ("asset 9/15"), and how many items are selected in select
-// mode.
-func (panel *filePanel) renderTitle(r *rendering.Renderer, selectedCount uint) {
+// mode. Its bottom edge says how the items are sorted and, when the panel's
+// rows don't hold them all, how many of them show ("14/138").
+func (panel *filePanel) renderTitle(r *rendering.Renderer, selectedCount uint, rows int) {
 	name := filepath.Base(panel.location)
 	switch panel.location {
 	case variable.HomeDir:
@@ -98,7 +86,11 @@ func (panel *filePanel) renderTitle(r *rendering.Renderer, selectedCount uint) {
 	// show it.
 	if opts := panel.sortOptions.data; opts.selected >= 0 && opts.selected < len(opts.options) {
 		kind := opts.options[opts.selected]
-		r.SetBorderInfoItems(strings.ToLower(kind) + " " + sortArrow(kind, opts.reversed))
+		items := []string{strings.ToLower(kind) + " " + sortArrow(kind, opts.reversed)}
+		if shown := panel.elementHeight(rows); shown > 0 && shown < len(panel.element) {
+			items = append([]string{strconv.Itoa(shown) + "/" + strconv.Itoa(len(panel.element))}, items...)
+		}
+		r.SetBorderInfoItems(items...)
 	}
 	suffix := panel.getCursorString()
 	if panel.panelMode == selectMode {
@@ -293,10 +285,7 @@ func (panel *filePanel) renderSelectBox(isSelected bool, bg lipgloss.Color) stri
 	}
 	if bg != common.FilePanelBGColor {
 		// On the cursor bar: the same boxes, drawn on the bar's color.
-		color, box := common.FilePanelBorderColor, icon.CheckboxEmpty
-		if panel.isFocused {
-			color = common.FilePanelBorderActiveColor
-		}
+		color, box := common.FilePanelFocusColor(panel.isFocused), icon.CheckboxEmpty
 		if isSelected {
 			box = icon.CheckboxChecked
 		}

@@ -67,5 +67,5 @@ func (m *model) dirRefreshed(msg dirRefreshMsg) {
 	}
 	panel.cachedElements = msg.elements
 	panel.element = iCloudFiltered(panel, msg.elements)
-	panel.scrollToCursor(m.mainPanelHeight)
+	panel.scrollToCursor(m.panelRows(msg.panel))
 }

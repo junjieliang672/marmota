@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -68,14 +69,43 @@ var (
 	}
 )
 
+// transcriptSummariesEvery is how often, at most, what was read of the
+// transcripts is written to TranscriptSummariesFile after the first time: a
+// working session's transcript changes with every listing.
+const transcriptSummariesEvery = time.Minute
+
+var (
+	programStampOnce  sync.Once //nolint:gochecknoglobals // read once
+	programStampValue string    //nolint:gochecknoglobals // read once
+)
+
+// programStamp names this build of Marmota, by its file's size and time: a
+// build that reads transcripts differently doesn't use another's summaries.
+func programStamp() string {
+	programStampOnce.Do(func() {
+		exe, err := os.Executable()
+		if err != nil {
+			return
+		}
+		if info, err := os.Stat(exe); err == nil {
+			programStampValue = strconv.FormatInt(info.Size(), 10) + "-" +
+				strconv.FormatInt(info.ModTime().UnixNano(), 10)
+		}
+	})
+	return programStampValue
+}
+
 type claudeSessionsState struct {
 	snapshot claudesession.Snapshot
 	panes    []weztermPane // WezTerm panes listed with the snapshot
 	tracker  *claudesession.Tracker
-	seen     *claudesession.SeenStore
-	unread   map[string]bool
-	inflight bool
-	loaded   bool
+	// trackerRead is set once the tracker has been given what the last run
+	// read of the transcripts (TranscriptSummariesFile).
+	trackerRead bool
+	seen        *claudesession.SeenStore
+	unread      map[string]bool
+	inflight    bool
+	loaded      bool
 	// folder is the folder the past sessions were listed for.
 	folder string
 	// pendingStop is the session the stop confirmation is about.
@@ -187,14 +217,37 @@ func (m *model) localSessionsRefreshCmd() tea.Cmd {
 	if order.stale(day) {
 		opts.RecentFolders = claudeSessionsRecentFolders
 	}
+	// The first listing starts from what the last run read of the
+	// transcripts: read whole, a day's transcripts take seconds.
+	readSummaries := !m.claude.trackerRead
+	m.claude.trackerRead = true
+	summaries, stamp := variable.TranscriptSummariesFile, programStamp()
 	return func() tea.Msg {
+		// Each step's time goes to the slow log (MARMOTA_SLOW_LOG): none of
+		// them is on the screen's loop, but the Sessions box waits for all.
+		start := time.Now()
+		if readSummaries {
+			tracker.Load(summaries, stamp)
+			noteSlow("list sessions", "what the last run read of the transcripts", start)
+			start = time.Now()
+		}
 		snap := claudesession.Collect(context.Background(), opts)
+		noteSlow("list sessions", "Claude Code's", start)
+		if _, err := tracker.Save(summaries, stamp, transcriptSummariesEvery); err != nil {
+			slog.Debug("Could not keep what was read of the transcripts", "error", err)
+		}
 		msg := claudeSessionsSnapshotMsg{snapshot: snap, folder: folder, layoutGen: layoutGen}
+		start = time.Now()
 		msg.codex = collectCodexSessions(codexsession.Options{Home: codexDir, Tracker: codexTracker,
 			Since: opts.Since, Folders: snap.Folders, Include: opts.Include})
+		noteSlow("list sessions", "Codex's", start)
 		if remote {
+			start = time.Now()
 			msg.starting = localStartingSessions(snap.Live)
+			noteSlow("list sessions", "those starting in tmux", start)
 		}
+		start = time.Now()
+		defer func() { noteSlow("list sessions", "WezTerm's and tmux's panes", start) }()
 		if os.Getenv("WEZTERM_PANE") != "" {
 			if listed, err := listWeztermPanes(folder); err == nil {
 				msg.panes, msg.panesListed = listed, true
