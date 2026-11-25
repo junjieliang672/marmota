@@ -108,6 +108,7 @@ Features:
   • Builds Marmota as y, and sets up your shell to run it (cd on quit too)
   • Initializes zoxide for smart directory navigation ('z' command)
   • Moves an install from before the program was Marmota over to y
+  • Sets up Claude Code's look: its theme and status line (yours stay)
   • Supports bash, zsh, and fish shells
 
 Examples:

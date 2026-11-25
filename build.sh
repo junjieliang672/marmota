@@ -3,10 +3,11 @@
 # Builds y (Marmota) into ./bin/y, and sets up your shell to run it: a block
 # in your shell config puts ./bin on PATH and defines the y function, which
 # moves your shell to the folder y quit in when cd_on_quit is on. On a Mac it
-# also keeps Marmota's look in ~/.wezterm.lua up to date. An install
-# from before the program was Marmota and its binary y is moved over: its
-# shell lines and its binaries go (OLD_* below). On a Mac where Marmota was never
-# installed (no Go, or nothing in your shell config), it first installs
+# also keeps Marmota's look in ~/.wezterm.lua up to date. Where Claude Code
+# is, it sets up its look too: its theme and status line (scripts/claude). An
+# install from before the program was Marmota and its binary y is moved over:
+# its shell lines and its binaries go (OLD_* below). On a Mac where Marmota was
+# never installed (no Go, or nothing in your shell config), it first installs
 # everything through install-deps-macos.sh, which calls back here to build.
 #
 #   ./build.sh                  build; the first time, install everything
@@ -34,7 +35,7 @@ case "$1" in
         INSTALL=no
         ;;
     -h|--help)
-        sed -n '3,18p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+        sed -n '3,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
         exit 0
         ;;
     "")
@@ -280,6 +281,78 @@ install_session_skill() {
     done
 }
 install_session_skill
+
+# Claude Code's look, on a computer that has Claude Code: the settings of
+# scripts/claude/settings.json (its theme) and the status line
+# scripts/claude/statusline.sh, in Claude Code's settings.json. A setting you
+# already have stays as you set it. So does a status line of your own, unless
+# it is the script Marmota's began as (known by the checksum of its lines of
+# code): that one gives way to Marmota's. The status line is named where it
+# is in this repository, not copied: a change to it shows in git, and is on
+# your other computers with the next pull. The settings as they were are kept
+# beside the file.
+setup_claude_look() {
+    local dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+    local look="$REPO/scripts/claude/settings.json" line="$REPO/scripts/claude/statusline.sh"
+    [[ -d $dir ]] || command -v claude &>/dev/null || return 0
+    if ! command -v jq &>/dev/null && command -v brew &>/dev/null; then
+        echo "Installing jq (Claude Code's status line reads the session with it)..."
+        brew install jq
+    fi
+    if ! command -v jq &>/dev/null; then
+        echo "Skipped Claude Code's look: it needs jq (brew install jq, or apt install jq)"
+        return 0
+    fi
+
+    local settings="$dir/settings.json" was="{}"
+    [[ -s $settings ]] && was="$(cat "$settings")"
+    if ! jq -e 'type == "object"' <<< "$was" &>/dev/null; then
+        echo "Left Claude Code's look as it is: jq can't read $settings"
+        return 0
+    fi
+
+    # Their status line, when its command is one file (~ for home): is it the
+    # script Marmota's began as, comments and empty lines aside?
+    local theirs began=false
+    theirs="$(jq -r '.statusLine.command? // empty' <<< "$was")"
+    theirs="${theirs/#\~\//$HOME/}"
+    if [[ -f $theirs && $(grep -vE '^[[:space:]]*(#|$)' "$theirs" | cksum) == "2136977005 1944" ]]; then
+        began=true
+    fi
+
+    local command now what
+    command="$(printf '%q' "$line")"
+    now="$(jq --arg command "$command" --argjson began "$began" --slurpfile look "$look" '
+        . as $yours
+        | . + ($look[0] | with_entries(select(.key as $key | $yours | has($key) | not)))
+        | if has("statusLine") | not then
+            .statusLine = {type: "command", command: $command}
+          elif $began or ((.statusLine.command? // "") | tostring | endswith("/scripts/claude/statusline.sh")) then
+            .statusLine.command = $command
+          else . end
+    ' <<< "$was")" || return 0
+    # What changed: the settings added, and a status line that was there
+    what="$(jq -r --argjson was "$was" '
+        [keys_unsorted[] | select(. as $key | $was | has($key) | not)]
+        + (if ($was | has("statusLine")) and .statusLine != $was.statusLine then ["statusLine"] else [] end)
+        | join(", ")
+    ' <<< "$now")"
+    if [[ -n $what ]]; then
+        local note=""
+        mkdir -p "$dir"
+        if [[ -s $settings ]]; then
+            local backup="$settings.bak-$(date +%Y%m%d-%H%M%S)"
+            cp -p "$settings" "$backup"
+            note=" (as it was: $backup)"
+        fi
+        (umask 077 && printf '%s\n' "$now" > "$settings") || return 0
+        echo "Set up Claude Code's look in $settings: $what$note"
+    fi
+    if ! jq -e --arg command "$command" '.statusLine.command? == $command' <<< "$now" &>/dev/null; then
+        echo "Claude Code's status line is yours, as you set it: Marmota's is $line"
+    fi
+}
+setup_claude_look
 
 # Update user config with missing fields
 echo "Updating user config with missing fields..."

@@ -69,7 +69,12 @@ Every run of `build.sh`:
   settings stay as they are;
 - adds any setting a new version introduced to `~/.config/marmota`;
 - installs the `marmota-sessions` skill into `~/.claude/skills` (and `~/.codex/skills` when Codex is
-  set up), which tells a coding agent about `y session`.
+  set up), which tells a coding agent about `y session`;
+- sets up Claude Code's look in `~/.claude/settings.json`: its theme, and a status line of one line,
+  `Fable 5.2  xhigh  marmota  dev ●↑2  ctx 63%  wk 62% ↻ 3d4h`, with an icon before the folder and
+  the branch (the model and its effort, the session's name, the folder, the branch, the context left,
+  what is left of the week's limit and when it resets; green, yellow at 30% or less, red at 10%). A
+  theme or a status line you set yourself stays; `scripts/claude` holds both.
 
 Each file it changes is backed up next to it first. Then, in a new terminal:
 
