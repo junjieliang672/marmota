@@ -261,9 +261,24 @@ build_shelf() {
         echo "Skipped the shelf (Y): it needs Xcode's command line tools (xcode-select --install)"
         return 0
     fi
-    [[ -x $out && $out -nt $src ]] && return 0
+    # Built already, and it runs: asked for a file that isn't there, it says
+    # so and ends with 1. One macOS won't run (it kills a program whose code
+    # signature it takes for invalid, with no word in the terminal) ends
+    # otherwise, and is built again.
+    if [[ -x $out && $out -nt $src ]]; then
+        "$out" "$REPO/bin/.no-such-file" &>/dev/null
+        [[ $? -eq 1 ]] && return 0
+        echo "The shelf (y-shelf) doesn't run: building it again"
+    fi
     echo "Building the shelf (y-shelf)..."
-    swiftc -O "$src" -o "$out" || echo "Warning: the shelf didn't build, so Y can't open it"
+    # Beside it, then moved over it: a signed program written over in place
+    # is one macOS won't run.
+    if swiftc -O "$src" -o "$out.new"; then
+        mv -f "$out.new" "$out"
+    else
+        rm -f "$out.new"
+        echo "Warning: the shelf didn't build, so Y can't open it"
+    fi
 }
 build_shelf
 
