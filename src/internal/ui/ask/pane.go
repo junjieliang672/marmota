@@ -121,6 +121,7 @@ func RenderSession(s Session, composer string, width, height, scroll int, focuse
 		r.SetBorderTitleGlyph(s.Glyph, s.GlyphColor)
 	}
 	r.SetBorderTitle(s.Title)
+	r.SetBorderTitleAtFoot() // next to the Ask box, where you look as you write
 	if s.Pinned != "" {
 		r.SetBorderTitleSuffix(s.Pinned)
 	}

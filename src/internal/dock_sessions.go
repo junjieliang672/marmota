@@ -250,6 +250,8 @@ func (m *model) dockSessionsKey(msg tea.KeyMsg) tea.Cmd {
 		return m.openDockAsk("")
 	case slices.Contains(common.Hotkeys.Confirm, key):
 		m.withSelectedSession(m.focusClaudeSession)
+		// It is beside Marmota now: the preview goes on to another.
+		return m.previewLeaves(prev)
 	case slices.Contains(common.Hotkeys.SessionMention, key):
 		m.withSelectedSession(m.mentionClaudeSession)
 	case slices.Contains(common.Hotkeys.SessionRename, key):
@@ -497,6 +499,7 @@ func (m *model) dockSessionsRender() string {
 
 	now := time.Now()
 	titles := m.dockTitleWidth(sessions)
+	m.follow.marks = m.cellMarks()
 	base := lipgloss.NewStyle().Background(common.FooterBGColor)
 	for row := 0; row < view && row < len(shown); row++ {
 		var line strings.Builder
@@ -584,6 +587,9 @@ func (m *model) dockRow(n, count int, s claudesession.Session, selected bool, wi
 	mark := base.Render(" ")
 	if selected {
 		mark = base.Foreground(lipgloss.Color(common.Theme.FilePanelBorderActive)).Render("▌")
+	}
+	if color, ok := m.follow.marks[s.ID]; ok {
+		mark = base.Foreground(color).Render("▌") // its cell's color in the preview
 	}
 	number := strconv.Itoa(n)
 	number = strings.Repeat(" ", max(0, len(strconv.Itoa(count))-len(number))) + number

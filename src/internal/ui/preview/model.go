@@ -126,13 +126,18 @@ func (m *Model) imageColumn(fullModelWidth int) int {
 	return fullModelWidth - m.width + previewFrameCells
 }
 
-// frame draws content, sized to the inside of the box, in the box titled
-// "Preview".
-func (m *Model) frame(content string) string {
+// frame draws content, sized to the inside of the box, in the box named
+// for itemPath, the file or folder it shows: its name is on the box's
+// bottom edge.
+func (m *Model) frame(content, itemPath string) string {
 	if m.width < minFrameSize || m.height < minFrameSize {
 		return content
 	}
-	r := ui.FilePreviewFrameRenderer(m.height, m.width, false)
+	name := ""
+	if itemPath != "" {
+		name = filepath.Base(itemPath)
+	}
+	r := ui.FilePreviewFrameRenderer(m.height, m.width, false, name)
 	r.AddLines(content)
 	return r.Render()
 }
@@ -141,7 +146,7 @@ func (m *Model) frame(content string) string {
 func (m *Model) RenderText(text string) string {
 	return m.frame(ui.FilePreviewPanelRenderer(m.InnerHeight(), m.InnerWidth()).
 		AddLines(text).
-		Render()) + m.imagePreviewer.ClearKittyImages()
+		Render(), m.location) + m.imagePreviewer.ClearKittyImages()
 }
 
 // RenderLines draws lines that are already laid out to fit the pane, such
@@ -151,7 +156,7 @@ func (m *Model) RenderLines(lines []string) string {
 	for _, line := range lines {
 		r.AddLineWithCustomTruncate(line, rendering.TailsTruncateRight)
 	}
-	return m.frame(r.Render()) + m.imagePreviewer.ClearKittyImages()
+	return m.frame(r.Render(), m.location) + m.imagePreviewer.ClearKittyImages()
 }
 
 func (m *Model) SetContentWithRenderText(text string) {
@@ -502,7 +507,7 @@ func (m *Model) textContent(itemPath string, width, lines int) (string, string) 
 }
 
 func (m *Model) RenderWithPath(itemPath string, fullModelWidth int) string {
-	return m.frame(m.renderContent(itemPath, fullModelWidth))
+	return m.frame(m.renderContent(itemPath, fullModelWidth), itemPath)
 }
 
 // renderContent is what the preview shows of itemPath, sized to the inside of

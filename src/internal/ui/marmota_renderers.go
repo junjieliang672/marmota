@@ -37,6 +37,27 @@ func FilePanelRenderer(totalHeight int, totalWidth int, filePanelFocussed bool) 
 	return r
 }
 
+// SessionCellRenderer draws one of the cells the preview is cut into while
+// several sessions show at once: its frame and its name in color, the
+// session's own, so one cell can't be taken for another.
+func SessionCellRenderer(totalHeight int, totalWidth int, color lipgloss.TerminalColor) *rendering.Renderer {
+	cfg := rendering.DefaultRendererConfig(totalHeight, totalWidth)
+	cfg.ContentFGColor = common.FilePanelFGColor
+	cfg.ContentBGColor = common.FilePanelBGColor
+	cfg.BorderRequired = true
+	cfg.BorderBGColor = common.FilePanelBGColor
+	cfg.BorderFGColor = color
+	cfg.TitleFGColor = color
+	cfg.TitleSuffixFGColor = common.FilePanelBorderColor
+	cfg.Border = DefaultLipglossBorder()
+	r, err := rendering.NewRenderer(cfg)
+	if err != nil {
+		slog.Error("Error in creating renderer. Falling back to default renderer", "error", err)
+		r = &rendering.Renderer{}
+	}
+	return r
+}
+
 // PinnedPanelRenderer draws the preview pinned to a session (V): its frame
 // and what follows the title ("pinned") in Claude's orange, so it can't be
 // taken for the preview that follows the keyboard.
@@ -86,9 +107,11 @@ func FilePreviewPanelRenderer(totalHeight int, totalWidth int) *rendering.Render
 	return r
 }
 
-// FilePreviewFrameRenderer draws the box around the preview pane, titled
-// "Preview". It takes the keyboard's colors when the preview has focus.
-func FilePreviewFrameRenderer(totalHeight int, totalWidth int, focused bool) *rendering.Renderer {
+// FilePreviewFrameRenderer draws the box around the preview pane, with name,
+// the file or folder it shows, at the left of its bottom edge, where a
+// session's name is when the preview shows one. It takes the keyboard's
+// colors when the preview has focus.
+func FilePreviewFrameRenderer(totalHeight int, totalWidth int, focused bool, name string) *rendering.Renderer {
 	cfg := rendering.DefaultRendererConfig(max(0, totalHeight), max(0, totalWidth))
 	cfg.ContentFGColor = common.FilePanelFGColor
 	cfg.ContentBGColor = common.FilePanelBGColor
@@ -107,7 +130,8 @@ func FilePreviewFrameRenderer(totalHeight int, totalWidth int, focused bool) *re
 		slog.Error("Error in creating renderer. Falling back to default renderer", "error", err)
 		r = &rendering.Renderer{}
 	}
-	r.SetBorderTitle("Preview")
+	r.SetBorderTitle(name)
+	r.SetBorderTitleAtFoot()
 	if keys := common.Hotkeys.PinViewer; len(keys) > 0 && keys[0] != "" {
 		r.SetBorderInfoItems(keys[0] + " pin") // as the dock's boxes give their key
 	}

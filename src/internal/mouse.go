@@ -50,6 +50,9 @@ func (m *model) handleMouse(msg tea.MouseMsg) tea.Cmd {
 		return nil
 	}
 	if !m.helpMenu.open && !m.overlayOpen() {
+		if cmd, took := m.cellsMouse(msg); took {
+			return cmd
+		}
 		if cmd, took := m.selectInSessionPreview(msg); took {
 			return cmd
 		}

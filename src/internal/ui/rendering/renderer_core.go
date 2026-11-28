@@ -74,7 +74,39 @@ func (r *Renderer) styledTopLine() (string, bool) {
 		return "", false
 	}
 	border := lipgloss.NewStyle().Foreground(r.borderFGColor).Background(r.borderBGColor)
-	line := border.Render(r.borderStrings.TopLeft + strings.Repeat(r.borderStrings.Top, l.margin) + " ")
+	return border.Render(r.borderStrings.TopLeft+strings.Repeat(r.borderStrings.Top, l.margin)) +
+		r.styledTitle(l, border) +
+		border.Render(strings.Repeat(r.borderStrings.Top, l.rest)+r.borderStrings.TopRight), true
+}
+
+// SetBorderTitleAtFoot has the title drawn in the bottom border, at its
+// left, where the eye is when the box is over the ones you type in; the top
+// border is then a plain line.
+func (r *Renderer) SetBorderTitleAtFoot() {
+	r.border.SetTitleAtFoot()
+}
+
+// SetBorderTitleReverse draws the title, with its glyph and suffix, on a
+// band of the title's color: a box that asks for you.
+func (r *Renderer) SetBorderTitleReverse() {
+	r.titleReverse = true
+}
+
+// styledTitle is a border's title as l lays it out, a space each side: the
+// glyph, the title and its suffix in their own colors, or all of it on a
+// band of the title's color.
+func (r *Renderer) styledTitle(l titleLayout, border lipgloss.Style) string {
+	if r.titleReverse {
+		text := l.title
+		if l.glyph != "" {
+			text = l.glyph + " " + text
+		}
+		if l.suffix != "" {
+			text += " " + l.suffix
+		}
+		return border.Foreground(r.titleFGColor).Reverse(true).Bold(true).Render(" " + text + " ")
+	}
+	line := border.Render(" ")
 	if l.glyph != "" {
 		glyphStyle := border
 		if r.titleGlyphFGColor != nil {
@@ -86,7 +118,21 @@ func (r *Renderer) styledTopLine() (string, bool) {
 	if l.suffix != "" {
 		line += border.Render(" ") + border.Foreground(r.titleSuffixFGColor).Render(l.suffix)
 	}
-	return line + border.Render(" "+strings.Repeat(r.borderStrings.Top, l.rest)+r.borderStrings.TopRight), true
+	return line + border.Render(" ")
+}
+
+// styledFootLine is the bottom border with the title at its left and the
+// info items at its right.
+func (r *Renderer) styledFootLine() (string, bool) {
+	info := r.border.infoText(r.borderStrings.Bottom)
+	l, ok := r.border.layoutFootTitle(info)
+	if !ok {
+		return "", false
+	}
+	border := lipgloss.NewStyle().Foreground(r.borderFGColor).Background(r.borderBGColor)
+	return border.Render(r.borderStrings.BottomLeft+strings.Repeat(r.borderStrings.Bottom, l.margin)) +
+		r.styledTitle(l, border) +
+		border.Render(strings.Repeat(r.borderStrings.Bottom, l.rest)+info+r.borderStrings.BottomRight), true
 }
 
 func (r *Renderer) SetBorderInfoItems(infoItems ...string) {
@@ -131,6 +177,14 @@ func (r *Renderer) joinedSections() string {
 // withStyledTopLine puts the styled top border line in place of res's
 // first line.
 func (r *Renderer) withStyledTopLine(res string) string {
+	if r.border.titleAtFoot {
+		if foot, ok := r.styledFootLine(); ok {
+			if i := strings.LastIndexByte(res, '\n'); i >= 0 {
+				return res[:i+1] + foot
+			}
+		}
+		return res
+	}
 	if top, ok := r.styledTopLine(); ok {
 		if i := strings.IndexByte(res, '\n'); i >= 0 {
 			return top + res[i:]

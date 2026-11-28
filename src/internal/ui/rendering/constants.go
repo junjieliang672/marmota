@@ -16,4 +16,8 @@ const (
 
 	// minInfoItemWidth is minimum width for each info item to render at least 1 char
 	minInfoItemWidth = 4
+
+	// minFootTitleWidth is how much of a title in the bottom border has to
+	// show for its suffix to be drawn after it.
+	minFootTitleWidth = 2
 )

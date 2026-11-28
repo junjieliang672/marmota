@@ -300,6 +300,9 @@ def main() -> int:
                           lambda: (pane_by_id(second["pane_id"]) or {}).get("workspace") == HIDDEN_WORKSPACE)
         assert parked
         assert (pane_by_id(first["pane_id"]) or {}).get("is_active"), "enter didn't put the keyboard in the session"
+        # The session beside Marmota is read there: the Sessions box, and so
+        # the preview, goes on to the other one.
+        wait_for("the Sessions box on the other session", lambda: "remote2" in selected_session(marmota))
         type_keys(marmota, "\x1b")  # esc: back to the files
         wait_for("the files again", lambda: not in_sessions_box(marmota))
         print("ok   s listed both sessions in the Sessions box, the rc one with the Remote Control mark; "
@@ -480,11 +483,19 @@ def main() -> int:
         for key in number + "g":  # [n]g moves the cursor; never enter on a file
             type_keys(marmota, key)
             time.sleep(0.1)
-        if "Preview" not in screen(marmota):
+        def preview_edge() -> re.Match[str] | None:
+            """The preview's top edge right of the sidebar's: a plain line,
+            its name being on its bottom edge. The Ask box's or the Sessions
+            box's, there while the preview is hidden, has a title."""
+            return re.search(r"╮╭─{3}", screen(marmota).splitlines()[0])
+
+        if not preview_edge():
             type_keys(marmota, "\x06")  # ctrl+f opens it
         wait_for("long.md in the preview", lambda: "row 001" in screen(marmota))
-        top = screen(marmota).splitlines()[0]
-        column = top.index("Preview") + 2
+        edge = wait_for("the preview's top edge", preview_edge)
+        column = edge.start() + 6
+        foot = next(line for line in screen(marmota).splitlines() if "╰─ long.md " in line[edge.start():])
+        assert foot, "the preview doesn't name its file on its bottom edge"
 
         def wheel(button: int, col: int) -> None:
             type_keys(marmota, f"\x1b[<{button};{col};6M")

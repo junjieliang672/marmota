@@ -49,7 +49,14 @@ func panelLines(t *testing.T, m *model) []string {
 	t.Helper()
 	var lines []string
 	for _, line := range strings.Split(m.View(), "\n") {
-		if strings.Contains(ansi.Strip(line), "assets") || strings.Contains(ansi.Strip(line), panelLine) {
+		// The sidebar's columns: the preview names what it shows on its
+		// bottom edge, and a panel its folder on its own.
+		line = ansi.Cut(line, 0, sidebarWidth)
+		text := ansi.Strip(line)
+		if strings.HasPrefix(text, "╰") {
+			continue
+		}
+		if strings.Contains(text, "assets") || strings.Contains(text, panelLine) {
 			lines = append(lines, line)
 		}
 	}

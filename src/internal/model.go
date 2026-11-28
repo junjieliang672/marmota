@@ -174,10 +174,12 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Focus reporting exists for the IME ascii-hold. Marmota stays in hotkey
 	// mode while it is in a background tab, and a hold left in place from there
 	// would force ASCII input in whatever the user switched to.
+	// The preview follows the sessions while the keyboard is away
+	// (preview_follow.go).
 	case tea.FocusMsg:
-		m.terminalFocused = true
+		updateCmd = m.terminalFocusChanged(true)
 	case tea.BlurMsg:
-		m.terminalFocused = false
+		updateCmd = m.terminalFocusChanged(false)
 
 	case editorFinishedMsg:
 		updateCmd = m.applyEditorFinished(msg)
@@ -256,6 +258,10 @@ func (m *model) handleOwnMsg(msg tea.Msg) (tea.Cmd, bool) {
 
 	case conversationReadMsg:
 		return m.conversationRead(msg), true
+
+	case cellConversationMsg:
+		m.cellConversationRead(msg)
+		return nil, true
 
 	case gitRefreshDebounceMsg:
 		// Debounce timer fired - refresh git status now
@@ -1039,6 +1045,12 @@ func (m *model) View() string {
 			// over it until cleared; back in the files, it is drawn again.
 			filePreview = highlightSelection(m.dockSessionPreview(m.fileModel.filePreview.GetWidth(),
 				m.fileModel.filePreview.GetHeight()), m.sessions.selection) + filepreview.ClearKittyImages()
+			if cells, more := m.previewCells(); len(cells) > 0 {
+				// The keyboard is away and several sessions have something
+				// to show: a cell each.
+				filePreview = m.previewCellsRender(cells, more, m.fileModel.filePreview.GetWidth(),
+					m.fileModel.filePreview.GetHeight())
+			}
 		}
 		right = append(right, filePreview)
 	}

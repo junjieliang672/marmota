@@ -419,8 +419,8 @@ func TestAnEndedSessionIsPreviewedFromItsTranscript(t *testing.T) {
 	s, ok := m.jumpPreviewSession()
 	require.True(t, ok)
 	assert.Equal(t, "ended-1", s.ID)
-	top := strings.Split(viewText(m), "\n")[0]
-	assert.Contains(t, top[strings.Index(top, "╮"):], "logo sizes for the deck", "the preview's title")
+	foot := strings.Split(viewText(m), "\n")[m.fileModel.filePreview.GetHeight()-1]
+	assert.Contains(t, foot[strings.LastIndex(foot, "╰"):], "logo sizes for the deck", "the preview's title, on its bottom edge")
 }
 
 func TestEnterOnASessionPicksItInTheSessionsBoxAndLeavesThePaneBesideAlone(t *testing.T) {

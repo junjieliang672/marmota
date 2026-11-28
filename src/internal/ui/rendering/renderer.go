@@ -41,6 +41,8 @@ type Renderer struct {
 	titleFGColor       lipgloss.TerminalColor
 	titleSuffixFGColor lipgloss.TerminalColor
 	titleGlyphFGColor  lipgloss.TerminalColor
+	// titleReverse draws the title on a band of its color.
+	titleReverse bool
 
 	// Maybe better rename these to maxHeight
 	// Final rendered string should have exactly this many lines, including borders

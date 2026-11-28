@@ -69,10 +69,11 @@ func (panel *filePanel) renderWithBadges(mainPanelHeight int, filePanelWidth int
 	return r.Render()
 }
 
-// renderTitle names the folder in the panel's top border, with the cursor's
-// place after it ("asset 9/15"), and how many items are selected in select
-// mode. Its bottom edge says how the items are sorted and, when the panel's
-// rows don't hold them all, how many of them show ("14/138").
+// renderTitle names the folder at the left of the panel's bottom edge, with
+// the cursor's place after it ("asset 9/15"), and how many items are
+// selected in select mode. The edge's right says how the items are sorted
+// and, when the panel's rows don't hold them all, how many of them show
+// ("14/138").
 func (panel *filePanel) renderTitle(r *rendering.Renderer, selectedCount uint, rows int) {
 	name := filepath.Base(panel.location)
 	switch panel.location {
@@ -82,6 +83,7 @@ func (panel *filePanel) renderTitle(r *rendering.Renderer, selectedCount uint, r
 		name = panel.location
 	}
 	r.SetBorderTitle(name)
+	r.SetBorderTitleAtFoot()
 	// The sort order, on the panel's bottom edge: there is no sidebar to
 	// show it.
 	if opts := panel.sortOptions.data; opts.selected >= 0 && opts.selected < len(opts.options) {

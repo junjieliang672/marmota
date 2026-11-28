@@ -110,7 +110,10 @@ type model struct {
 	macSampler *sysstat.Sampler
 	macStats   *sysstat.Stats
 	// dock is what the Sessions box keeps between visits.
-	dock                 dockState
+	dock dockState
+	// follow is the preview going from session to session on its own while
+	// the keyboard is away (preview_follow.go).
+	follow               previewFollow
 	diff                 diffView // the preview of a session's change to the cursor's file (W)
 	ioReqCnt             int
 	modelQuitState       modelQuitStateType

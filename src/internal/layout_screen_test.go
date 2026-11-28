@@ -71,7 +71,9 @@ func TestTheScreenIsTheSidebarAndThePreviewOverTheSessions(t *testing.T) {
 	panel := m.getFocusedFilePanel()
 	assert.Equal(t, l.body-l.details.h, l.panels[0].h, "the one file panel has the sidebar's rows above Details")
 	assert.Equal(t, 40, l.sidebar.w)
-	assert.True(t, strings.HasPrefix(lines[0], "╭─ "+filepath.Base(panel.location)), lines[0])
+	foot := lines[l.panels[0].h-1]
+	assert.True(t, strings.HasPrefix(foot, "╰─ "+filepath.Base(panel.location)), "a panel's folder is on its bottom edge: %q", foot)
+	assert.True(t, strings.HasPrefix(lines[0], "╭──"), "and its top edge is a line: %q", lines[0])
 	assert.Equal(t, l.details.y, l.panels[0].h, "and goes down to Details")
 	assert.True(t, strings.HasPrefix(at(lines, l.ask.x, l.ask.y), "╭─ Ask → "), "the Ask box under the preview: %q",
 		lines[l.ask.y])
@@ -81,7 +83,9 @@ func TestTheScreenIsTheSidebarAndThePreviewOverTheSessions(t *testing.T) {
 		lines[l.details.y])
 	assert.Equal(t, l.body, l.details.y+l.details.h)
 
-	assert.True(t, strings.HasPrefix(at(lines, l.preview.x, 0), "╭─ Preview "), "the preview right of the sidebar")
+	assert.True(t, strings.HasPrefix(at(lines, l.preview.x, 0), "╭──"), "the preview right of the sidebar")
+	assert.True(t, strings.HasPrefix(at(lines, l.preview.x, l.preview.h-1), "╰─"), "what it shows named on its bottom edge: %q",
+		lines[l.preview.h-1])
 	assert.Contains(t, at(lines, l.sessions.x, l.sessions.y), "Sessions ─", "the Sessions box under the preview")
 	assert.Equal(t, len(m.dockSessions())+common.BorderPadding, l.sessions.h, "a row a session")
 	assert.Equal(t, l.body, l.sessions.y+l.sessions.h)
@@ -160,7 +164,7 @@ func TestFilePanelsAreOneUnderAnother(t *testing.T) {
 		"the first is as tall as its items, one row when it has none")
 	assert.Equal(t, l.panels[0].h, l.panels[1].y, "the second under it")
 	assert.Equal(t, l.details.y, l.panels[1].y+l.panels[1].h, "and down to Details, with the rows no file needs")
-	assert.True(t, strings.HasPrefix(lines[l.panels[1].y], "╭─ "), lines[l.panels[1].y])
+	assert.True(t, strings.HasPrefix(lines[l.panels[1].y+l.panels[1].h-1], "╰─ "), lines[l.panels[1].y+l.panels[1].h-1])
 	assert.Equal(t, one.preview, l.preview, "the preview stays as it is")
 	assert.Equal(t, one.sessions, l.sessions, "and so does the Sessions box")
 	assert.Equal(t, one.details, l.details)
@@ -195,7 +199,7 @@ func TestAFilePanelSaysHowManyOfItsItemsShow(t *testing.T) {
 	shown := big.h - common.BorderPadding - filePanelChromeRows
 	require.Less(t, shown, 200)
 	assert.Contains(t, lines[big.y+big.h-1], fmt.Sprintf(" %d/200 ", shown), "on its bottom edge")
-	assert.NotContains(t, lines[m.lay.panels[0].h-1], "/", "a panel that shows all its items says nothing")
+	assert.NotRegexp(t, `\d+/\d+ ─ name`, lines[m.lay.panels[0].h-1], "a panel that shows all its items says nothing")
 }
 
 // Whichever box has the keyboard, its frame is the one focus color, and no
@@ -210,17 +214,23 @@ func TestTheBoxWithTheKeyboardHasTheFocusColor(t *testing.T) {
 	m := screenTestModel(t, 111)
 	focus := sgr(lipgloss.NewStyle().Foreground(common.FocusBorderColor()))
 	require.Equal(t, "38;2;0;255;0", focus, "the theme's footer_border_active")
-	// lit is the boxes whose top edge is drawn in the focus color, by title.
+	// lit is the boxes whose frame is drawn in the focus color, by title: a
+	// title follows a corner, the top one or the bottom one, after one rune
+	// of the edge.
 	lit := func() []string {
 		m.relayout()
 		var out []string
 		for _, line := range strings.Split(m.View(), "\n") {
-			pieces := strings.Split(line, "╭")
-			for i, piece := range pieces[1:] {
-				// The corner is drawn in the color set last before it.
-				before := pieces[i]
-				if at := strings.LastIndex(before, "\x1b["); at >= 0 && strings.Contains(before[at:], focus) {
-					out = append(out, strings.Fields(ansi.Strip(piece))[1])
+			for _, corner := range []string{"╭", "╰"} {
+				pieces := strings.Split(line, corner)
+				for i, piece := range pieces[1:] {
+					// The corner is drawn in the color set last before it.
+					before := pieces[i]
+					at := strings.LastIndex(before, "\x1b[")
+					if text := ansi.Strip(piece); at >= 0 && strings.Contains(before[at:], focus) &&
+						strings.HasPrefix(text, "─ ") {
+						out = append(out, strings.Fields(text)[1])
+					}
 				}
 			}
 		}

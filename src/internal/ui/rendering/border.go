@@ -33,6 +33,10 @@ type BorderConfig struct {
 	height int
 
 	titleLeftMargin int
+
+	// titleAtFoot draws the title in the bottom border, left of the info
+	// items, and leaves the top border a plain line.
+	titleAtFoot bool
 }
 
 func NewBorderConfig(height int, width int) BorderConfig {
@@ -55,6 +59,68 @@ func (b *BorderConfig) SetTitleSuffix(suffix string) {
 // SetTitleGlyph sets a symbol drawn before the title.
 func (b *BorderConfig) SetTitleGlyph(glyph string) {
 	b.titleGlyph = ansi.Strip(glyph)
+}
+
+// SetTitleAtFoot has the title drawn in the bottom border, at its left.
+func (b *BorderConfig) SetTitleAtFoot() {
+	b.titleAtFoot = true
+}
+
+// infoText is the info items as the bottom border ends with them, each
+// " item " and a rune of the border after it; "" when they have no room.
+func (b *BorderConfig) infoText(bottom string) string {
+	actualWidth := b.width - borderCornerWidth
+	cnt := len(b.infoItems)
+	// Minimum 4 character for each info item so that at least first character is rendered
+	if cnt == 0 || actualWidth < cnt*minInfoItemWidth {
+		return ""
+	}
+	// Max available width for each item's actual content
+	// " " <content> " " border.Bottom
+	availWidth := actualWidth/cnt - borderDividerWidth
+	var infoText strings.Builder
+	for _, item := range b.infoItems {
+		infoText.WriteString(" " + ansi.Truncate(item, availWidth, "") + " " + bottom)
+	}
+	return infoText.String()
+}
+
+// layoutFootTitle fits the title in the bottom border, left of info, the
+// info items as drawn. The title is cut first, with an ellipsis, and its
+// suffix, such as a cursor's "9/15", stays whole while two cells of the
+// title fit before it. It reports false when there is no room.
+func (b *BorderConfig) layoutFootTitle(info string) (titleLayout, bool) {
+	actualWidth := b.width - borderCornerWidth - ansi.StringWidth(info)
+	if b.title == "" || actualWidth < minTitleWidth {
+		return titleLayout{}, false
+	}
+	avail := actualWidth - borderPaddingWidth // a space each side of the text
+	glyph := b.titleGlyph
+	if glyph != "" {
+		avail -= ansi.StringWidth(glyph) + 1
+	}
+	if avail < 1 {
+		return titleLayout{}, false
+	}
+	title, suffix := b.title, b.titleSuffix
+	if suffix != "" {
+		if room := avail - 1 - ansi.StringWidth(suffix); room >= minFootTitleWidth {
+			title = ansi.Truncate(title, room, "…")
+		} else {
+			suffix = ""
+		}
+	}
+	title = ansi.Truncate(title, avail, "…")
+	used := ansi.StringWidth(title)
+	if suffix != "" {
+		used += 1 + ansi.StringWidth(suffix)
+	}
+	l := titleLayout{glyph: glyph, title: title, suffix: suffix, rest: avail - used}
+	if l.rest > b.titleLeftMargin {
+		l.margin = b.titleLeftMargin
+		l.rest -= b.titleLeftMargin
+	}
+	return l, true
 }
 
 // titleLayout is how the top border is laid out around the title:
@@ -137,7 +203,7 @@ func (b *BorderConfig) GetBorder(borderStrings lipgloss.Border) lipgloss.Border 
 
 	// The title sits in the top border with a space each side, as in
 	// "╭─ asset 9/15 ───╮". The renderer draws it again in its own colors.
-	if l, ok := b.layoutTitle(); ok {
+	if l, ok := b.layoutTitle(); ok && !b.titleAtFoot {
 		text := l.title
 		if l.suffix != "" {
 			text += " " + l.suffix
@@ -146,21 +212,11 @@ func (b *BorderConfig) GetBorder(borderStrings lipgloss.Border) lipgloss.Border 
 			strings.Repeat(borderStrings.Top, l.rest)
 	}
 
-	cnt := len(b.infoItems)
-	// Minimum 4 character for each info item so that at least first character is rendered
-	if cnt > 0 && actualWidth >= cnt*minInfoItemWidth {
-		// Max available width for each item's actual content
-		// " " <content> " " border.Bottom
-		availWidth := actualWidth/cnt - borderDividerWidth
-		var infoText strings.Builder
-		for _, item := range b.infoItems {
-			infoText.WriteString(" " + ansi.Truncate(item, availWidth, "") + " " + borderStrings.Bottom)
-		}
-
+	if infoText := b.infoText(borderStrings.Bottom); infoText != "" {
 		// Fill the rest with border char.
-		remainingWidth := actualWidth - ansi.StringWidth(infoText.String())
+		remainingWidth := actualWidth - ansi.StringWidth(infoText)
 
-		res.Bottom = strings.Repeat(borderStrings.Bottom, remainingWidth) + infoText.String()
+		res.Bottom = strings.Repeat(borderStrings.Bottom, remainingWidth) + infoText
 	}
 
 	if len(b.dividerIdx) > 0 {
