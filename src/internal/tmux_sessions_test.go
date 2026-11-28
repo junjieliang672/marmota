@@ -164,6 +164,35 @@ func TestShowingSessionsUsesOnePaneBesideMarmota(t *testing.T) {
 	assert.Equal(t, m.tmux.viewer, wez.active, "with focus the keyboard goes to it")
 }
 
+// The tmux server a pane beside Marmota was attached to ended, and WezTerm
+// kept the pane: its view is gone, and tmux would say "can't find session".
+func TestAPaneWhoseViewEndedGivesWayToANewOne(t *testing.T) {
+	ownTmux(t)
+	m := newClaudeTestModel(t)
+	wez := newFakeWezterm(t, marmotaTab())
+
+	first, err := m.launchParkedAgent(t.TempDir(), "sleep 60", managedAgentProviderClaude, "one")
+	require.NoError(t, err)
+	second, err := m.launchParkedAgent(t.TempDir(), "sleep 60", managedAgentProviderClaude, "two")
+	require.NoError(t, err)
+	_, err = m.showTmuxPane(first, "one", false)
+	require.NoError(t, err)
+	old := m.tmux.viewer
+	// The fake WezTerm runs nothing in its panes: there is no view.
+
+	_, err = m.showTmuxPane(second, "two", false)
+	require.NoError(t, err)
+	splits := 0
+	for _, cmd := range wez.commands {
+		if strings.Contains(cmd, "split-pane") {
+			splits++
+		}
+	}
+	assert.Equal(t, 2, splits, "a new pane shows the session")
+	assert.Contains(t, wez.commands, fmt.Sprintf("wezterm cli kill-pane --pane-id %d", old), "the old pane closes")
+	assert.NotEqual(t, old, m.tmux.viewer)
+}
+
 func TestARestartedMarmotaFindsTheSessionsInTmux(t *testing.T) {
 	ownTmux(t)
 	m := newClaudeTestModel(t)

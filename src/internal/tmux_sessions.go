@@ -533,6 +533,16 @@ func (m *model) showTmuxPane(id int, title string, focus bool) (string, error) {
 		}
 		m.tmux.viewer, m.tmux.viewWindow, shown = 0, "", false
 	}
+	if shown && c != nil && c.ViewWindow(view) == "" {
+		// The pane is there and its view isn't: the tmux server it was
+		// attached to ended, and WezTerm keeps a pane whose program failed.
+		// tmux would answer "can't find session: view-0"; a new pane takes
+		// its place.
+		if err := killWeztermPane(cwd, viewer.PaneID); err != nil {
+			slog.Debug("Could not close the pane whose view ended", "pane", viewer.PaneID, "error", err)
+		}
+		m.tmux.viewer, m.tmux.viewWindow, shown = 0, "", false
+	}
 	switch {
 	case shown && m.tmux.viewWindow == ref.window:
 		if err := activateWeztermPane(cwd, viewer.PaneID); err != nil {

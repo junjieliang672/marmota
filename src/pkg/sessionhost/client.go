@@ -320,10 +320,59 @@ type shellRun struct {
 	code  int
 }
 
+// controlClient is the shell line that runs the connection's tmux client.
+//
+// Its output goes through cat, then through a second cat that reads on to
+// nowhere once the first has ended. The tmux server writes a control
+// client's output itself, and lets the client go only when all of it is
+// written. When the program reading it dies with a line still to come, the
+// write fails, the line stays, and the server keeps the client for good:
+// Marmota and the pane beside it closing together is enough, since the
+// server then has "%client-detached" to say. With something always reading,
+// the server writes the line, sees the input has ended and lets go.
+func controlClient() string {
+	return Tmux() + " -u -C new-session -A -s " + TmuxSession + " -n _ -x 200 -y 50 'exec cat'" +
+		" | { cat; exec cat >/dev/null; }"
+}
+
+// stuckServer is what a tmux client says of a server that takes its
+// connection and closes it.
+const stuckServer = "server exited unexpectedly"
+
+// endStuckServer is the script that ends a tmux server which was told to
+// exit and can't. Such a server has ended its sessions and waits for its
+// clients to go; one it never lets go of (see controlClient; a Marmota from
+// before 2026-11-26 left them) keeps it there for good, closing every new
+// connection, so that neither a session nor a new server starts. Nothing
+// runs in it any more: the server and the clients it holds are ended, and
+// its socket taken away in case the server wasn't found by its command
+// line. The script asks the server once more first, and leaves one that
+// answers alone.
+const endStuckServer = `sock="${MARMOTA_TMUX_SOCKET:-` + "%SOCKET%" + `}"
+case "$(tmux -L "$sock" has-session 2>&1)" in
+*"` + stuckServer + `"*)
+	pkill -9 -u "$(id -u)" -f "^([^ ]*/)?tmux -L $sock " 2>/dev/null
+	rm -f "${TMUX_TMPDIR:-/tmp}/tmux-$(id -u)/$sock"
+	;;
+esac
+`
+
 // Dial starts the connection and waits until tmux answers. What the command
 // printed before tmux started, such as a login prompt or ssh's error, comes
-// back in the error.
+// back in the error. A server that can't exit (see endStuckServer) is ended,
+// and the connection started again.
 func Dial(ctx context.Context, h Host) (*Client, error) {
+	c, err := dial(ctx, h)
+	var failed *DialError
+	if err == nil || !errors.As(err, &failed) || !strings.Contains(failed.Output, stuckServer) {
+		return c, err
+	}
+	argv := h.Argv(Script(strings.ReplaceAll(endStuckServer, "%SOCKET%", Socket)))
+	_ = exec.CommandContext(ctx, argv[0], argv[1:]...).Run() //nolint:gosec // the command config.toml gives
+	return dial(ctx, h)
+}
+
+func dial(ctx context.Context, h Host) (*Client, error) {
 	// The config is written first, so a server that starts reads it; the
 	// first window is a shell that waits, as a session can't be empty.
 	start := `mkdir -p "$HOME/.config/marmota" && cat > "` + configPath + `" <<'MARMOTA_TMUX_CONF'` + "\n" +
@@ -331,9 +380,12 @@ func Dial(ctx context.Context, h Host) (*Client, error) {
 	if !h.Local {
 		start += strings.ReplaceAll(guiServer, "%SOCKET%", Socket)
 	}
-	start += "exec " + Tmux() + " -u -C new-session -A -s " + TmuxSession + " -n _ -x 200 -y 50 'exec cat'"
+	start += controlClient()
 	argv := h.Argv(Script(start))
 	cmd := exec.Command(argv[0], argv[1:]...) //nolint:gosec // the command config.toml gives
+	// The shell is what Close ends when tmux doesn't answer; its tmux
+	// client and the cats may outlive it, holding its error output open.
+	cmd.WaitDelay = time.Second
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err
@@ -382,6 +434,12 @@ func Dial(ctx context.Context, h Host) (*Client, error) {
 		return nil, err
 	}
 	c.reattachOnNewConfig()
+	// A Marmota from before 2026-11-26, here or on a computer that connects
+	// to this one, leaves its tmux client behind when it dies (see
+	// controlClient): a control client whose parent is gone, which the
+	// server holds until it is ended.
+	_, _ = c.Shell(Tmux()+` list-clients -F '#{client_pid} #{client_control_mode}' | while read -r pid control; do `+
+		`[ "$control" = 1 ] && [ "$(ps -o ppid= -p "$pid" | tr -d ' ')" = 1 ] && kill "$pid"; done; true`, commandTimeout)
 	// The editor a session opens asks this y where the prompt's cursor was.
 	// Only y itself is named, not a test of it or another program.
 	if exe, err := os.Executable(); err == nil && h.Local && filepath.Base(exe) == "y" {

@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 	"unicode/utf8"
@@ -88,6 +90,83 @@ func TestARunningServerTakesTheConfigAgainOnEachConnection(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 1, n, "loading it again adds nothing twice: %v", features)
+}
+
+// unreadClient runs a tmux control client on the test's server whose output
+// nobody reads, gives the server more to say to it than its pipes hold, and
+// then closes both ends: a Marmota that died with output still to come.
+func unreadClient(t *testing.T, c *Client, script string) {
+	t.Helper()
+	inR, inW, err := os.Pipe()
+	require.NoError(t, err)
+	outR, outW, err := os.Pipe()
+	require.NoError(t, err)
+	cmd := exec.Command("/bin/sh", "-c", Script(script))
+	cmd.Stdin, cmd.Stdout = inR, outW
+	require.NoError(t, cmd.Start())
+	_, _ = inR.Close(), outW.Close()
+	t.Cleanup(func() {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+	})
+	waitFor(t, "the second connection", func() bool { return controlClients(t, c) == 2 })
+
+	windows, err := c.Command("list-windows -F '#{window_id}'")
+	require.NoError(t, err)
+	require.NotEmpty(t, windows)
+	for i := range 400 { // each renaming is a line of 1 KB to every control client
+		_, err := c.Command("rename-window -t " + windows[0] + " " + strings.Repeat("x", 1000) + strconv.Itoa(i))
+		require.NoError(t, err)
+	}
+	_, _ = inW.Close(), outR.Close()
+}
+
+// controlClients is how many control clients the server holds.
+func controlClients(t *testing.T, c *Client) int {
+	t.Helper()
+	lines, err := c.Command("list-clients -F '#{client_control_mode}'")
+	require.NoError(t, err)
+	n := 0
+	for _, line := range lines {
+		if line == "1" {
+			n++
+		}
+	}
+	return n
+}
+
+func TestTheServerLetsGoOfAConnectionWhoseReaderDied(t *testing.T) {
+	c := localClient(t)
+	unreadClient(t, c, controlClient())
+	waitFor(t, "the server to let go of it", func() bool { return controlClients(t, c) == 1 })
+}
+
+func TestAServerThatCannotExitIsEndedAndTheConnectionStartsAgain(t *testing.T) {
+	c := localClient(t)
+	lines, err := c.Command("display-message -p '#{pid}'")
+	require.NoError(t, err)
+	require.Len(t, lines, 1)
+	server, err := strconv.Atoi(lines[0])
+	require.NoError(t, err)
+	// A connection as Marmota ran it before: tmux alone, which the server
+	// never lets go of once its output can't be written.
+	unreadClient(t, c, "exec "+Tmux()+" -u -C attach-session -t "+TmuxSession)
+	c.Close()
+	_ = exec.Command("tmux", "-L", Socket, "kill-server").Run()
+	said, _ := exec.Command("tmux", "-L", Socket, "has-session").CombinedOutput()
+	if !strings.Contains(string(said), stuckServer) {
+		t.Skip("this tmux lets go of a client whose output can't be written: " + string(said))
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	again, err := Dial(ctx, Host{Local: true})
+	require.NoError(t, err, "the server that couldn't exit is ended, and a new one starts")
+	defer again.Close()
+	lines, err = again.Command("display-message -p '#{pid}'")
+	require.NoError(t, err)
+	assert.NotEqual(t, []string{strconv.Itoa(server)}, lines, "a new server")
+	waitFor(t, "the old server to be gone", func() bool { return syscall.Kill(server, 0) != nil })
 }
 
 func TestShellRunsOverThereAndReturnsItsOutput(t *testing.T) {
